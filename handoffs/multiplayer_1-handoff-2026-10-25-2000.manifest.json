@@ -1,0 +1,201 @@
+{
+    "project":  "multiplayer_1",
+    "status":  "paused by user",
+    "createdUtc":  "2026-10-26T00:04:02.3787047Z",
+    "sourceRoot":  "C:\\Users\\tyler\\Main Storage\\multiplayer_1",
+    "archiveName":  "multiplayer_1-handoff-2026-10-25-2000.zip",
+    "scope":  "Root README.md, AGENTS.md, and all docs. Source sibling projects and chat transcripts excluded.",
+    "fileCount":  38,
+    "files":  [
+                  {
+                      "path":  "AGENTS.md",
+                      "bytes":  3024,
+                      "sha256":  "D483DCF4A07F3C2F4D74CF7ADF69C417224613072CBD40DDDA8D4C7618B1D3E2"
+                  },
+                  {
+                      "path":  "docs/art-direction/A-graphic-brutalism.png",
+                      "bytes":  2165316,
+                      "sha256":  "A09E2653E5349AD9162B8BF476D7CC0927041DFB6F4F14340CC4472481361627"
+                  },
+                  {
+                      "path":  "docs/art-direction/B-painted-concrete.png",
+                      "bytes":  2021229,
+                      "sha256":  "59661B5D493AA3EE22CBC17D8BFC65BD88FA31C6FB4BC0D5E2CB7829F3E4BE8B"
+                  },
+                  {
+                      "path":  "docs/art-direction/C1-rooftop-rebels.png",
+                      "bytes":  2473794,
+                      "sha256":  "F1FF78A5F86817F48540751E43C5CD22893A8743DC15512426C13C583F84C4EF"
+                  },
+                  {
+                      "path":  "docs/art-direction/C2-scrapyard-machines.png",
+                      "bytes":  2511333,
+                      "sha256":  "11A1DEC5E4EDDB77C293EE8415F73489F2FF7CE781B18312FE5185D488A80EE2"
+                  },
+                  {
+                      "path":  "docs/art-direction/C3-1-wildstone-modern.png",
+                      "bytes":  2195986,
+                      "sha256":  "D5905F3E52D1AF4CE72E4F858EE511628F4DC417B3A0E623CB40379536D3B7DD"
+                  },
+                  {
+                      "path":  "docs/art-direction/C3-modern-prompts.md",
+                      "bytes":  4028,
+                      "sha256":  "3FD5B7F8170CA9EB77ED2F62A2BED0E3888361997E3E07ADD87B248E9F456F2E"
+                  },
+                  {
+                      "path":  "docs/art-direction/C3-wildstone-ruins.png",
+                      "bytes":  2653719,
+                      "sha256":  "93CF3DD2688D16A9703C0881D7C80B19DFB391B4F5397045CC7FF449414E8127"
+                  },
+                  {
+                      "path":  "docs/art-direction/C-ink-concrete.png",
+                      "bytes":  2293212,
+                      "sha256":  "A168CBD8F4DB5D2842CDCDE19CBE2ACCCDAEAE391E8D00EF187C364277F66D99"
+                  },
+                  {
+                      "path":  "docs/art-direction/C-variations.md",
+                      "bytes":  2914,
+                      "sha256":  "79F44E7E98E11F370ED21DEEE24B8AB0FB91EBE9B17BF3AA754ECCE2A290DBC1"
+                  },
+                  {
+                      "path":  "docs/art-direction/C-variations-prompts.md",
+                      "bytes":  12447,
+                      "sha256":  "2DCCC260278B894C6EDCA1C55F47C006AD2CBF7E507896A3F3F231AC75F52D18"
+                  },
+                  {
+                      "path":  "docs/art-direction/prompts.md",
+                      "bytes":  10097,
+                      "sha256":  "5D23B337FA3AE07B970E747277EF1FA4417C9A72B59F9C4B84ECC100F4702D2B"
+                  },
+                  {
+                      "path":  "docs/art-direction/README.md",
+                      "bytes":  4779,
+                      "sha256":  "282EF22F2A80A33328870DB50C1AA1E4361154D6801B8F0D394B4189992183FF"
+                  },
+                  {
+                      "path":  "docs/art-direction/references/vholume-steam-demo.jpg",
+                      "bytes":  222638,
+                      "sha256":  "07E9EBCE38E22156B197D346966B5656C8746382E3D217E2D20EB723A72E0C26"
+                  },
+                  {
+                      "path":  "docs/art-direction/W01-line-driver.png",
+                      "bytes":  1707655,
+                      "sha256":  "1B367F107C78F6421A9E66E84C183C8D685DB57657546EE2A20AADB00F413FDD"
+                  },
+                  {
+                      "path":  "docs/art-direction/W01-line-driver-simple-v2.png",
+                      "bytes":  1673570,
+                      "sha256":  "56247564A3A26BE10D946E4AE5751A261BF3A4BB15AA91EEAE1FB262999A5CAD"
+                  },
+                  {
+                      "path":  "docs/art-direction/W02-pulse-lobber.png",
+                      "bytes":  1969937,
+                      "sha256":  "D1B278D15895497234BB5A27ECC65D63B82F3A1BE62B232EB5CD17F0A3E29552"
+                  },
+                  {
+                      "path":  "docs/art-direction/W02-pulse-lobber-simple-v2.png",
+                      "bytes":  1726474,
+                      "sha256":  "4682ECABA6FFE8290282367CA4B791A975316BF1AEFDE2B15D9C80B36EE9364B"
+                  },
+                  {
+                      "path":  "docs/art-direction/W03-rebound-disc.png",
+                      "bytes":  1801179,
+                      "sha256":  "459DB86C0572F205992D4E5BA7772D99A13D6F62AD832BD5665E1B30D167E744"
+                  },
+                  {
+                      "path":  "docs/art-direction/W03-rebound-disc-simple-v2.png",
+                      "bytes":  1631276,
+                      "sha256":  "C51DC46448CA5A0D056BAF5A4DC96A3D7DA681F72B527BAC055127FCE39505AE"
+                  },
+                  {
+                      "path":  "docs/art-direction/W04-push-lens.png",
+                      "bytes":  1833610,
+                      "sha256":  "E7DBB6B4F232CFDE9A6D522073FD32F8D1ECD43797D822B27ED2F1E65848EE41"
+                  },
+                  {
+                      "path":  "docs/art-direction/W04-push-lens-simple-v2.png",
+                      "bytes":  1709842,
+                      "sha256":  "252EEBA0D5E0805FFB1DDE4EE85ECB3020651353307FA13C9A611B9B2C061290"
+                  },
+                  {
+                      "path":  "docs/art-direction/weapon-concepts.md",
+                      "bytes":  3739,
+                      "sha256":  "6DF95A51832D1855B1E33645C58A73B66C155FEFE242B112F1DAFDFD80643FA1"
+                  },
+                  {
+                      "path":  "docs/art-direction/weapon-concepts-prompts.md",
+                      "bytes":  10522,
+                      "sha256":  "AD6C1B788CD60112C900450CBCC1CE58710ADAD4E502EE87B1290955BD19D55B"
+                  },
+                  {
+                      "path":  "docs/art-direction/weapon-simplification-prompts.md",
+                      "bytes":  12846,
+                      "sha256":  "9A82D18D4DA6BE4BA3C118B3ED484A9239007C0C166176CCEFC851E9207A8629"
+                  },
+                  {
+                      "path":  "docs/ASSET-PIPELINE.md",
+                      "bytes":  8823,
+                      "sha256":  "7664B9DF9B31F9EF4EEB566DC9CA4E85C397F5E586E0550063A644BDBB567EFE"
+                  },
+                  {
+                      "path":  "docs/BACKLOG.md",
+                      "bytes":  2049,
+                      "sha256":  "20662E3B1E62703CBB5C2C6CF82433D93E270FD683BE17804B1FF133C95A80D7"
+                  },
+                  {
+                      "path":  "docs/DECISIONS.md",
+                      "bytes":  3210,
+                      "sha256":  "54C8A10016252DF255EBB1E2C0E64CE54DD027B279E6975ACF4E2575CB4AF2F7"
+                  },
+                  {
+                      "path":  "docs/HANDOFF.md",
+                      "bytes":  3965,
+                      "sha256":  "B47553DE0643C3CCBF81B222AF172A69B01C3A94806F2148FD3D1DC69FF98F98"
+                  },
+                  {
+                      "path":  "docs/handoffs/2026-10-25-paused-project.md",
+                      "bytes":  15994,
+                      "sha256":  "8D38FE72B9CFBA231EA792812C0CD2B96D562AF484ED0BDA8EA91D17C64DC2E7"
+                  },
+                  {
+                      "path":  "docs/README.md",
+                      "bytes":  2601,
+                      "sha256":  "E343147E747BF31C8FD4B71C106E0E16644CA1141B21AB4ABCBE3C7DCDDF0063"
+                  },
+                  {
+                      "path":  "docs/superpowers/specs/2026-10-25-arena-combat-items-zone-design.md",
+                      "bytes":  11586,
+                      "sha256":  "37ECF826A99692FD7BCDCD4CB796288FE2388C3D3BCC43AAC0044BB43FE22525"
+                  },
+                  {
+                      "path":  "docs/superpowers/specs/2026-10-25-characters-weapons-design-workflow.md",
+                      "bytes":  7886,
+                      "sha256":  "2B9828A29F82DE17270E68FDE18D01691907F39A2F763614402CC1C605E61D28"
+                  },
+                  {
+                      "path":  "docs/superpowers/specs/2026-10-25-multiplayer-arena-design.md",
+                      "bytes":  17879,
+                      "sha256":  "E339D14494E0186AA77DE8CB1C450E2DDF63A55F1C79C0A290322663997297DF"
+                  },
+                  {
+                      "path":  "docs/superpowers/specs/2026-10-25-multiplayer-foundation-design.md",
+                      "bytes":  35192,
+                      "sha256":  "CF2C97365EB2A0A9B46E94DF7E2B6A87B8C28375A9B03692A2BAC3D34C8E491E"
+                  },
+                  {
+                      "path":  "docs/superpowers/specs/2026-10-25-unity-rendering-design.md",
+                      "bytes":  12643,
+                      "sha256":  "1F18DC134E85D54F69EA4B8175E6B23C8814C2ECC7313F56EE8B1C7FDE3D61B2"
+                  },
+                  {
+                      "path":  "docs/superpowers/specs/2026-10-25-wildstone-modern-map-design.md",
+                      "bytes":  7136,
+                      "sha256":  "21C16D1005912FF178CF25B2889B9881B07F183C89284E00F6EBECCBD9DC7612"
+                  },
+                  {
+                      "path":  "README.md",
+                      "bytes":  1571,
+                      "sha256":  "9340FA9F9334B4856E7C4894D03FBDA0F5EB7DD383C17C1E3C4312DB7C018D7A"
+                  }
+              ]
+}
