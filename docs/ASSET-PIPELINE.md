@@ -1,7 +1,8 @@
 # Blender and Unity asset pipeline
 
-Date: 2026-10-25. Status: proposed production procedure, grounded in read-only
-source inspection. No models were generated, imported or tested here.
+Updated: 2026-10-27. The isolated Blender environment and native Unity asymmetric
+axis fixture pass. Production model moving visual acceptance remains open. See
+[MVP progress](MVP-PROGRESS.md) for current evidence.
 Return to the [documentation index](README.md). The
 [rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md) owns graphics
 strategy; [combat](superpowers/specs/2026-10-25-arena-combat-items-zone-design.md)
@@ -11,20 +12,21 @@ owns visual review.
 Use Blender and Unity to build editable maps, humans and weapons. Audit
 `C:\Users\tyler\Main Storage\vibegame1` first and selectively inspect sibling
 `ai_skelly_tool`; leave both projects untouched. Multiplayer authority, prediction, reconciliation and replicated state
-are new Fusion integration, not inherited single-player behavior. Foundation proof
-precedes arena production.
+are new Fusion integration, not inherited single-player behavior. The user's D018
+instruction permits independent asset work while Photon provisioning is pending;
+it does not waive foundation or imported-asset acceptance.
 
 ## Tool and project preflight
 
-Unity MCP tools are available in this session, but no `multiplayer_1` Editor instance
-was verified. Before editing, enumerate instances, verify the project path, and pin
-this project's own instance. Never reuse the source project's instance or another
-checkout's identifier. This workspace currently has no imported Unity project.
+Native batch Unity now runs against the isolated `mvp-2` project through
+[TOOLING](TOOLING.md). No Unity MCP bridge is configured in this worktree.
+Before any future bridge-based editing, enumerate instances and verify the exact
+project path. Never reuse another checkout's instance identifier.
 
 `Get-Command blender` found no executable on PATH; no Blender MCP tool was observed.
-The source scripts use `bpy` through sibling `ai_skelly_tool`; its
-`.venv/Scripts/python.exe` and `stages/rig.py` exist, but execution and installed
-versions were not verified. Check the actual executable/environment before use.
+The source scripts use `bpy` through sibling `ai_skelly_tool`. Its
+`.venv/Scripts/python.exe -B` was verified to run Python 3.11.16 and bpy/Blender 4.2.0
+in background mode. The isolated process writes assets only into this destination.
 An available Blender CLI or compatible existing `bpy` environment is sufficient;
 do not require a new plugin. Audit scripts' hard-coded source/output paths and
 dependencies before adapting them into this workspace. Do not run them against
@@ -32,17 +34,18 @@ the original checkout.
 
 ## Verified reuse leads
 
-Paths below are relative to the read-only `vibegame1` root. Existence and the named
+Source-qualified paths below use the read-only roots in [SOURCE-REUSE](SOURCE-REUSE.md).
+Existence and the named
 code paths were inspected; compatibility, licensing and visual fit still need review.
 
 | Existing source | Decision and reason |
 | --- | --- |
-| [Assets/Editor/LevelStudio/](../../vibegame1/Assets/Editor/LevelStudio/) and [LevelDefinitionBuilder.cs](../../vibegame1/Assets/Editor/LevelDefinitionBuilder.cs) | Adapt native authoring. `BuildWorldContent` uses an explicit root without opening/saving scenes or creating campaign managers; audit optional runtime behaviors before reuse. |
-| [LevelPieceFactory.cs](../../vibegame1/Assets/Scripts/Level/LevelPieceFactory.cs), [LevelMesh.cs](../../vibegame1/Assets/Scripts/Level/LevelMesh.cs) | Reuse procedural structural geometry where faster. Structural boxes retain BoxColliders while rendering shared chamfered meshes. |
-| [Tools/env_models/build_architecture.py](../../vibegame1/Tools/env_models/build_architecture.py), [LevelArchitectureBuilder.cs](../../vibegame1/Assets/Editor/LevelArchitectureBuilder.cs), [ArchitectureKitPlan.cs](../../vibegame1/Assets/Editor/ArchitectureKitPlan.cs) | Adapt modular sizing/export conventions; simplify the old detailed masonry to the accepted modernist forms. |
-| [Tools/weapon_models/build_weapons.py](../../vibegame1/Tools/weapon_models/build_weapons.py), [build_laser_kit.py](../../vibegame1/Tools/weapon_models/build_laser_kit.py) | Adapt geometry, grip/emitter and export-roundtrip checks; replace ornate surface treatment. Audit sibling helper dependencies. |
-| [output/laser-kit/LaserPistol.blend](../../vibegame1/output/laser-kit/LaserPistol.blend), [Assets/Art/Weapons/Modeled/](../../vibegame1/Assets/Art/Weapons/Modeled/), [Assets/Art/Viewmodels/](../../vibegame1/Assets/Art/Viewmodels/) | Editable source/export and hand-fit leads. Preserve useful geometry and anchors; they do not prove a suitable full human rig. |
-| [WeaponViewmodel.cs](../../vibegame1/Assets/Scripts/Player/WeaponViewmodel.cs), [PrefabFactory.cs](../../vibegame1/Assets/Editor/PrefabFactory.cs) | Adapt local presentation/attachment setup after dependency tracing. Rewrite network ownership and combat integration: `LaserPistol` uses global `GameEvents`; `LaserShot` damages source enemies. |
+| `vibegame1/Assets/Editor/LevelStudio/` and `vibegame1/Assets/Editor/LevelDefinitionBuilder.cs` | Adapt native authoring. `BuildWorldContent` uses an explicit root without opening/saving scenes or creating campaign managers; audit optional runtime behaviors before reuse. |
+| `vibegame1/Assets/Scripts/Level/LevelPieceFactory.cs`, `vibegame1/Assets/Scripts/Level/LevelMesh.cs` | Reuse procedural structural geometry where faster. Structural boxes retain BoxColliders while rendering shared chamfered meshes. |
+| `vibegame1/Tools/env_models/build_architecture.py`, `vibegame1/Assets/Editor/LevelArchitectureBuilder.cs`, `vibegame1/Assets/Editor/ArchitectureKitPlan.cs` | Adapt modular sizing/export conventions; simplify the old detailed masonry to the accepted modernist forms. |
+| `vibegame1/Tools/weapon_models/build_weapons.py`, `vibegame1/Tools/weapon_models/build_laser_kit.py` | Adapt geometry, grip/emitter and export-roundtrip checks; replace ornate surface treatment. Audit sibling helper dependencies. |
+| `vibegame1/output/laser-kit/LaserPistol.blend`, `vibegame1/Assets/Art/Weapons/Modeled/`, `vibegame1/Assets/Art/Viewmodels/` | Editable source/export and hand-fit leads. Preserve useful geometry and anchors; they do not prove a suitable full human rig. |
+| `vibegame1/Assets/Scripts/Player/WeaponViewmodel.cs`, `vibegame1/Assets/Editor/PrefabFactory.cs` | Adapt local presentation/attachment setup after dependency tracing. Rewrite network ownership and combat integration: `LaserPistol` uses global `GameEvents`; `LaserShot` damages source enemies. |
 
 Do not carry source global pause, hitstop/time-scale mutation or campaign `GameEvents`
 into shared simulation. Preserve movement laws through the foundation's explicit
@@ -52,16 +55,16 @@ fixed-tick adaptation rather than treating asset reuse as multiplayer conversion
 
 Read-only inspection found useful code, not executed proof:
 
-- [stages/rig.py](../../ai_skelly_tool/stages/rig.py): humanoid armature/binding helpers
+- `ai_skelly_tool/stages/rig.py`: humanoid armature/binding helpers
   and bind-frame-aware FBX export. Existing `vibegame1` weapon builders already
   import its helpers. The heuristic body fitter still needs comparison against
   the deliberately simple shared human; do not adopt it unquestioningly.
-- [stages/weapon.py](../../ai_skelly_tool/stages/weapon.py): hand sockets, blade
+- `ai_skelly_tool/stages/weapon.py`: hand sockets, blade
   clearance and two-hand grip helpers. Reuse attachment/measurement ideas, not
   boss hit events as multiplayer damage authority.
-- [tests/test_skin_stretch.py](../../ai_skelly_tool/tests/test_skin_stretch.py),
-  [test_mesh_artifacts.py](../../ai_skelly_tool/tests/test_mesh_artifacts.py) and
-  [test_anim_quality.py](../../ai_skelly_tool/tests/test_anim_quality.py): deformation
+- `ai_skelly_tool/tests/test_skin_stretch.py`,
+  `ai_skelly_tool/tests/test_mesh_artifacts.py` and
+  `ai_skelly_tool/tests/test_anim_quality.py`: deformation
   and motion validation candidates. Audit sidecar/helper dependencies and calibrate
   thresholds on our mesh rather than inheriting enemy acceptance results.
 
@@ -94,6 +97,17 @@ geometry, pivot, handedness, normals, grip/muzzle orientation, material mapping 
 nonuniform scale. For a rig, also verify bind pose, bone orientation, skin weights,
 animation scale and foot contact. Save the successful settings and checks before
 batch production; a Blender-only reimport does not prove Unity correctness.
+
+The authored models use Blender `(X,-Z,Y)` and FBX `-Z` forward / `Y` up. Native
+import exposed an X reflection: the fixture Grip imported at `(-.12,.10,-.05)`
+instead of the authored `(.12,.10,-.05)`. `WildstoneModelImportPostprocessor`
+corrects handedness on the imported root with an X scale reflection, restricted to
+the fifteen named procedural models in `Assets/Wildstone/Art/`; other models are
+untouched. Editable sources and FBX exports remain unchanged.
+Keep the imported root's axis rotation and reflection when instantiating models.
+Fixture checks use asset coordinates including that root, matching the presentation
+builder. This import correction requires native fixture/rig/presentation acceptance;
+source/export hash checks alone do not validate it.
 
 ## Production branches and acceptance
 

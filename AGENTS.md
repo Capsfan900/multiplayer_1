@@ -3,7 +3,8 @@
 Before work, read [docs/README.md](docs/README.md), [HANDOFF](docs/HANDOFF.md) and
 the relevant canonical spec. For continuation, use [BACKLOG](docs/BACKLOG.md) to
 find the next actionable stage; confirm current evidence before treating a stage
-as complete. This is currently a documentation/concept workspace, not a Unity build.
+as complete. Unity MVP implementation is active; consult the progress ledger for
+the distinction between authored files, passing local checks and online evidence.
 
 ## Preserve the project boundary
 

@@ -1,0 +1,1 @@
+{"name":"Wildstone.PlayModeTests","rootNamespace":"Wildstone.Tests","references":["Wildstone.Runtime","Unity.InputSystem"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}

@@ -1,0 +1,10 @@
+{
+  "name": "Wildstone.Fusion.EditModeTests",
+  "rootNamespace": "Wildstone.Tests",
+  "references": ["Wildstone.Runtime", "Wildstone.Fusion", "Fusion.Unity", "Photon.Realtime"],
+  "includePlatforms": ["Editor"],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll", "Fusion.Runtime.dll", "Fusion.Realtime.dll", "Fusion.Common.dll", "Fusion.Sockets.dll", "Fusion.Log.dll", "PhotonClient.dll", "NanoSockets.dll"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

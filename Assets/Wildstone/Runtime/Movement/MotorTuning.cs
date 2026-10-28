@@ -1,0 +1,105 @@
+using UnityEngine;
+namespace Wildstone.Movement
+{
+    // Shipped Player.prefab at vibegame1 2cb6e576; immutable for one simulation life.
+    public sealed class MotorTuning
+    {
+        public const float TickDelta = 1f / 120f;
+        public const int PlayerLayer = 6;
+        public const int WorldMask = ~((1 << 6) | (1 << 7) | (1 << 8));
+        public static readonly MotorTuning Source = new MotorTuning();
+        public readonly float height=1.8f, radius=.4f, slopeLimit=45f, stepOffset=.4f, skinWidth=.05f, minMoveDistance=.001f;
+        public readonly Vector3 center=new Vector3(0,.9f,0);
+        MotorTuning() { }
+        public readonly float groundSpeed = 11f;
+        public readonly float groundAccel = 90f;
+        public readonly float groundFriction = 14f;
+        public readonly float airAccel = 35f;
+        public readonly float gravity = -30f;
+        public readonly float jumpHeight = 2.4f;
+        public readonly float jumpCutGravityMultiplier = 1.2f;
+        public readonly float coyoteTime = 0.12f;
+        public readonly float jumpBuffer = 0.12f;
+        public readonly float dashSpeed = 22f;
+        public readonly float dashDuration = 0.16f;
+        public readonly float dashCooldown = 0.6f;
+        public readonly float slideBoost = 5f;
+        public readonly float slideMaxSpeed = 22f;
+        public readonly float slideMinEntrySpeed = 5f;
+        public readonly float slideFriction = 2f;
+        public readonly float slideEndSpeed = 8f;
+        public readonly float slideMaxDuration = 0.9f;
+        public readonly float slideSlopeAccel = 0.85f;
+        public readonly float slideCooldown = 0.3f;
+        public readonly float slideHeight = 0.9f;
+        public readonly float slideSteerAccel = 8f;
+        public readonly float wallCheckDistance = 0.55f;
+        public readonly float wallJumpUpSpeed = 11f;
+        public readonly float wallJumpPushSpeed = 12f;
+        public readonly int maxWallJumps = 5;
+        public readonly float sameWallCosineLimit = 0.85f;
+        public readonly float wallRunMinEntrySpeed = 6f;
+        public readonly float wallRunMaxEntryFallSpeed = 9f;
+        public readonly float wallRunMaxApproachCos = 0.8f;
+        public readonly float wallRunMinLookAlongCos = -0.05f;
+        public readonly float wallRunMaxDuration = 1.75f;
+        public readonly float wallRunGravityStartScale = 0.1f;
+        public readonly float wallRunGravityEndScale = 0.6f;
+        public readonly float wallRunEntryUpSpeed = 3f;
+        public readonly float wallRunSpeedDecay = 0.35f;
+        public readonly float wallRunMinSustainSpeed = 4f;
+        public readonly float wallRunAccel = 14f;
+        public readonly float wallRunStickSpeed = 2.5f;
+        public readonly float wallRunReleaseCos = 0.5f;
+        public readonly float wallRunExitUpSpeed = 10f;
+        public readonly float wallRunExitPushSpeed = 7f;
+        public readonly float wallRunExitTangentBoost = 4f;
+        public readonly int maxWallRuns = 6;
+        public readonly float wallRunCooldown = 0.2f;
+        public readonly float wallRunCameraRoll = 13f;
+        public readonly float wallRunExitRollKick = 7f;
+        public readonly float wallRunTopSpeed = 13.75f;
+        public readonly float wallRunLostGrace = 0.15f;
+        public readonly float wallRunExitGrace = 0.3f;
+        public readonly float airSoftCap = 17.6f;
+        public readonly float airDrag = 3f;
+        public readonly float groundOverspeedDecay = 4f;
+        public readonly float maxHorizontalSpeed = 27.5f;
+        public readonly float slideChainWindow = 1.2f;
+        public readonly float slideChainFalloff = 0.6f;
+        public readonly float fallGravityMultiplier = 1.5f;
+        public readonly float airCarryDecay = 0.8f;
+        public readonly float airSteerDegPerSec = 120f;
+        public readonly float airStrafeWishSpeed = 2f;
+        public readonly float landingSoftSpeed = 16f;
+        public readonly float landingHardSpeed = 26f;
+        public readonly float landingSpeedLoss = 0.35f;
+        public readonly float groundSnapDistance = 0.12f;
+        public readonly float launchFloatSeconds = 0.45f;
+        public readonly float launchGravityScale = 0.55f;
+        public readonly float launchSteerBoost = 1.6f;
+        public readonly float launchCarryCap = 9f;
+        public readonly float waterSpeedScale = 1.35f;
+        public readonly float waterAccel = 30f;
+        public readonly float waterGrace = 0.15f;
+        public readonly float perfectWallJumpWindow = 0.2f;
+        public readonly float perfectWallJumpRefund = 20f;
+        public readonly float perfectDashJumpMinDelay = 0.06f;
+        public readonly float perfectDashJumpWindow = 0.1f;
+        public readonly float perfectDashJumpRefund = 30f;
+        public readonly float cornerCorrectionMetres = 0.18f;
+        public readonly float ledgeCatchMetres = 0.22f;
+        public readonly float ledgeCatchLiftSpeed = 6f;
+        public readonly float ledgeCatchMinSpeed = 1.5f;
+        public readonly float max = 100f;
+        public readonly float regenPerSecondGrounded = 45f;
+        public readonly float regenPerSecondAirborne = 18f;
+        public readonly float regenDelay = 0.45f;
+        public readonly float dashCost = 30f;
+        public readonly float wallRunEntryCost = 12f;
+        public readonly float wallRunDrainPerSecond = 22f;
+        public readonly float wallJumpCost = 12f;
+        public readonly float slideCost = 12f;
+    }
+}
+

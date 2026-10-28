@@ -1,0 +1,68 @@
+name: Windows preview release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: [self-hosted, Windows, X64, wildstone-unity]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build saved scenes with licensed Unity
+        run: ./Tools/Unity/Invoke-Unity.ps1 -Action BuildWindows -TimeoutMinutes 30
+
+      - name: Package Windows player
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $build = 'Artifacts/Unity/Windows'
+          foreach ($required in @('WildstoneArena.exe', 'UnityPlayer.dll', 'WildstoneArena_Data')) {
+            if (!(Test-Path "$build/$required")) { throw "Missing player output: $required" }
+          }
+          $tag = "preview-$env:GITHUB_RUN_NUMBER-$env:GITHUB_RUN_ATTEMPT"
+          $zip = "Wildstone-Windows-$tag.zip"
+          # Unity's backup/debug folders are not needed to run the player.
+          $player = Get-ChildItem $build | Where-Object Name -NotMatch '(BackUpThisFolder_ButDontShipItWithYourGame|BurstDebugInformation_DoNotShip)$'
+          Compress-Archive -Path $player.FullName -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $zip" | Set-Content "$zip.sha256" -Encoding utf8NoBOM
+          @"
+          Offline Practice preview for Windows x64. Internet multiplayer is unfinished.
+
+          Extract the entire ZIP, then run WildstoneArena.exe. Keep the data folder beside it.
+          Source: $env:GITHUB_SHA
+          Unity: 6000.5.10f1. Built from a clean checkout; local service credentials are excluded.
+          This preview has not received a complete visual, gameplay or internet acceptance pass.
+          "@ | Set-Content release-notes.md
+          "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+          "RELEASE_ZIP=$zip" >> $env:GITHUB_ENV
+
+      - name: Publish private preview release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create $env:RELEASE_TAG $env:RELEASE_ZIP "$env:RELEASE_ZIP.sha256" --target $env:GITHUB_SHA --title "Windows Practice $env:RELEASE_TAG" --notes-file release-notes.md --prerelease --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+
+      - name: Preserve build logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unity-build-logs
+          path: Artifacts/Unity/*.log
+          if-no-files-found: ignore
+          retention-days: 7

@@ -65,6 +65,9 @@ playable location under the traversal rules. An invalid endpoint or negligible
 legal displacement rejects the action without consuming a charge. A visible departure
 and arrival cue identifies what happened. This wall-blocking behavior is the stated
 implementation contract; the exact blink range and presentation remain tunable.
+The native offline adapter checks the final floor-adjusted displacement against
+the same minimum as match admission, so a vertical request cannot succeed by
+finding support back at its original feet position.
 Mark a successful blink as a position discontinuity: do not interpolate the body or
 melee sweep through the gap. Retain legitimate pre-blink hit history only under the
 foundation's bounded rewind policy; teleport is not retroactive invulnerability.
@@ -149,6 +152,46 @@ the center preserve alternate races; the zone route must not make one spawn or
 perch control every useful reward.
 
 ## 6. Acceptance and implementation order
+
+### Initial MVP tuning (builder defaults, 2026-10-25 resume)
+
+The user delegated implementation of the complete MVP. These are starting values
+for testing, not previously approved balance or a claim of competitive fairness.
+Keep one versioned catalog in code, with values copied into data assets only when
+the authoring flow needs them. Distances are Unity meters, times simulation seconds.
+
+| Item | Initial behavior and cost |
+| --- | --- |
+| Line Driver (starter) | 26 damage; 70 m hitscan; 0.30 s shot interval; 12-round clip; 1.2 s reload; unlimited starter reserve |
+| Pulse Lobber | 60 center / 20 edge damage over 4 m; 18 m/s visible orb; 0.90 s interval; 10 rounds; bounded 5 s flight; cover blocks blast |
+| Rebound Disc | 35 damage; 28 m/s; 0.60 s interval; 10 rounds; at most 2 wall ricochets / 4 s life; one hit per target per flight |
+| Push Lens | No direct damage; 8 m range, 55-degree total cone; 0.18 s windup / 0.85 s total cycle; 6 uses; horizontal impulse 14 m/s plus 4 m/s up; world cover blocks |
+| Grenade | 90 center / 15 edge damage over 5.5 m; 1.6 s fuse; 0.70 s throw interval; carry 2; 16 m/s forward plus 6 m/s up; cover blocks blast |
+| Stun gun | 15 damage, 0.45 s stun, then 1.75 s stun immunity; 45 m/s visible bolt, 35 m range; 1.20 s interval; 8 rounds; hits during stun/immunity may damage but never extend control loss |
+| Laser sword | 45 damage; 2.3 m reach; 0.12 s windup / 0.13 s active / 0.40 s recovery; bounded swept melee and per-swing deduplication; no ammo |
+| Blink | One charge; 6 m maximum short teleport; sweep/clamp before obstruction and require a supported fitting destination; no charge on invalid use |
+| Shield | One charge; 60 absorption for 6 s; overflow reaches health; reject active-shield reuse without spending |
+
+Players have 100 health and respawn after 3 s. Death clears specials, grenade ammo,
+consumables and active statuses; respawn restores starter clip only. Initial grenade
+ammo is zero and comes from pickups. One starter plus one replaceable special slot;
+grenade has a dedicated action, and Blink/shield each have one dedicated charge slot.
+Pickups initially respawn after 15 s; simultaneous claims commit atomically. Friendly
+damage/stun is disabled; self-explosion damage is enabled. Push Lens affects enemies
+only. Friendly collision may not trap players in doorways.
+
+Default controls: WASD move, mouse look, Space jump, Shift source movement dash,
+Ctrl slide/crouch, left mouse attack, R reload, 1/2 weapon slots, G grenade,
+Q Blink, E shield, F pickup/interact, Tab scoreboard, Escape pause/menu. The existing
+movement dash is a traversal action, distinct from the confirmed consumable Blink.
+Bindings must be displayed and remain remappable through local settings.
+
+Match defaults: 120 points to win, one point per second to the sole occupying team,
+8-minute limit, 4 m zone radius and 1.25 m floor-height tolerance; initial zone speed
+2 m/s along authored supported routes. Equal top scores at time limit draw. Accepted
+same-tick attacks may trade, with costs reserved before resolution; dead-at-acceptance
+commands fail. The existing five-phase order remains authoritative. These defaults
+do not alter the foundation's 30-second opponent-absence/abort contract.
 
 Pass foundation movement, minimal combat, pickup and scoring fixtures before adding
 the roster incrementally. Required cases include:

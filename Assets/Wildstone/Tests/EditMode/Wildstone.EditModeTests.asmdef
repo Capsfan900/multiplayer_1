@@ -1,0 +1,1 @@
+{"name":"Wildstone.EditModeTests","rootNamespace":"Wildstone.Tests","references":["Wildstone.Runtime"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}

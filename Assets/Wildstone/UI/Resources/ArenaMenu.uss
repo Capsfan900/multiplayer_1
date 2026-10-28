@@ -1,0 +1,28 @@
+.arena-root { flex-grow: 1; color: rgb(240,238,230); -unity-font-style: normal; font-size: 18px; }
+.menu-shade { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: rgba(27,30,29,0.50); }
+.menu-scroll { flex-grow: 1; padding-left: 5%; padding-right: 5%; padding-top: 4%; padding-bottom: 4%; }
+.menu-card { width: 520px; max-width: 100%; padding: 30px; background-color: rgba(31,35,33,0.94); border-radius: 4px; }
+.eyebrow { color: rgb(174,190,177); font-size: 13px; letter-spacing: 3px; margin-bottom: 16px; }
+.title { font-size: 42px; white-space: normal; -unity-font-style: bold; margin-bottom: 16px; }
+.description { font-size: 18px; white-space: normal; margin-bottom: 22px; color: rgb(216,218,209); }
+.note { font-size: 14px; white-space: normal; margin-top: 14px; margin-bottom: 8px; color: rgb(181,190,180); }
+.feedback { font-size: 16px; white-space: normal; margin-top: 12px; margin-bottom: 12px; color: rgb(237,209,169); }
+Button { min-height: 44px; margin: 0 0 8px 0; padding: 10px 14px; border-width: 1px; border-color: rgb(100,111,104); border-radius: 3px; color: rgb(237,237,227); background-color: rgb(45,52,47); -unity-text-align: middle-left; font-size: 17px; transition-duration: 0.12s; transition-property: background-color, border-color; }
+Button.primary { background-color: rgb(225,229,214); color: rgb(33,40,35); border-color: rgb(225,229,214); }
+Button:hover { background-color: rgb(66,79,68); border-color: rgb(207,219,198); }
+Button.primary:hover { background-color: rgb(247,246,233); }
+Button:focus { border-width: 2px; border-color: rgb(233,204,145); }
+.setting { margin: 6px 0 12px 0; min-height: 32px; font-size: 16px; }
+.setting > .unity-base-field__label { min-width: 160px; color: rgb(232,232,222); }
+.arena-root .unity-base-text-field__input, .arena-root .unity-base-popup-field__input { color: rgb(240,238,230); background-color: rgb(45,52,47); border-width: 1px; border-color: rgb(100,111,104); border-radius: 3px; }
+.arena-root .unity-base-popup-field__text { color: rgb(240,238,230); }
+.arena-root .unity-base-popup-field__arrow { -unity-background-image-tint-color: rgb(240,238,230); }
+.arena-root .unity-base-text-field__input:hover, .arena-root .unity-base-popup-field__input:hover { background-color: rgb(66,79,68); border-color: rgb(207,219,198); }
+.arena-root .unity-base-text-field__input:focus, .arena-root .unity-base-popup-field__input:focus { border-color: rgb(233,204,145); border-width: 2px; }
+.hud { position: absolute; left: 3%; right: 3%; top: 3%; bottom: 3%; }
+.hud-top { flex-direction: row; justify-content: space-between; background-color: rgba(25,30,26,0.75); padding: 8px 14px; border-radius: 3px; font-size: 16px; }
+.hud-bottom { position: absolute; left: 0; bottom: 0; background-color: rgba(25,30,26,0.80); padding: 14px 18px; border-radius: 3px; font-size: 16px; }
+.hud-bottom Label { margin-bottom: 4px; }
+.crosshair { position: absolute; left: 49%; top: 46%; width: 2%; -unity-text-align: middle-center; font-size: 32px; }
+.hit-cue { position: absolute; left: 40%; top: 42%; width: 20%; -unity-text-align: middle-center; font-size: 24px; color: rgb(240,211,164); }
+.reduced-motion Button { transition-duration: 0s; }

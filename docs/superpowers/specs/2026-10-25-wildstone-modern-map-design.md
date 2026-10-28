@@ -1,9 +1,10 @@
 # Wildstone Modern — map direction
 
 Date: 2026-10-25. Status: the user accepted **C3.1 / Wildstone Modern** as the map
-visual direction and its simple human character direction. Exact assets, collision
-and the layout proposal below remain unapproved. No Unity map or performance result
-exists yet.
+visual direction and its simple human character direction. On resuming, the user
+requested three complete maps and delegated implementation. Layouts below are builder
+starting designs, subject to traversal/readability/route validation; no runtime or
+performance result is inferred from this document.
 
 ## Selected direction
 
@@ -81,6 +82,31 @@ travel time, exposure and escape options rather than assuming visual symmetry is
 fair. Do not add smaller-team buffs or special spawn rules through this art brief.
 
 ## Authoring and validation sequence
+
+### Three-map MVP scope
+
+All maps share the accepted modular palette and silhouettes. They must have distinct
+route topology, not merely rearranged decoration. Stable map IDs are used in session
+compatibility checks. Host selects a map in the lobby; rematch returns to that lobby
+and preserves the selection, allowing an explicit map change before ready/start.
+No automatic mid-match map transfer is required.
+
+| ID / name | Builder starting layout | Zone circuit and landmark |
+| --- | --- | --- |
+| `atrium` / Atrium | About 64 x 64 m; central open court, +4 m upper gallery, interrupted bridges, four screened corner arrivals and multiple broad ramps | Continuous court-edge/gallery loop on supported surfaces; broken rectangular arch marks center |
+| `split-gallery` / Split Gallery | About 84 x 48 m; two parallel halls divided by a monumental spine, staggered cross-passages and a middle elevated crossover | Long figure-eight through both halls and crossover approaches; paired skyline fins identify each half |
+| `terrace-steps` / Terrace Steps | About 66 x 72 m; offset courts at 0/+4 m, three broad ramps, side return lanes and an interrupted central wall | Perimeter ascent and a different descent ramp; cantilevered terrace tower marks high ground |
+
+The zone's entire footprint must fit traversable routes: widen ramps and turns rather
+than shrink the scoring volume inconsistently. Each map needs all four two-player
+start groups, center and side special-weapon races, at least two approaches to valuable
+pickups, deliberate cover and clear death boundaries. Test zone support on ramps and
+stacked floors and measure each opening route with the actual adapted motor.
+
+The shared kit is slab, wall, pier, low cover, parapet, ramp, bridge, rectangular
+opening and abstract broken arch. Use source chamfered mesh construction with separate
+simple colliders. Persist meshes and generate UV2 before baking. The first material
+slice uses stock URP Lit, soft key light and restrained ambient/probe fill.
 
 1. After the foundation's movement and minimal combat gates, reuse the source's
    level data and authoring tools in the separate project. Audit the available kit;

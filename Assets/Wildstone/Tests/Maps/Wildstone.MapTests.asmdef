@@ -1,0 +1,8 @@
+{
+  "name": "Wildstone.MapTests",
+  "rootNamespace": "Wildstone.Tests",
+  "references": ["Wildstone.Runtime", "Wildstone.Editor", "Unity.RenderPipelines.Core.Runtime", "Unity.RenderPipelines.Universal.Runtime"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

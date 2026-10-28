@@ -1,0 +1,1 @@
+{"name":"Wildstone.Runtime","rootNamespace":"Wildstone","references":["Unity.InputSystem","Unity.RenderPipelines.Universal.Runtime"],"autoReferenced":true}

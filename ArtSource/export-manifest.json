@@ -1,0 +1,232 @@
+{
+  "generator": "Tools/Assets/build_assets.py",
+  "blender": "4.2.0",
+  "axis": "Unity (X,Y,Z) -> Blender (X,-Z,Y); FBX forward -Z up Y; metres",
+  "provenance": "Original procedural geometry; approved local C3.1 and W01-W04 simple-v2 concept images as visual references; no copied source meshes or textures",
+  "exports": [
+    {
+      "name": "LineDriver.fbx",
+      "source_sha256": "4234e60f71a95d528cc5e1e7ccea458c693e2b206bb331dbc04f39e77d61e00d",
+      "fbx_sha256": "d711c8c65e9fb1f7386c6fc22b5f32777bfcec41b9551a7f3ad9231f4bdce3dc",
+      "triangles": 1244,
+      "bounds_min": [
+        -0.12982860207557678,
+        -0.24750003218650818,
+        -0.5225000381469727
+      ],
+      "bounds_max": [
+        0.12982860207557678,
+        0.23500001430511475,
+        0.6399999856948853
+      ]
+    },
+    {
+      "name": "PulseLobber.fbx",
+      "source_sha256": "6a5736fe057671c575c1d0844a14d965142aac43b66f3da7be1db296e5bf1cbf",
+      "fbx_sha256": "73c33be479a725f078a8419b8da8788df546538c91f8cdff3a014d795440c899",
+      "triangles": 1514,
+      "bounds_min": [
+        -0.22499999403953552,
+        -0.24750003218650818,
+        -0.26500004529953003
+      ],
+      "bounds_max": [
+        0.22499999403953552,
+        0.39500007033348083,
+        0.5460000038146973
+      ]
+    },
+    {
+      "name": "ReboundDisc.fbx",
+      "source_sha256": "139823df32d67432677195c83f219147fdb2c51c862a9b38732d340a7469d42e",
+      "fbx_sha256": "a78ced3a80a6a4667d1d427cc04ac4ebd8659a0354d4fcd0b53335e64158c4bb",
+      "triangles": 1140,
+      "bounds_min": [
+        -0.2449999898672104,
+        -0.24750003218650818,
+        -0.39000001549720764
+      ],
+      "bounds_max": [
+        0.2449999898672104,
+        0.17850007116794586,
+        0.5875000357627869
+      ]
+    },
+    {
+      "name": "PushLens.fbx",
+      "source_sha256": "1286264ee8dfd49d54f8382c4fdf9b1d899ab3e13a2fffa7285b128ea1678385",
+      "fbx_sha256": "600b861a4aef1996895e412114380d6f1cc9580eeec448be07ed1d4e7a819975",
+      "triangles": 1544,
+      "bounds_min": [
+        -0.2830047011375427,
+        -0.24750003218650818,
+        -0.3400000333786011
+      ],
+      "bounds_max": [
+        0.2830047011375427,
+        0.4100000560283661,
+        0.4375
+      ]
+    },
+    {
+      "name": "Grenade.fbx",
+      "source_sha256": "58f8d70ee41850dbb1114932b5701ede5b82c11535581f615897e2b0492570a7",
+      "fbx_sha256": "1897ebdd9d0f2ee6adb51f0d898f62b679534d6b2a05ef35b3821caf635f9618",
+      "triangles": 436,
+      "bounds_min": [
+        -0.10400000214576721,
+        -0.10399999469518661,
+        -0.030000001192092896
+      ],
+      "bounds_max": [
+        0.10400000214576721,
+        0.11800002306699753,
+        0.1899999976158142
+      ]
+    },
+    {
+      "name": "StunGun.fbx",
+      "source_sha256": "5dd5d4bcf0f6b26bc12ad2f1a5cd4ae096bce2772df4f5e0e7f17591823b1d4b",
+      "fbx_sha256": "0e57f9bb9b65cf2cb53be2c72ff66b889f41e2a8b939436da6be13750207d3dd",
+      "triangles": 856,
+      "bounds_min": [
+        -0.10199999809265137,
+        -0.24750003218650818,
+        -0.25499996542930603
+      ],
+      "bounds_max": [
+        0.10199999809265137,
+        0.1459999978542328,
+        0.39799997210502625
+      ]
+    },
+    {
+      "name": "LaserSword.fbx",
+      "source_sha256": "53b88e2f4132234a84a2743c49786758cfc6d70b5fc3dbac795dba823f7fd84d",
+      "fbx_sha256": "134d2cfebc10bbb2e1f296745099bcdd1a597f54f5afc966032b25f3979799e3",
+      "triangles": 508,
+      "bounds_min": [
+        -0.09200000017881393,
+        -0.24750003218650818,
+        -0.25499996542930603
+      ],
+      "bounds_max": [
+        0.09200000017881393,
+        0.09200002253055573,
+        0.9100000262260437
+      ]
+    },
+    {
+      "name": "BlinkPickup.fbx",
+      "source_sha256": "7b664cc3ea6ce30682342a5a1ea8a6de9458a6bfae9a5ff2647a67054fd8ddcd",
+      "fbx_sha256": "4c26a3bc4353e61d3897aeb8cf16ab8e7c1f257abaf2ad79524c53cee2c01dac",
+      "triangles": 536,
+      "bounds_min": [
+        -0.1574999988079071,
+        0.12749996781349182,
+        -0.15000003576278687
+      ],
+      "bounds_max": [
+        0.1574999988079071,
+        0.19500000774860382,
+        0.14999999105930328
+      ]
+    },
+    {
+      "name": "ShieldPickup.fbx",
+      "source_sha256": "f8cd8c73926f552545cc689ed64a368364e7f920505db2d520365158757d7ab7",
+      "fbx_sha256": "73b50d053f77a9449a99276809632fbf1ca4b41fd0ad748e0557f1303ae9037c",
+      "triangles": 436,
+      "bounds_min": [
+        -0.14000000059604645,
+        0.10000000894069672,
+        -0.1600000262260437
+      ],
+      "bounds_max": [
+        0.14000000059604645,
+        0.21150001883506775,
+        0.15999996662139893
+      ]
+    },
+    {
+      "name": "WildstoneHuman.fbx",
+      "source_sha256": "7fc4cfee164066164592e2228fc287108321943c90eeda9f0fec18988364a6cd",
+      "fbx_sha256": "d8f245fa2334da1f60704559cc02e8d98fa1dac4bd5069cdcadd8455775ef55a",
+      "triangles": 3196,
+      "bounds_min": [
+        -0.5519999861717224,
+        0.00500001385807991,
+        -0.14100022614002228
+      ],
+      "bounds_max": [
+        0.5519999861717224,
+        1.7869999408721924,
+        0.2150000035762787
+      ]
+    },
+    {
+      "name": "WildstoneHumanTeam02.fbx",
+      "source_sha256": "7fc4cfee164066164592e2228fc287108321943c90eeda9f0fec18988364a6cd",
+      "fbx_sha256": "b7a597dcf1692fe7e8257e35177536fe4684a55cf9fbf15b3321c28932401617",
+      "triangles": 3412,
+      "bounds_min": [
+        -0.5519999861717224,
+        0.00500001385807991,
+        -0.14100022614002228
+      ],
+      "bounds_max": [
+        0.5519999861717224,
+        1.7869999408721924,
+        0.2150000035762787
+      ]
+    },
+    {
+      "name": "WildstoneHumanTeam03.fbx",
+      "source_sha256": "7fc4cfee164066164592e2228fc287108321943c90eeda9f0fec18988364a6cd",
+      "fbx_sha256": "1046b92695fba7eff73c67cca4d34dd2860b7862317ab23a62b7570a2dc10874",
+      "triangles": 3628,
+      "bounds_min": [
+        -0.5519999861717224,
+        0.00500001385807991,
+        -0.14100022614002228
+      ],
+      "bounds_max": [
+        0.5519999861717224,
+        1.7869999408721924,
+        0.2150000035762787
+      ]
+    },
+    {
+      "name": "WildstoneHumanTeam04.fbx",
+      "source_sha256": "7fc4cfee164066164592e2228fc287108321943c90eeda9f0fec18988364a6cd",
+      "fbx_sha256": "4405b4b8621c94f8128b352c842385319d5ee330601d0e7a9c5aaa8aee207940",
+      "triangles": 3516,
+      "bounds_min": [
+        -0.5519999861717224,
+        0.00500001385807991,
+        -0.1410001963376999
+      ],
+      "bounds_max": [
+        0.5519999861717224,
+        1.7869999408721924,
+        0.2150000035762787
+      ]
+    },
+    {
+      "name": "FirstPersonHands.fbx",
+      "source_sha256": "c8f81df94db7d692075c145f3eda47bce93a9412d36eb59c0ce8d3dfd91c8e3b",
+      "fbx_sha256": "67c73c23e05c18d9cce0636af2bdb44a4963d28ebd1ca63f05b7ee1c4dcb50b0",
+      "triangles": 648,
+      "bounds_min": [
+        -0.2789205312728882,
+        -0.25279873609542847,
+        -0.41626110672950745
+      ],
+      "bounds_max": [
+        0.2789205312728882,
+        -0.061553891748189926,
+        -0.013429712504148483
+      ]
+    }
+  ]
+}

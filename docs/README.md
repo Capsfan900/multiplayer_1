@@ -8,6 +8,8 @@ Read [HANDOFF](HANDOFF.md) for current evidence and next work,
 [BACKLOG](BACKLOG.md) for stages, and [DECISIONS](DECISIONS.md) for accepted choices.
 The root [README](../README.md) describes the workspace; [AGENTS](../AGENTS.md)
 defines contributor practice.
+Use [QA](QA.md) for evidence limits and remaining acceptance commands,
+[TOOLING](TOOLING.md) for local tools and [USER-SETUP](USER-SETUP.md) for account steps.
 
 ## Sources of truth
 
@@ -19,6 +21,7 @@ defines contributor practice.
 | [Wildstone Modern map](superpowers/specs/2026-10-25-wildstone-modern-map-design.md) | Architectural language, geometry, routes and spatial validation; not zone scoring rules |
 | [Character/weapon workflow](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md) | Reuse audit, production sheets, rigs, readability and first-/third-person presentation checks |
 | [Asset pipeline](ASSET-PIPELINE.md) | Blender sources, source-project reuse, exports, Unity authoring/import and round-trip validation |
+| [Menus and game flow](superpowers/specs/2026-10-25-ui-gameflow-design.md) | Minimalist presentation, screen transitions, local settings, HUD and UI acceptance |
 | [Art gallery](art-direction/README.md) and [weapon concepts](art-direction/weapon-concepts.md) | Saved visual references and prompts; not balance, collision or performance authority |
 | [Historical arena proposal](superpowers/specs/2026-10-25-multiplayer-arena-design.md) | Retired planning context and reuse leads only; current contracts above supersede it |
 
@@ -27,7 +30,7 @@ technical feasibility and test outcomes must remain visibly distinguished. If
 documents conflict, reconcile the owning spec with the recorded user decision;
 do not silently implement an older proposal. Detailed rules live once, in their owner.
 
-When implementation begins, link actual code, focused tests and evidence from the
+Keep actual code, focused tests and evidence linked from the
 owning spec or handoff. Add new documentation only when a distinct contract or
 reusable procedure needs a home. Keep historical rationale without presenting
 retired topology or art options as active requirements.

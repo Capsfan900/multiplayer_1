@@ -1,13 +1,45 @@
 # Multiplayer foundation — design for review
 
-Date: 2026-10-25. Status: proposed design; no implementation or performance proof yet.
+Updated: 2026-10-27. Movement, session and combat state/rules have managed and
+native offline checks. Real Fusion/provider integration, full visual/gameplay and
+performance acceptance remain open. The targets below are requirements, not measured results;
+see [current evidence](../../MVP-PROGRESS.md).
+
+2026-10-27 integration checkpoint: the real Fusion SDK and local App ID are present.
+`Assets/Wildstone/Networking` contains lossless input/motor wire structs, a networked
+movement behaviour, proxy presentation, private runner lifecycle and a recoverable
+PlayFab client. [QA](../../QA.md) owns native results. These components are not yet
+composed into the full menu/lobby/match/recovery path; no internet acceptance is implied.
+
+Movement restores the whole motor state before each SDK simulation tick. An
+authoritative spawn supplies its position, life and runner tick origin explicitly;
+the motor's Awake snapshot may predate Fusion's placement of the clone. Client
+sample sequences only deduplicate intent and cannot set authoritative motor time.
+The deduplication cursor is networked so rollback restores it. Missing/repeated
+samples use the existing bounded hold policy. Proxy colliders use current state;
+a separate visual child may interpolate real SDK snapshot buffers, snapping across
+life/teleport epochs. This initial adapter refuses runner-local physics scenes and
+shared launch-orb state until their queries/world state participate in rollback.
+
+Provider implementation uses PlayFab email/password login, registration and recovery,
+then requests a Photon token bound to the returned PlayFab ID. HTTPS requests are
+bounded, cancellable and do not log or persist credentials. A configuration flag
+or client-supplied account string is not proof of verified identity. Host-side
+admission still must bind the actual authenticated Photon subject before any seat
+or avatar is assigned; dashboard setup and live rejection tests remain mandatory.
+
+SDK provisioning checkpoint: Fusion 2.1.3 Stable build 2390 is imported, its supplied
+App ID is configured locally and native compilation passes. [QA](../../QA.md) records
+the package/hash evidence and required Physics 2D dependency. Live service behavior,
+simulation/rewind configuration and gameplay adapters remain unverified.
 
 ## 1. Intent, decisions and scope
 
 Build the base systems before the arena content. The eventual Windows game is a
 first-person arena battler for four teams of up to two players, with uneven teams,
 weapon races and a moving capture zone. It reuses `vibegame1` in a separate project
-at `C:\Users\tyler\Main Storage\multiplayer_1`. The user requires internet play
+originally authored at `C:\Users\tyler\Main Storage\multiplayer_1`; the active
+isolated worktree is recorded in [HANDOFF](../../HANDOFF.md). The user requires internet play
 with friends and competitive-quality responsiveness, latency handling and performance.
 
 Confirmed decisions:
@@ -91,7 +123,10 @@ Netcode for Entities would change the source's GameObject programming model; a
 custom prediction framework would spend effort on infrastructure Fusion provides.
 No multi-provider networking abstraction is part of this project.
 
-The source inspected at commit `09e10da3fb1fd64003aa14ec6597acb936470740` has:
+The original design audit used commit `09e10da3fb1fd64003aa14ec6597acb936470740`.
+The resumed implementation audit verified source HEAD
+`2cb6e5760bccc0733f34b367be2f18c90b802766`; selected imports must record that pin.
+The source has:
 
 - `FirstPersonMotor.Update()` reading global input and player delta, with many
   mutable timers/flags and calls into stamina, camera feedback and physics.
@@ -188,12 +223,30 @@ water, launch and surface triggers into reproducible simulation queries or SDK-s
 events. Do not rely on Unity callbacks firing again automatically after rollback.
 Start against static geometry and disable player-to-player physical pushing; players
 still have authoritative combat hitboxes. Moving platforms/destruction are later scope.
+Initial capsule tuning recreates the native query shape while retaining an
+intentionally disabled controller, so bound combat queries work before and after
+the first simulation step. Native startup and disabled-state regressions cover this.
 
 Keep the existing CharacterController only if the replay tests pass. If its hidden
 collision state causes unacceptable divergence, use Fusion's supported kinematic
 controller approach and port the existing movement laws/tuning. This is an explicit
 compatibility decision, not permission to substitute generic movement unnoticed.
 Measure jump/dash/slide/wall-run trajectories against the source before accepting it.
+
+Local native restore regressions allow less than 0.1 mm position difference and
+`1e-4` unit-vector distance for PhysX ground normals (approximately 0.006 degrees)
+and less than `1e-4` m/s velocity difference after CharacterController re-insertion.
+Small contact-normal differences can propagate through slope acceleration; each
+fixture records maximum position, normal and velocity error over its replay ticks.
+The remaining snapshot fields, including gameplay timers, contact IDs, charges and event sequences, must match
+exactly. This is a local replay check, not bitwise PhysX determinism or network
+acceptance; the correction budgets below and real Fusion replay gates still apply.
+
+Native local evidence: `Artifacts/Unity/PlayMode-20261027-195501-577.xml` passes
+all ten `MotorCollisionTests`. Across the replay helper's courses the maximum
+position difference was `9.536743e-7` m, ground-normal distance `9.536743e-6`, and
+velocity difference `4.53048727e-8` m/s. These are same-process static-fixture
+measurements, not cross-machine or network replay results.
 
 Predicted effects use stable action IDs and are not re-emitted on replay. Confirmed
 damage/death/score notifications come from authority. Remote-player events never
@@ -276,7 +329,15 @@ logs. [Fusion reconnect sample](https://doc.photonengine.com/fusion/v2/technical
 Set bounded load/connect timeouts and cancel on leave. If fewer than two teams
 remain connected, pause scoring for one 30-second absence deadline; recover if
 opposition returns, otherwise abort without awarding a win. Reconnect loops must
-not extend the deadline. Room cleanup uses Photon session lifecycle behavior;
+not extend the deadline. Initial implementation ruling: an absence episode ends
+only after at least two connected teams remain present for five continuous seconds.
+Scoring may resume as soon as opposition returns; a shorter return retains the
+original deadline, and renewed absence after it aborts immediately. A completed
+stable recovery permits a fresh deadline for a genuinely later disconnect. Save
+the pending deadline/stability clock in checkpoints; migration interrupts stable
+presence and cannot restart an already-known absence. This five-second debounce
+is a builder default to test, not a separately user-selected balance value.
+Room cleanup uses Photon session lifecycle behavior;
 application state must release failed admissions and ignore obsolete callbacks.
 
 ### Host migration contract
@@ -412,7 +473,7 @@ processes competing for the measured host's CPU/GPU.
 | Host migration | Proposed 2-second snapshot interval, <=3 seconds of lost simulated progress, <=30 seconds recovery after loss detection; otherwise clean abort |
 
 Budgets are deliberately falsifiable and may expose that 120 Hz costs too much. Run
-60/120 Hz comparison on the same content; do not silently reduce the accepted target.
+60/120 Hz comparison on the same content; do not silently reduce the proposed target.
 If a target fails, report the limiting subsystem and decide the tradeoff before
 claiming readiness. Frame rate is not measured input-to-photon latency; hardware
 measurement is required for any such claim.

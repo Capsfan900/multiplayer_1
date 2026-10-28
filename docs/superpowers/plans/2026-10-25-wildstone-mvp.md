@@ -10,6 +10,11 @@
 
 **Spec:** [Foundation](../specs/2026-10-25-multiplayer-foundation-design.md), [combat](../specs/2026-10-25-arena-combat-items-zone-design.md), [rendering](../specs/2026-10-25-unity-rendering-design.md), [maps](../specs/2026-10-25-wildstone-modern-map-design.md), [models](../specs/2026-10-25-characters-weapons-design-workflow.md), [asset pipeline](../../ASSET-PIPELINE.md).
 
+**2026-10-27 resume:** existing authored work was recovered into `mvp-2` without
+changing the original checkout. Native tests, preparation, three-map baking and an
+offline Windows build now pass. [QA](../../QA.md) records evidence; unchecked mixed
+offline/online steps remain open until their whole acceptance requirement is met.
+
 ## Global Constraints
 
 - Four teams of up to two, eight participants maximum; incomplete teams allowed; start needs at least two occupied teams.
@@ -34,7 +39,7 @@
 
 The user resumed the already-discussed design and delegated implementation choices; no additional design approval loop is required. Three maps and menu polish are new explicit requirements. Proposed balance values become clearly labeled initial tuning defaults in the combat owner before implementation, not claimed past approvals.
 
-Photon's official SDK link currently requires a signed-in Photon account. No SDK copy was found in Downloads or the source workspace. A Fusion 2 App ID and verified identity-provider configuration are also absent. Work on code/assets independent of those inputs is authorized while the user sleeps; authentic SDK integration and internet validation remain unproved until access is available. Do not implement a fake Fusion shim. Any local exercise mode must visibly say offline practice/development and use the same game rules; it is not a multiplayer substitute.
+SDK provisioning completed on 2026-10-27: the user supplied Fusion 2.1.3 Stable build 2390 and a Fusion App ID. The SDK is imported and compiles; the App ID persists in ignored local settings. Real runner/gameplay integration, verified identity-provider configuration and internet validation remain open. Do not implement a fake Fusion shim. Any local exercise mode must visibly say offline practice/development and use the same game rules; it is not a multiplayer substitute.
 
 An SDK access block is not a failed movement experiment. Independent rule tests, asset authoring and UI can proceed under D018 while integration is pending; network-dependent acceptance stays open. No runtime failure may be hidden by relaxing the spec.
 
@@ -44,10 +49,10 @@ An SDK access block is not a failed movement experiment. Independent rule tests,
 
 **Interfaces:** `Wildstone.Editor.ProjectSetup.Configure()` generates this project's own render settings and test/bootstrap scene; `Tools/Unity/Invoke-Unity.ps1` supports compile, tests and Windows build against this absolute project root, with log/result paths under `Artifacts`.
 
-- [ ] Pin the installed Unity version and necessary packages only; establish local version control on an MVP branch if allowed by the environment.
-- [ ] Add build/test tooling with containment checks and failure propagation; exercise invalid action/path arguments before the valid run.
-- [ ] Import/install the real Fusion SDK when legitimately available; record version and package checksum. Otherwise record the specific blocked SDK gate without placeholder APIs.
-- [ ] Configure URP, linear color, text serialization, separate product/save identity and source-based layer policy. Compile a Windows bootstrap and run an empty-suite/tooling smoke check without claiming gameplay coverage.
+- [x] Pin the installed Unity version and necessary packages only; establish local version control on an MVP branch if allowed by the environment.
+- [x] Add build/test tooling with containment checks and failure propagation; exercise invalid action/path arguments before the valid run. Native execution now passes; focused `-TestFilter` runs are supported.
+- [x] Import/install the real Fusion SDK; version, checksum, local App ID configuration and native compile are recorded in QA and `Artifacts/Resume/photon-setup.md`.
+- [x] Configure URP, linear color, text serialization, separate product/save identity and source-based layer policy. Native tests and offline Windows build supersede the bootstrap-only smoke check; Fusion compatibility is separate.
 - [ ] Record logs, licenses/source pins and compatibility results, then review the task.
 
 ## Task 2: Explicit movement state and local presentation
@@ -56,11 +61,11 @@ An SDK access block is not a failed movement experiment. Independent rule tests,
 
 **Interfaces:** `ArenaMotor.Simulate(in MotorInput input, float deltaTime, int tick)` operates on restorable `MotorState`; `CaptureState()` / `RestoreState(in MotorState)` round-trip every simulation-affecting field. Inputs are finite, bounded intent; camera samples/rendering never supply authoritative position/delta. State has position/velocity/stance/grounding, traversal contacts and all stamina/jump/dash/slide/wall timers.
 
-- [ ] Preserve actual source prefab tuning and movement-law inventory, not AddComponent defaults. Build a compact source parity fixture.
+- [x] Preserve actual source prefab tuning and movement-law inventory, not AddComponent defaults. Build a compact source parity fixture.
 - [ ] Write and observe failing state-restore/replay, input-edge, coyote/jump-buffer, wall-run, slide, water/launch and missing-input tests.
-- [ ] Adapt source laws and collision interaction; separate feedback from replay, keep next-frame camera response and tick-based movement.
-- [ ] Run deterministic command sequences from restored snapshots, then real Unity collision tests on a small course. Capture deviations and correct causes.
-- [ ] Add Fusion input/state mapping and host-plus-two-client checks only against the actual SDK. Keep the gate open while SDK/account access is absent.
+- [x] Adapt source laws and collision interaction; separate feedback from replay, keep next-frame camera response and tick-based movement. Human feel/source trajectory acceptance remains separate.
+- [x] Run restored command sequences and real Unity collision tests on a small course. Record bounded native vector deviations without changing timers, discrete state or network budgets.
+- [ ] Complete host-plus-two-client checks against the actual SDK. Input/state mapping, networked movement and a real Single-runner native fixture now pass; remote prediction/correction remains open.
 
 ## Task 3: Session lifecycle, identity, seats and recovery
 
@@ -81,7 +86,7 @@ An SDK access block is not a failed movement experiment. Independent rule tests,
 
 **Interfaces:** validated actions are tick/life/connection/action-sequence scoped. `CombatRules` returns committed state changes and events once; presentation consumes event IDs. `MovingZone` derives position from authored route and match tick; occupancy uses player feet and bounded floor height.
 
-- [ ] Record initial tuning and deterministic same-tick policy in the combat spec. Keep starter plus one replaceable special, grenade ammo and the two dedicated consumables.
+- [x] Record initial tuning and deterministic same-tick policy in the combat spec. Keep starter plus one replaceable special, grenade ammo and the two dedicated consumables.
 - [ ] Write failing tests for repeated/stale actions, atomic pickup losers/full capacity, shield spillover/expiry, stun immunity, death cleanup, scoring ties/contests and incomplete teams.
 - [ ] Implement the seven weapon behaviors, authoritative damage/impulses/cover and bounded projectile lifetimes/ricochets; hitscan uses actual Fusion lag-compensation when online.
 - [ ] Implement wall-blocked short Blink with legal landing, no-charge rejection and discontinuity; shield does not stack/refresh and is not invulnerability.
@@ -94,9 +99,9 @@ An SDK access block is not a failed movement experiment. Independent rule tests,
 
 **Interfaces:** stable named root, grip, muzzle and bone/socket transforms; explicit Unity meter/axis convention. Generator requires a contained output root and retains `.meta` GUIDs. Effects consume authoritative/predicted event IDs, never cause gameplay damage.
 
-- [ ] Verify bpy import in an isolated process without writing into sibling environments; export/import an asymmetric 1 m fixture with grip/muzzle.
-- [ ] Produce a shaped low-poly human with explicit rig/weights, first-person hands and four team symbols; validate bind pose and animation scale.
-- [ ] Produce all seven equipment models plus Blink/shield pickups, retaining the four approved v2 silhouettes and shared matte material treatment.
+- [x] Verify bpy import in an isolated process without writing into sibling environments; export/import an asymmetric 1 m fixture with grip/muzzle. Blender and native Unity fixture checks pass.
+- [x] Produce a shaped low-poly human with explicit rig/weights, first-person hands and four team symbols; validate bind pose and animation scale in Blender. Native deformation remains open.
+- [x] Produce all seven equipment models plus Blink/shield pickups, retaining the four approved v2 silhouettes and shared matte material treatment. Native framing/readability remains open.
 - [ ] Add local readable firing/projectile/ricochet/blast/impulse/stun/melee/Blink/shield/death/zone VFX and restrained generated or audited sound cues. Bound pools and particle counts; no global time scale/hitstop.
 - [ ] Capture moving first-/third-person evidence, inspect dark/light backgrounds and low quality, then fix framing and readability issues.
 
@@ -106,10 +111,10 @@ An SDK access block is not a failed movement experiment. Independent rule tests,
 
 **Interfaces:** stable map IDs `atrium`, `split-gallery`, `terrace-steps`; definitions contain geometry, four team spawn groups, pickups, zone route and playable bounds. Builder creates render meshes and simple colliders separately, saves assets, and generates UV2 before any bake.
 
-- [ ] Extend the owning map spec with the three layouts and initial dimensions. Use one modular C3.1 kit, distinct route topology and silhouette landmarks.
+- [x] Extend the owning map spec with the three layouts and initial dimensions. Use one modular C3.1 kit, distinct route topology and silhouette landmarks.
 - [ ] Write failing validators for missing team starts, invalid pickup IDs, disconnected/obstructed zone routes and floor-support gaps.
-- [ ] Adapt the pure source chamfered mesh builder and minimal platform/ramp patterns; do not import the campaign level builder wholesale.
-- [ ] Build Atrium's court/gallery, Split Gallery's parallel corridors/crossovers and Terrace Steps' staggered elevations/broad ramps. Keep four screened approaches and center/side reward routes.
+- [x] Adapt the pure source chamfered mesh builder and minimal platform/ramp patterns; do not import the campaign level builder wholesale.
+- [x] Build Atrium's court/gallery, Split Gallery's parallel corridors/crossovers and Terrace Steps' staggered elevations/broad ramps. All three saved Unity scenes and CPU lighting bakes pass; fairness/visual acceptance remains separate.
 - [ ] Verify traversal, zone footprint support, spawn sightlines and pickup reachability; measure opening routes and document fairness limits rather than assume symmetry proves balance.
 
 ## Task 7: Minimalist finished menus and full play loop
@@ -126,13 +131,13 @@ An SDK access block is not a failed movement experiment. Independent rule tests,
 
 ## Task 8: Build, adversarial QA, performance and user completion report
 
-**Files:** `Tools/QA`, `Artifacts/QA`, `docs/QA.md`, `docs/HANDOFF.md`, `docs/USER-SETUP.md`, Windows build under `Builds/Windows`.
+**Files:** `Tools/QA`, `Artifacts/QA`, `docs/QA.md`, `docs/HANDOFF.md`, `docs/USER-SETUP.md`, Windows build under `Artifacts/Unity/Windows`.
 
-- [ ] Run relevant EditMode/PlayMode tests and Windows compilation; review all important findings and retest fixes.
+- [x] Run relevant EditMode/PlayMode tests and Windows compilation; review important resume findings and retest fixes. See QA for native evidence and limits.
 - [ ] Exercise all maps/weapons/items, full UI flow, death/respawn and zone completion in the standalone build; save moving evidence and exact build identity.
 - [ ] Run actual Fusion multi-client/network impairment tests when SDK/App ID are configured. Local processes are functional evidence only.
 - [ ] Perform scoped performance captures without screenshot polling. Final full-network acceptance remains the canonical separate-machine 8-player/direct-relay matrix, 30-minute profiles, two-hour soak and 100 reconnect cycles.
-- [ ] If the user is still needed for SDK/account access or external machines, finish all independent work, retain clearly marked open gates and provide exact free setup steps, expected outcomes and tests to complete. Never label unrun internet or secure identity tests passed.
+- [x] Finish independent authoring/review and provide exact remaining setup/test steps in HANDOFF, USER-SETUP and QA. Licensing and SDK/App ID provisioning are resolved; verified identity and external machines remain dependencies. Full visual, internet and performance acceptance remains open.
 - [ ] Package a versioned Windows build with hashes, editable sources, source/license provenance and a concise current handoff. No public release or paid action is implied.
 
 ## Execution record

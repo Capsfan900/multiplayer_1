@@ -1,0 +1,7 @@
+{
+  "name": "Wildstone.Editor",
+  "rootNamespace": "Wildstone.Editor",
+  "references": ["Wildstone.Runtime", "Unity.RenderPipelines.Core.Runtime", "Unity.RenderPipelines.Universal.Runtime"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

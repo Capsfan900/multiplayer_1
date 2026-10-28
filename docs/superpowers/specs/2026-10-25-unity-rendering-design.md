@@ -1,9 +1,10 @@
 # Unity rendering — soft Wildstone Modern
 
-Date: 2026-10-25. Status: proposed rendering design grounded in a read-only source
-audit. `multiplayer_1` has no Unity project, imported assets or measured rendering
-result. C3.1's soft modern appearance is accepted; this implementation strategy
-still needs a finished slice, visual review and profiling.
+Updated: 2026-10-27. C3.1's soft modern appearance is accepted. Native model import,
+three-map CPU lighting and an offline Windows build pass; full moving visual and
+performance acceptance remain open. This strategy is grounded
+in the read-only source audit and still needs a finished playable slice, moving
+visual review and profiling. See [current evidence](../../MVP-PROGRESS.md).
 
 ## 1. Ownership and intended result
 
@@ -25,18 +26,18 @@ coherent, readable result judged in motion, not automatically more rendering fea
 
 ## 2. Verified reuse and material baseline
 
-The source uses [Unity 6000.5.10f1](../../../../vibegame1/ProjectSettings/ProjectVersion.txt)
-and [URP 17.5.0](../../../../vibegame1/Packages/manifest.json#L13). Retain them subject
-to foundation compatibility checks. Source links below point into the original
-read-only checkout; imports and adaptations belong here.
+The source uses `vibegame1/ProjectSettings/ProjectVersion.txt`
+and `vibegame1/Packages/manifest.json#L13`. Retain them subject
+to foundation compatibility checks. Source-qualified paths below use the original
+read-only roots in [SOURCE-REUSE](../../SOURCE-REUSE.md); imports and adaptations belong here.
 
 | Existing implementation | Reuse decision and limit |
 | --- | --- |
-| [LevelMesh.cs:36](../../../../vibegame1/Assets/Scripts/Level/LevelMesh.cs#L36) builds small geometric chamfers; `:45` defines vertex AO and `:81` caches shared meshes. | Reuse the geometry/cache approach. Soft edge highlights and controlled face values are useful inexpensive cues. Vertex AO is authored shading, not scene-wide baked occlusion. |
-| [ArchitecturalStone.shader:617](../../../../vibegame1/Assets/Shaders/ArchitecturalStone.shader#L617) samples lightmaps/SH and shadowmask, then adds a material side-light term at `:622`. | Baked-light reception exists. Avoid adding the old fake ambient over already sufficient baked bounce. No Meta pass is present; bake contribution requires verification. |
-| [LevelMesh.cs:166](../../../../vibegame1/Assets/Scripts/Level/LevelMesh.cs#L166) writes UV0, normals, tangents and colors, without a lightmap UV channel. | Generate and validate UV2 for lightmapped kit meshes. Static flags alone cannot supply a sound bake. |
-| [M_ArchitecturalStone.mat:75](../../../../vibegame1/Assets/Materials/M_ArchitecturalStone.mat#L75) retains grime, moss and photo surfaces; [the shader's photo blend](../../../../vibegame1/Assets/Shaders/ArchitecturalStone.shader#L319) samples repeated albedo/normal/mask sets. | Do not inherit the detailed stone preset. Disable photo detail, moss, grime, tiny joints and strong relief for the modernist comparison. |
-| [CharacterBlock.shader:115](../../../../vibegame1/Assets/Shaders/CharacterBlock.shader#L115) samples per-vertex SH; `:138` uses a shadowed main light and tunable tone transition. | Try a softer tone transition, restrained rim and quiet matte human surfaces. It has no additional-light loop; weapon lights will not behave like URP/Lit. |
+| `vibegame1/Assets/Scripts/Level/LevelMesh.cs#L36` builds small geometric chamfers; `:45` defines vertex AO and `:81` caches shared meshes. | Reuse the geometry/cache approach. Soft edge highlights and controlled face values are useful inexpensive cues. Vertex AO is authored shading, not scene-wide baked occlusion. |
+| `vibegame1/Assets/Shaders/ArchitecturalStone.shader#L617` samples lightmaps/SH and shadowmask, then adds a material side-light term at `:622`. | Baked-light reception exists. Avoid adding the old fake ambient over already sufficient baked bounce. No Meta pass is present; bake contribution requires verification. |
+| `vibegame1/Assets/Scripts/Level/LevelMesh.cs#L166` writes UV0, normals, tangents and colors, without a lightmap UV channel. | Generate and validate UV2 for lightmapped kit meshes. Static flags alone cannot supply a sound bake. |
+| `vibegame1/Assets/Materials/M_ArchitecturalStone.mat#L75` retains grime, moss and photo surfaces; `vibegame1/Assets/Shaders/ArchitecturalStone.shader#L319` samples repeated albedo/normal/mask sets. | Do not inherit the detailed stone preset. Disable photo detail, moss, grime, tiny joints and strong relief for the modernist comparison. |
+| `vibegame1/Assets/Shaders/CharacterBlock.shader#L115` samples per-vertex SH; `:138` uses a shadowed main light and tunable tone transition. | Try a softer tone transition, restrained rim and quiet matte human surfaces. It has no additional-light loop; weapon lights will not behave like URP/Lit. |
 
 Compare two material paths on identical geometry and lighting: **stock URP Lit
 with simple matte materials**, and a stripped Architectural Stone variant retaining
@@ -67,7 +68,7 @@ ramps. Supply a correct Meta path if the custom shader requires it. Reduce its
 side ambient, foot darkening and vertex AO where they double-darken baked contacts.
 Keep shadowed humans readable without flattening the architecture.
 
-The source's [AtmosphereBuilder.cs:257](../../../../vibegame1/Assets/Editor/AtmosphereBuilder.cs#L257)
+The source's `vibegame1/Assets/Editor/AtmosphereBuilder.cs#L257`
 creates realtime reflection probes refreshed OnAwake with all faces together.
 These are not diffuse light probes. Prefer precomputed reflection captures for
 the static arena; validate startup cost and moving-weapon appearance. The builder
@@ -105,6 +106,24 @@ timers, hit volumes or zone occupancy. Predicted effects reconcile without repea
 late join/migration reconstructs current persistent cues without replaying old
 bursts. Proposed visual treatment:
 
+**Current implementation (2026-10-27; full visual/performance acceptance open):**
+`ArenaPresentation` binds to the offline Practice session, reads committed
+`ArenaMatch` events and state, suppresses repeated event IDs, and renders a bounded
+viewmodel overlay, team human/weapon models, projectile cores/trails, pickup models,
+shield bands, a moving depth-tested zone boundary and short event cues. A builder
+references the editable FBX exports through prefabs and maps their matte materials.
+The effects and generated audio have fixed pools and no colliders or gameplay writes.
+Old bursts are not replayed after a presentation restart; persistent zone, shield,
+pickup and projectile cues are reconstructed from current match state. The managed
+typecheck and pure dedup test pass. The reviewed implementation aligns authored
+grips to hand sockets, follows current aim/death and persistent fuse/stun/immunity
+state, uses numeric identities with conservative eviction, and synchronizes
+overlay projection on settings changes. Native import, rig clip/attachment,
+camera-stack lifecycle and effects tests now pass; [QA](../../QA.md) records the
+commands and limits. Grayscale recognition, complete first-person framing,
+accessibility and graphics cost still require visual/profile acceptance. This is an offline rendering slice, not
+acceptance of the proposed visual or performance targets below.
+
 | Event | Small readable treatment |
 | --- | --- |
 | Shots, orbs and discs | Opaque projectile/core where applicable, a few depth-tested trail or flipbook meshes, brief local impact cue; recognizable direction and ownership. |
@@ -121,11 +140,11 @@ need different cues; color alone is insufficient. Visibility rules still apply t
 markers. Quality changes may simplify particles, shadows and secondary trails,
 but cannot remove team, fuse, stun, shield, attack or zone cues or alter hit volumes.
 
-Reuse the source's [local viewmodel separation](../../../../vibegame1/Assets/Editor/PrefabFactory.cs#L1247):
+Reuse the source's `vibegame1/Assets/Editor/PrefabFactory.cs#L1247`:
 one local overlay camera, restricted layer and post-processing once. Remote players
 use world models. Verify renderer features do not run unwanted full-screen effects
 on the overlay; the source already has a
-[fog bypass for that case](../../../../vibegame1/Assets/Shaders/Atmosphere.shader#L222).
+`vibegame1/Assets/Shaders/Atmosphere.shader#L222`.
 
 ## 5. Cost controls and acceptance
 
@@ -135,14 +154,14 @@ soft lighting does not require blur. Optional SSAO must not be the sole contact
 cue. Preserve contrast on Low. Keep opaque surfaces dominant, effect lifetimes
 bounded and shared materials stable; inspect actual batching rather than assuming
 shader sharing guarantees it. The source
-[PC asset](../../../../vibegame1/Assets/Settings/PC_RPAsset.asset#L72) enables SRP
+`vibegame1/Assets/Settings/PC_RPAsset.asset#L72` enables SRP
 Batcher, but runtime property overrides still require inspection. Follow Unity's
 [URP performance guidance](https://docs.unity3d.com/6000.0/Documentation/Manual/urp/configure-for-better-performance.html)
 to disable unused work, then measure the selected configuration.
 
 Collect the new game's actually drawn shader variants with the adapted
-[ShaderWarmupBuilder](../../../../vibegame1/Assets/Editor/ShaderWarmupBuilder.cs#L12)
-and [boot warmup](../../../../vibegame1/Assets/Scripts/Core/ShaderPrewarm.cs#L33).
+`vibegame1/Assets/Editor/ShaderWarmupBuilder.cs#L12`
+and `vibegame1/Assets/Scripts/Core/ShaderPrewarm.cs#L33`.
 Do not copy the source collection as coverage proof. Include all supported effects
 and graphics tiers; measure cold startup and first-use behavior separately.
 
@@ -165,7 +184,7 @@ Acceptance proceeds after the applicable foundation gates:
    first-use stalls and direct/relay conditions. Repeat problematic moving scenes
    in the packaged Windows build before expanding art production.
 
-The existing [RenderCostProbe](../../../../vibegame1/Assets/Editor/RenderCostProbe.cs#L97)
+The existing `vibegame1/Assets/Editor/RenderCostProbe.cs#L97`
 forces GPU completion with `ReadPixels`; use it only to isolate costs, not as a
 normal-frame acceptance benchmark. Its feature restoration also needs correction
 before Low-tier use. No source measurement, attractive concept or empty-map frame
