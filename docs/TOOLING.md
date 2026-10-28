@@ -15,8 +15,19 @@ on the existing licensed Unity 6000.5.10f1 PC. Runner installation is outside th
 at `C:\Users\tyler\orca\runners\wildstone`; its working checkout is separate from
 the authoring worktree. It requires `pwsh`, `git`, `gh`, and that exact Unity editor
 with Windows build support. No cloud Unity credentials or paid runner are configured.
-The runner is launched hidden in the current user session, not installed as a service
-or startup task. After reboot, start it with:
+Runner 2.338.2 was downloaded and its GitHub-published SHA-256 verified. Registration
+and startup were blocked by automatic approval review, including after the user
+explicitly authorized this PC. No runner is registered or running yet. Complete
+registration yourself in PowerShell (the short-lived token is kept out of files):
+
+```powershell
+$runnerRoot = 'C:\Users\tyler\orca\runners\wildstone'
+$registration = gh api --method POST repos/Capsfan900/multiplayer_1/actions/runners/registration-token | ConvertFrom-Json
+& "$runnerRoot\config.cmd" --unattended --url https://github.com/Capsfan900/multiplayer_1 --token $registration.token --name wildstone-local-windows --labels wildstone-unity --work _work
+```
+
+Then launch it hidden in the current user session. It is not installed as a service
+or startup task; repeat this launch after reboot:
 
 ```powershell
 Start-Process -FilePath 'C:\Users\tyler\orca\runners\wildstone\run.cmd' -WorkingDirectory 'C:\Users\tyler\orca\runners\wildstone' -WindowStyle Hidden

@@ -6,8 +6,12 @@ Goal active; user explicitly resumed and delegated all work possible while away.
 ## Current position
 
 GitHub delivery (2026-10-27): private `Capsfan900/multiplayer_1` created and a manual
-Windows Practice prerelease workflow authored. Runner/first-run verification is pending;
-[TOOLING](TOOLING.md#github-builds-and-private-releases) owns operation, [QA](QA.md) evidence.
+Windows Practice prerelease workflow uploaded. Clean-source commit `e3f5815` built
+successfully and its ZIP/checksum were published as a private preview via the exact
+workflow packaging/publication steps run locally. Runner registration was blocked
+by automatic approval review even after authorization; manual setup and the first
+Actions run remain pending. [TOOLING](TOOLING.md#github-builds-and-private-releases)
+owns operation, [QA](QA.md) exact evidence and limitations.
 
 Updated 2026-10-27 in `C:\Users\tyler\orca\workspaces\multiplayer_1\mvp-2` (`mvp-2`).
 The 2026-10-26 authored checkpoint was recovered read-only from the original project;

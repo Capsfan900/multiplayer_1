@@ -9,8 +9,10 @@ Acceptance detail belongs in the [canonical specs](README.md), not this checklis
 
 Current work: finish packaged visual/input validation and integrate real networking.
 Private GitHub delivery was requested separately: repository and manual Windows
-preview workflow authored; first automated build/publication evidence pending in
-[QA](QA.md). This does not complete any multiplayer acceptance stage.
+preview workflow uploaded, and a clean-source Windows build published privately.
+Runner registration was blocked by automatic approval review; manual setup and
+first Actions build remain pending in [QA](QA.md). This does not complete any
+multiplayer acceptance stage.
 Native tests, content preparation, all three map bakes and Windows compilation pass;
 this is offline evidence from before SDK import. Fusion 2.1.3 build 2390 is now
 imported, its App ID is configured locally and native compilation passes. Live

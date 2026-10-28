@@ -14,7 +14,11 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
 - GitHub delivery is authorized: personal private repository `Capsfan900/multiplayer_1`
   and a manual Windows Practice prerelease workflow. [TOOLING](TOOLING.md#github-builds-and-private-releases)
   owns operation and access constraints; [QA](QA.md) records publication evidence.
-  The runner registration and first workflow run are not yet verified.
+  A fresh clean-source Windows build was packaged and published locally as private
+  [preview-local-20261027-e3f5815-1](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-local-20261027-e3f5815-1).
+  Automatic approval review blocked runner registration even after user authorization;
+  manual setup and the first Actions build remain pending. No runtime/online acceptance
+  was added by publication.
 
 - Unity 6000.5.10f1 licensing, import, Compile and full content preparation now work.
 - Fusion 2.1.3 Stable build 2390 is imported; the user-supplied App ID is configured

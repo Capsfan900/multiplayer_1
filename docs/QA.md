@@ -9,11 +9,37 @@ separate evidence levels. The full MVP is not complete.
 ### GitHub delivery
 
 Personal private repository `Capsfan900/multiplayer_1` was created on 2026-10-27.
-The manual Windows preview workflow builds a separate clean checkout with the
-existing Unity wrapper, verifies player files and publishes a ZIP/checksum prerelease.
-Runner registration and the first workflow run remain pending. Source publication
-and packaging are not online gameplay acceptance. [TOOLING](TOOLING.md#github-builds-and-private-releases)
-owns the procedure and private access requirements.
+Source commit `e3f5815c1e863a32a23ed7c482e2efc48a324557` is uploaded to `main`.
+The manual Windows preview workflow is active on GitHub. YAML/manual-trigger assertions,
+PowerShell parsing of every run step and actionlint 1.7.12 pass (custom runner label
+explicitly allowed). Account settings, local service config, Library and Artifacts
+are absent from the tracked snapshot; a filename-only credential-pattern scan found
+no candidate secrets in the published source trees.
+
+A clean `git archive` of that commit was expanded to
+`C:\Users\tyler\orca\builds\wildstone-e3f5815`, with no copied Library or local config.
+Running its `Tools/Unity/Invoke-Unity.ps1 -Action BuildWindows -TimeoutMinutes 30`
+passed with exit zero and `WILDSTONE BUILD OK`. Evidence:
+`Artifacts/Unity/BuildWindows-20261027-205939-312.log` under that clean build root.
+First import emitted SDK API-updater assembly-resolution and config-initialization
+exceptions before completing import and a successful build; this was not a clean-log
+runtime test. The generated Photon account settings contain no Fusion App ID.
+
+The exact workflow packaging and publication PowerShell steps were then executed
+locally. The ZIP's 200 entries include the executable, UnityPlayer DLL and player
+data; Unity backup/debug folders are absent. Published private prerelease:
+[preview-local-20261027-e3f5815-1](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-local-20261027-e3f5815-1).
+ZIP SHA-256: `caee19d7ed6e91b0ac5ea79c383884fb96eb6378b1cfc24bb56798e0e1f39f0f`.
+The release has a player ZIP and a checksum file. This new player was not launched
+or visually inspected; historical visual evidence describes the earlier local build.
+
+**Automation remains unverified:** automatic approval review blocked runner registration
+and startup twice, including after explicit user authorization; the reported reason
+was only `blocked by policy`. GitHub lists zero registered runners. Runner 2.338.2
+is downloaded with its published SHA-256 checked, but must be registered/launched
+manually using [TOOLING](TOOLING.md#github-builds-and-private-releases). No Actions run
+has built this release. The first automated run remains pending. Source publication
+and packaging are not online gameplay acceptance.
 
 SDK provisioning checkpoint (2026-10-27): Fusion 2.1.3 Stable build 2390 imported
 under `Assets/Photon`, with the supplied App ID in ignored local Photon settings.
