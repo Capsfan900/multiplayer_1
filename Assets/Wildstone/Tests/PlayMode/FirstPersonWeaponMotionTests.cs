@@ -60,6 +60,23 @@ namespace Wildstone.Tests
             player.Alive=false; Step();
             Assert.That(hands.localPosition,Is.EqualTo(rest));
         }
+        [TestCase(WeaponKind.LaserPistol)] [TestCase(WeaponKind.LaserShotgun)] [TestCase(WeaponKind.LaserSniper)]
+        public void FamiliarLaserWeaponsHaveAuthoredContactsDistinctMechanismsAndBoundedFlashes(WeaponKind kind)
+        {
+            player.SelectedSpecial=true; player.SpecialWeapon=kind; Step();
+            Assert.That(view.TryGetMuzzle(out var muzzle),Is.True);
+            var model=Find("Grip_R").GetChild(Find("Grip_R").childCount-1);
+            Assert.That(Vector3.Distance(Find("Grip_R").position,GripAttachment.Find(model,"Grip").position),Is.LessThan(.0001f));
+            Assert.That(Vector3.Distance(Find("Wrist_L").position,GripAttachment.Find(model,"LeftHand").position),Is.LessThan(.0001f));
+            var mechanism=GripAttachment.Find(model,"Weapon mechanism");
+            Assert.That(mechanism,Is.Not.Null);
+            var rest=mechanism.localPosition;
+            view.Play(new CombatEvent(CombatEventKind.Shot,new CombatAction { Participant=1 },10,vector:Vector3.forward,weapon:kind),1); Step();
+            Assert.That(Vector3.Distance(rest,mechanism.localPosition),Is.GreaterThan(.001f));
+            Assert.That(Find("Local muzzle 0").GetComponent<LineRenderer>().enabled,Is.True);
+            Step(.6f);
+            Assert.That(Find("Local muzzle 0").GetComponent<LineRenderer>().enabled,Is.False);
+        }
         [Test] public void MuzzleUsesAuthoredSocketAndFourReusedElementsExpireAndReset()
         {
             Assert.That(view.TryGetMuzzle(out var muzzle),Is.True);

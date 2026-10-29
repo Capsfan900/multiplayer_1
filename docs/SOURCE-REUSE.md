@@ -60,3 +60,14 @@ The candidate table preserves the audit decisions; the actual-reuse list above
 records what has been adapted. [QA](QA.md) distinguishes managed compilation and
 Blender checks from pending Unity import/native behavior and online compatibility.
 The [asset pipeline](ASSET-PIPELINE.md) owns production import and validation steps.
+
+### Original laser kit, 2026-10-28
+
+The surgical `laser-kit` mode in `Tools/Assets/build_assets.py` creates original
+LaserPistol/LaserShotgun/LaserSniper .blend sources, FBX and reference renders in this
+worktree only. It uses existing Blender 4.2 through the audited Python environment,
+not source meshes/textures or GPU generation. New triangles: 984 / 1212 / 1300.
+`ArtSource/laser-kit-export-manifest.json` records exact source/export hashes;
+existing fourteen production source/export pairs remain unchanged. The Unity import
+reflection whitelist now includes these three named exports. Regenerating maps or
+approved earlier models is not needed for this weapon pass.

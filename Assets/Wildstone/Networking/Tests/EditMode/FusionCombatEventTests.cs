@@ -29,6 +29,21 @@ namespace Wildstone.Tests
             Assert.Throws<ArgumentException>(() => FusionCombatEvent.FromCombat(new CombatEvent(kind, default, 1, reason: "diagnostic"), 1, 1));
         }
 
+        [Test] public void ShotgunPelletHitIdentitiesSurviveWireAndPresentationDeduplication()
+        {
+            var action=new CombatAction {Participant=1,ConnectionGeneration=1,LifeGeneration=1,AuthorityGeneration=1,Tick=1,Sequence=1,Kind=CombatActionKind.Fire,Direction=Vector3.forward};
+            var history=new Wildstone.Presentation.PresentationEventHistory();
+            var ids=new System.Collections.Generic.HashSet<string>();
+            for(int pellet=0;pellet<8;pellet++)
+            {
+                var original=new CombatEvent(CombatEventKind.Hit,action,1,2,1,Vector3.forward*5,amount:9,subIndex:pellet,weapon:WeaponKind.LaserShotgun);
+                var copy=FusionCombatEvent.FromCombat(original,pellet+1,1).ToCombat();
+                Assert.That(copy.Id,Is.EqualTo(original.Id)); Assert.That(copy.SubIndex,Is.EqualTo(pellet));
+                Assert.That(copy.Weapon,Is.EqualTo(WeaponKind.LaserShotgun));
+                Assert.That(ids.Add(copy.Id),Is.True); Assert.That(history.Accept(copy),Is.True);
+                Assert.That(history.Accept(copy),Is.False);
+            }
+        }
         [Test]
         public void EveryGameplayEventPreservesIdentityAndExactValues()
         {

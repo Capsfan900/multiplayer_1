@@ -26,6 +26,9 @@ MonoBehaviour:
   - {fileID: 7905801029847503450, guid: f535d7393f33f9044940ac3acc75e755, type: 3}
   - {fileID: 3478324114623311067, guid: 6af06bf352b603d4483af6480acce96c, type: 3}
   - {fileID: 3740379936956028615, guid: cff08fcd128b3de4aa9d214eede6ccd1, type: 3}
+  - {fileID: 5156544636603313295, guid: c2f7913bc2a165b459637ac870f489a6, type: 3}
+  - {fileID: 3224103426051724208, guid: 9118c0c358af80943b1d69695cc64509, type: 3}
+  - {fileID: 7408647920696287573, guid: 38bd3c43b51f6974a9094fdc4345fb2d, type: 3}
   BlinkPickup: {fileID: 2217181803577540101, guid: 44b2febc52e7eed408f27b08e812fc55, type: 3}
   ShieldPickup: {fileID: 3498973480606926337, guid: 488c39071d34d514bbcc8a498451692c, type: 3}
   Beam: {fileID: 2100000, guid: 5927a69e6451452449a7c336e494cf10, type: 2}

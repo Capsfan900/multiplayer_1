@@ -225,7 +225,7 @@ namespace Wildstone.Match
         {
             if(weapon==WeaponKind.None) return;
             var p=Find(a.Participant); var spec=WeaponCatalog.Get(weapon);
-            if(IsProjectile(weapon) || weapon==WeaponKind.LineDriver)
+            if(IsProjectile(weapon) || WeaponCatalog.IsHitscan(weapon))
                 Emit(CombatEventKind.Shot,a,p.Participant,position:p.Eye,vector:a.Direction,weapon:weapon);
             if(IsProjectile(weapon))
             {
@@ -236,14 +236,19 @@ namespace Wildstone.Match
                 shot.ExpireTick=Tick+Ticks(spec.Lifetime); shot.Bounces=0; shot.HitMask=0; shot.Travel=0;
                 projectiles.Add(shot);
             }
-            else if(weapon==WeaponKind.LineDriver)
+            else if(WeaponCatalog.IsHitscan(weapon))
             {
-                CombatHit hit;
-                bool found=world is IHitscanCombatWorld hitscan?
-                    hitscan.Hitscan(a,p.Eye,a.Direction*spec.Range,0,out hit):
-                    world.Sweep(p.Eye,a.Direction*spec.Range,0,p.Participant,0,out hit);
-                if(found && hit.Participant!=0)
-                    Hit(a,p.Team,Find(hit.Participant),spec.Damage,world,false,hit.Point);
+                for(int pellet=0;pellet<WeaponCatalog.HitscanPellets(weapon);pellet++)
+                {
+                    Vector3 direction=WeaponCatalog.HitscanDirection(weapon,a.Direction,pellet);
+                    CombatHit hit;
+                    bool found=world is IHitscanCombatWorld hitscan?
+                        hitscan.Hitscan(a,p.Eye,direction*spec.Range,0,out hit):
+                        world.Sweep(p.Eye,direction*spec.Range,0,p.Participant,0,out hit);
+                    if(found && hit.Participant!=0 && CombatRules.Finite(hit.Point) && CombatRules.Finite(hit.Distance) &&
+                        hit.Distance>=0 && hit.Distance<=spec.Range && (hit.Point-p.Eye).sqrMagnitude<=spec.Range*spec.Range+.01f)
+                        Hit(a,p.Team,Find(hit.Participant),spec.Damage,world,false,hit.Point,subIndex:pellet,weapon:weapon);
+                }
             }
             else
             {
@@ -297,11 +302,11 @@ namespace Wildstone.Match
                 attack.HitMask|=1<<target.Participant; Hit(attack.Action,owner.Team,target,spec.Damage,world,false,hit.Point);
             }
         }
-        void Hit(CombatAction action,int team,CombatState target,float damage,ICombatWorld world,bool stun,Vector3 point,bool selfDamage=false)
+        void Hit(CombatAction action,int team,CombatState target,float damage,ICombatWorld world,bool stun,Vector3 point,bool selfDamage=false,int subIndex=0,WeaponKind weapon=WeaponKind.None)
         {
             if(target==null || !target.Alive || (target.Team==team && !(selfDamage && target.Participant==action.Participant))) return;
             float prior=target.Shield, dealt=CombatRules.Damage(target,damage);
-            Emit(CombatEventKind.Hit,action,target.Participant,dealt,point);
+            Emit(CombatEventKind.Hit,action,target.Participant,dealt,point,subIndex:subIndex,weapon:weapon);
             if(prior>0 && target.Shield==0) Emit(CombatEventKind.ShieldBroken,action,target.Participant);
             if(stun && CombatRules.Stun(target,Tick,TickRate)) Emit(CombatEventKind.Stunned,action,target.Participant);
         }

@@ -482,3 +482,72 @@ Startup record `guest-startup-20261028-200856-804.json` reports fifteen seconds 
 zero runtime exceptions/assertions and both diagnostic drivers excluded. This is
 **unpublished, local-playtest-only**, preserving uncommitted inputs. Human animation
 feel, physical input, adverse/external networks and performance acceptance remain open.
+
+## 2026-10-28 expanded laser arsenal and weapon expression (D026)
+
+The user selected sci-fi arena weapons plus recognizable laser pistol, shotgun and
+sniper. Catalog revision3 appends those three identities, keeps earlier IDs, adds
+map-revision2 pickups on all three arenas and changes starter to held rapid fire.
+The combat owner contains initial tuning; balance is not accepted by these checks.
+
+### Native implementation evidence
+
+- `./Tools/Unity/Invoke-Unity.ps1 -Action PreparePresentation -TimeoutMinutes 5` imports the three original models and rebuilds only presentation assets. Map geometry/lightmaps were preserved; scene diffs add only revision/pickup metadata.
+- `-Action Test -TestPlatform EditMode -TestFilter 'Wildstone.Tests.CombatRulesTests;Wildstone.Tests.MenuPresentationTests;Wildstone.Tests.FusionCombatMappingTests;Wildstone.Tests.FusionCombatEventTests;Wildstone.Tests.FusionCombatWorldTests;Wildstone.Tests.PresentationImportTests;Wildstone.Tests.ArenaDefinitionTests;Wildstone.Tests.ArenaWorldTests' -TimeoutMinutes 5`: `Artifacts/Unity/EditMode-20261028-202656-758.xml`, **155 passed, zero failures/skips**. Includes all new damage/cadence/ammo/clip/snapshot rules, eight deterministic shotgun rays and pellet event IDs, SDK adapter dispatch/mapping, release-timed Lens/sword events and cancellation, ten weapon attachment imports, all map pickup support/clearance.
+- `-Action Test -TestPlatform PlayMode -TestFilter 'Wildstone.Tests.PracticeInputTests;Wildstone.Tests.FirstPersonWeaponMotionTests;Wildstone.Tests.ArenaWeaponAudioTests;Wildstone.Tests.WeaponEffectsTests;Wildstone.Tests.PresentationRuntimeTests;Wildstone.Tests.NetworkPresentationBridgeTests;Wildstone.Tests.PracticeSessionTests;Wildstone.Tests.FusionDisconnectedHitscanRunnerTests;Wildstone.Tests.FusionMatchRunnerTests' -Graphics -TimeoutMinutes 5`: `Artifacts/Unity/PlayMode-20261028-202728-298.xml`, **51 passed, zero failures/skips**. Real Input System tap/hold/release/focus/life handling, bounded reusable muzzle/audio/world effects, imported cuffs/grips, final-pose muzzle routing and event dedup, ten distinct non-silent synthesized shot waveforms, Fusion lifecycle/hitscan integration.
+- After reducing the three new first-person weapon models to70% for framing, `PlayMode-20261028-203322-539.xml` passed **35/35** for FirstPersonWeaponMotionTests, NetworkPresentationBridgeTests and WeaponEffectsTests with graphics enabled. No simulation scale or hitbox changed.
+- Earlier `PlayMode-20261028-201946-237.xml` was38/42: three new input fixtures accidentally rebound Fire to the existing Pickup key; fixed fixtures use unusedJ. One projectile fixture omitted required action direction; fixed fixture supplies forward. Production validators were preserved. Initial EditMode66/66 run omitted two mistakenly qualified Fusion filters; the final155 run above uses correct namespace and covers them.
+- Sol peer review found ring creation radius did not match animation age0 and local world beams sampled muzzle before the final weapon pose. Both were corrected, with regression tests. No remaining actionable gameplay/SDK/handling finding was reported.
+
+### Source and live limits
+
+Three original Blender4.2 exports were generated with the surgical `laser-kit` mode:
+LaserPistol984, LaserShotgun1212, LaserSniper1300 triangles. Editable .blend, FBX,
+previews and `ArtSource/laser-kit-export-manifest.json` are retained. Existing
+fourteen FBX exports still match their earlier manifest hashes. No source-project
+asset writes, new dependencies or GPU generation.
+
+Actual separate Photon processes passed `Invoke-NetworkSmoke.ps1 -Scenario combat`
+and `-Scenario reconnect` (both `-TimeoutSeconds 210`) on diagnostic
+`Smoke-20261029-002944-426`: `Artifacts/Smoke/20261028-203036-206-combat/` and
+`20261028-203036-198-reconnect/`. These cover actual movement, starter-fire dedup,
+controlled stationary hit replication and retained-seat reconnect with clean runtime
+logs/exits. New pistol/shotgun/sniper behavior is covered by native authoritative,
+SDK-dispatch and wire tests; these two live scenarios do not claim three-weapon
+external-network playtesting. Subsequent changes only affect color, framing and
+excluded capture fixtures.
+
+Early packaged captures `Artifacts/Visual/20261028-203036-200/` were superseded for
+oversized new viewmodels, dull effects and stale fixture HUD. The next26-frame run
+`20261028-203504-583` improved framing but was superseded for washed-out colors,
+a grenade gun-style muzzle flash and fixture blast occlusion behind spawn cover.
+Review findings led to saturated HDR weapon colors, no grenade muzzle burst and
+an open-space diagnostic viewpoint. Screenshot generation alone is not acceptance.
+
+### Final visual and normal-player evidence
+
+- Final material/framing/muzzle changes pass **35/35** focused graphics-enabled PlayMode tests in `Artifacts/Unity/PlayMode-20261028-203813-949.xml` (WeaponEffectsTests, FirstPersonWeaponMotionTests, NetworkPresentationBridgeTests), with no failures/skips.
+- `Artifacts/Visual/20261028-203918-040/` completed26 captures. Root inspected six effect/charge/overlap cases; two Sol reviewers inspected fourteen earlier-weapon views and six new-gun views. **25 cases accepted** for static recognition, color, muzzle placement and aim visibility. Pistol/shotgun/sniper HUD labels and reduced viewmodel framing are correct. Hands remain partly hidden by weapon geometry; these samples do not prove moving arm/reload feel.
+- The overlap fixture placed synthetic peer eyes on the observer camera plane, producing misleading near-plane bands. Only this excluded diagnostic placement changed: eight origins now sit separately three metres ahead. `BuildSmoke-20261028-204144-533.log` passed, and `Artifacts/Visual/20261028-204215-286/` completed26 captures. Root inspected the corrected `weapon-overlapping-lasers.png` and a shotgun framing spot check; both accepted. The other25 cases retain the immediately previous inspected evidence rather than being claimed reinspected. All26 weapon/effect cases therefore have explicit accepted static evidence across these two runs. No eight-player performance claim follows from the synthetic overlap case.
+- Color treatment uses saturated HDR weapon materials with a separate bright beam core; grenade throws retain projectile/fuse cues without a gun muzzle burst. Captures establish visible differentiated color/geometry, not a measured bloom-softness or human quality rating. Shared96 transient lines/64 projectiles/16 audio voices remain bounded; shotgun uses9 lines per trigger before impacts. Previous allocation calibration remains unavailable, so no measured allocation/performance claim is added.
+
+Final normal player: `Artifacts/Unity/Windows-20261028-203918-018/WildstoneArena.exe`.
+`./Artifacts/Resume/Build-GuestPreview.ps1` succeeded; log
+`Artifacts/Unity/GuestWindows-20261028-203918-018.log`. Manifest
+`Artifacts/Resume/guest-manifest-20261028-203918-018.json` records source HEAD
+`e654b3a9b87c274115383aff086ccde78e6aa206`, **1,173 inputs unchanged during build and
+200 output hashes**. `guest-startup-20261028-203918-018.json` verifies15 seconds alive,
+zero runtime exceptions/assertions and both diagnostic drivers excluded. The later
+overlap-fixture-only adjustment is excluded from this normal player.
+
+This local player includes uncommitted weapon changes and is **not a new published
+release**. Concurrent delivery committed/published an earlier snapshot; its records
+were preserved. No public-release edit was performed by this weapon continuation.
+Use F to collect a weapon and2 to select its special slot; hold Fire for the starter.
+Sniper currently fires unscoped; the scope model does not add a zoom binding.
+Remaining acceptance: human aim/animation/weapon balance/audio listening, moving-target
+and adverse/external-network cases, eight-machine rendering/frame budgets and long
+endurance. The full MVP remains open; no PlayFab setup is needed.
+
+Documentation check:87 current local links resolve. `git diff --check` passes for
+this final workspace state. Prior failed/superseded runs remain preserved.

@@ -2168,7 +2168,7 @@ MonoBehaviour:
   Definition:
     Id: terrace-steps
     DisplayName: Terrace Steps
-    Revision: 1
+    Revision: 2
     Minimum: {x: -33, y: -2, z: -36}
     Maximum: {x: 33, y: 24, z: 36}
     KillHeight: -12
@@ -2337,6 +2337,12 @@ MonoBehaviour:
       Position: {x: -14, y: 0.45, z: 22}
     - Item: grenade
       Position: {x: 14, y: 0.45, z: 22}
+    - Item: laser-pistol
+      Position: {x: -19, y: 0.45, z: -20}
+    - Item: laser-shotgun
+      Position: {x: 14, y: 4.45, z: 14}
+    - Item: laser-sniper
+      Position: {x: -8, y: 4.45, z: 26}
     ZoneRoute:
     - {x: -24, y: 0, z: -21}
     - {x: 20, y: 0, z: -21}

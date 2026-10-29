@@ -14,7 +14,7 @@ namespace Wildstone.Editor
         const string Output="Assets/Wildstone/Resources/Presentation/";
         const string CatalogPath="Assets/Wildstone/Resources/WildstonePresentation.asset";
         static readonly string[] HumanNames={"WildstoneHuman","WildstoneHumanTeam02","WildstoneHumanTeam03","WildstoneHumanTeam04"};
-        static readonly string[] WeaponNames={"LineDriver","PulseLobber","ReboundDisc","PushLens","Grenade","StunGun","LaserSword"};
+        static readonly string[] WeaponNames={"LineDriver","PulseLobber","ReboundDisc","PushLens","Grenade","StunGun","LaserSword","LaserPistol","LaserShotgun","LaserSniper"};
         static readonly string[] MaterialNames={"MatteIvory","Graphite","SoftGrey","SignalCyan","SignalAmber","SignalCoral","SignalViolet","MatteCharcoalSuit","DeepCharcoal","HeadValue","TeamMark"};
         static readonly Color[] Colors={new Color(.76f,.73f,.66f),new Color(.105f,.115f,.125f),new Color(.32f,.34f,.35f),new Color(.13f,.68f,.74f),new Color(.95f,.43f,.12f),new Color(.84f,.30f,.24f),new Color(.55f,.39f,.80f),new Color(.19f,.21f,.22f),new Color(.105f,.12f,.13f),new Color(.28f,.30f,.31f),new Color(.70f,.70f,.66f)};
         static Material[] palette;
@@ -37,14 +37,15 @@ namespace Wildstone.Editor
             var controller=HumanController();
             for(int i=0;i<HumanNames.Length;i++) catalog.Humans[i]=ModelPrefab(HumanNames[i],controller);
             catalog.Hands=ModelPrefab("FirstPersonHands",null);
+            if(catalog.Weapons.Length!=WeaponNames.Length) Array.Resize(ref catalog.Weapons,WeaponNames.Length);
             for(int i=0;i<WeaponNames.Length;i++) catalog.Weapons[i]=ModelPrefab(WeaponNames[i],null);
             catalog.BlinkPickup=ModelPrefab("BlinkPickup",null);
             catalog.ShieldPickup=ModelPrefab("ShieldPickup",null);
-            catalog.Beam=Effect("Beam",new Color(.65f,.84f,.88f));
-            catalog.Pulse=Effect("Pulse",new Color(.95f,.49f,.18f));
-            catalog.Disc=Effect("Disc",new Color(.92f,.36f,.30f));
-            catalog.Push=Effect("Push",new Color(.60f,.45f,.86f));
-            catalog.Stun=Effect("Stun",new Color(.36f,.85f,.89f));
+            catalog.Beam=Effect("Beam",new Color(.035f,.50f,1f),2);
+            catalog.Pulse=Effect("Pulse",new Color(1f,.22f,.025f),2);
+            catalog.Disc=Effect("Disc",new Color(.95f,.06f,.12f),2);
+            catalog.Push=Effect("Push",new Color(.42f,.045f,.95f),2);
+            catalog.Stun=Effect("Stun",new Color(.025f,.85f,.42f),2);
             catalog.Blink=Effect("Blink",new Color(.65f,.52f,.94f));
             catalog.Shield=Effect("Shield",new Color(.56f,.84f,.93f));
             catalog.Danger=Effect("Danger",new Color(.98f,.57f,.20f));
@@ -68,7 +69,7 @@ namespace Wildstone.Editor
             EditorUtility.SetDirty(material);
             return material;
         }
-        static Material Effect(string name,Color color) => Material(name,color,"Universal Render Pipeline/Unlit");
+        static Material Effect(string name,Color color,float intensity=1) => Material(name,new Color(color.r*intensity,color.g*intensity,color.b*intensity,1),"Universal Render Pipeline/Unlit");
         static bool Loop(string name) => name=="Idle" || name=="Run" || name=="Strafe" || name=="Aim";
         static string ClipName(string name)
         {

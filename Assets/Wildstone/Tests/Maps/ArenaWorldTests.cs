@@ -28,6 +28,17 @@ namespace Wildstone.Tests
             }
             finally { Object.DestroyImmediate(root); }
         }
+        [TestCase(0)] [TestCase(1)] [TestCase(2)]
+        public void SavedCatalogContainsSupportedLaserPickups(int index)
+        {
+            var catalog=Resources.Load<ArenaCatalog>("ArenaCatalog");
+            var map=catalog.Maps[index];
+            foreach(string item in new[]{"laser-pistol","laser-shotgun","laser-sniper"})
+                Assert.That(System.Array.FindAll(map.Pickups,p=>p.Item==item).Length,Is.EqualTo(1),map.Id+" "+item);
+            var root=ArenaBuilder.CreateGeometry(map);
+            try { Assert.That(ArenaValidation.ValidateWorld(root),Is.Empty,map.Id); }
+            finally { Object.DestroyImmediate(root); }
+        }
 
         [TestCase(0, "Gallery fin east", 27f)]
         [TestCase(2, "Cantilever tower", 28f)]

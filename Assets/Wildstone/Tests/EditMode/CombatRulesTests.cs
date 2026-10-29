@@ -59,9 +59,97 @@ namespace Wildstone.Tests
             saved.Players[0].Pending.Action.ConnectionGeneration=connection;
             Assert.That(Match().TryRestore(saved),Is.False);
         }
+        sealed class LaserWorld : EmptyCombatWorld,IHitscanCombatWorld
+        {
+            public int Queries;
+            public bool Cover,InvalidPoint;
+            public Vector3[] Directions=new Vector3[8];
+            public bool Hitscan(CombatAction action,Vector3 origin,Vector3 delta,int ignored,out CombatHit hit)
+            {
+                Directions[Queries%8]=delta.normalized; Queries++;
+                hit=new CombatHit(Cover?0:2,InvalidPoint?new Vector3(float.NaN,0,0):origin+delta.normalized*5,-delta.normalized,5);
+                return true;
+            }
+            public override bool Sweep(Vector3 origin,Vector3 delta,float radius,int owner,int ignored,out CombatHit hit)
+            { throw new System.InvalidOperationException("Laser shots must use historical query path."); }
+        }
+        [TestCase(WeaponKind.LaserPistol,32,18,1)]
+        [TestCase(WeaponKind.LaserShotgun,72,8,8)]
+        [TestCase(WeaponKind.LaserSniper,80,6,1)]
+        public void LaserSpecialUsesOneAmmoAndDistinctHistoricalPelletHits(WeaponKind kind,int damage,int ammo,int pellets)
+        {
+            var m=Match(); Equip(m.Find(1),kind); var world=new LaserWorld();
+            var action=Act(1,1,1,CombatActionKind.Fire);
+            m.Step(1,new[]{action,action},world);
+            Assert.That(m.Find(1).SpecialAmmo,Is.EqualTo(ammo-1));
+            Assert.That(m.Find(2).Health,Is.EqualTo(100-damage));
+            Assert.That(world.Queries,Is.EqualTo(pellets));
+            Assert.That(m.Events.Count(e=>e.Kind==CombatEventKind.Shot),Is.EqualTo(1));
+            var hits=m.Events.Where(e=>e.Kind==CombatEventKind.Hit).ToArray();
+            Assert.That(hits.Length,Is.EqualTo(pellets));
+            Assert.That(hits.Select(e=>e.Id).Distinct().Count(),Is.EqualTo(pellets));
+            CollectionAssert.AreEqual(Enumerable.Range(0,pellets),hits.Select(e=>e.SubIndex));
+            Assert.That(hits.All(e=>e.Weapon==kind),Is.True);
+            Assert.That(Match().TryRestore(m.Capture()),Is.True);
+            m.Step(2,new[]{Act(1,2,2,CombatActionKind.Fire)},world);
+            Assert.That(world.Queries,Is.EqualTo(pellets),"Cooldown rejects the whole trigger.");
+            m.Find(1).FireReadyTick=0; m.Find(1).SpecialAmmo=0;
+            m.Step(3,new[]{Act(1,3,3,CombatActionKind.Fire)},world);
+            Assert.That(world.Queries,Is.EqualTo(pellets),"Empty special cannot shoot.");
+        }
+        [TestCase(WeaponKind.LaserPistol)] [TestCase(WeaponKind.LaserShotgun)] [TestCase(WeaponKind.LaserSniper)]
+        public void LaserSpecialRespectsCoverFriendliesAndFiniteHitPoints(WeaponKind kind)
+        {
+            for(int scenario=0;scenario<3;scenario++)
+            {
+                var m=Match(); Equip(m.Find(1),kind);
+                var world=new LaserWorld {Cover=scenario==0,InvalidPoint=scenario==2};
+                if(scenario==1) m.Find(2).Team=0;
+                m.Step(1,new[]{Act(1,1,1,CombatActionKind.Fire)},world);
+                Assert.That(m.Find(2).Health,Is.EqualTo(100));
+                Assert.That(m.Events.Any(e=>e.Kind==CombatEventKind.Hit),Is.False);
+            }
+        }
+        [TestCase("laser-pistol",WeaponKind.LaserPistol)]
+        [TestCase("laser-shotgun",WeaponKind.LaserShotgun)]
+        [TestCase("laser-sniper",WeaponKind.LaserSniper)]
+        public void LaserPickupEquipsFiniteSpecialAndRejectsOverfullSnapshot(string item,WeaponKind kind)
+        {
+            var map=Map(); map.Pickups[0].Item=item;
+            var m=new ArenaMatch(map,60); m.AddPlayer(1,0,1,1,Vector3.zero); m.AddPlayer(2,1,1,1,Vector3.forward*5); m.Begin();
+            m.Step(1,new[]{Act(1,1,1,CombatActionKind.Pickup)},new EmptyCombatWorld());
+            Assert.That(m.Find(1).SelectedSpecial,Is.True); Assert.That(m.Find(1).SpecialWeapon,Is.EqualTo(kind));
+            Assert.That(m.Find(1).SpecialAmmo,Is.EqualTo(WeaponCatalog.Get(kind).Ammo));
+            var saved=m.Capture(); saved.Players[0].SpecialAmmo++;
+            Assert.That(m.TryRestore(saved),Is.False);
+        }
+        [Test] public void ShotgunPatternIsDeterministicFiniteAndBoundedAtVerticalAim()
+        {
+            foreach(var aim in new[]{Vector3.forward,Vector3.up,Vector3.down,new Vector3(1,2,3).normalized})
+            {
+                var rays=new Vector3[8];
+                for(int pellet=0;pellet<8;pellet++)
+                {
+                    var ray=WeaponCatalog.HitscanDirection(WeaponKind.LaserShotgun,aim,pellet); rays[pellet]=ray;
+                    Assert.That(CombatRules.Direction(ray),Is.True);
+                    Assert.That(Vector3.Angle(aim,ray),Is.LessThanOrEqualTo(5.001f));
+                    Assert.That(ray,Is.EqualTo(WeaponCatalog.HitscanDirection(WeaponKind.LaserShotgun,aim,pellet)));
+                }
+                Assert.That(rays.Distinct().Count(),Is.EqualTo(8));
+            }
+            Assert.Throws<System.ArgumentOutOfRangeException>(()=>WeaponCatalog.HitscanDirection(WeaponKind.LaserShotgun,Vector3.forward,8));
+            Assert.Throws<System.ArgumentOutOfRangeException>(()=>WeaponCatalog.HitscanDirection(WeaponKind.LaserShotgun,Vector3.zero,0));
+            Assert.That((int)WeaponKind.LaserSword,Is.EqualTo(7));
+            Assert.That((int)WeaponKind.LaserPistol,Is.EqualTo(8));
+            Assert.That((int)WeaponKind.LaserShotgun,Is.EqualTo(9));
+            Assert.That((int)WeaponKind.LaserSniper,Is.EqualTo(10));
+            Assert.That(WeaponCatalog.FromPickup("laser-pistol"),Is.EqualTo(WeaponKind.LaserPistol));
+            Assert.That(WeaponCatalog.FromPickup("laser-shotgun"),Is.EqualTo(WeaponKind.LaserShotgun));
+            Assert.That(WeaponCatalog.FromPickup("laser-sniper"),Is.EqualTo(WeaponKind.LaserSniper));
+        }
         [Test] public void StarterCadenceClipReloadAndRevisionStayConsistent()
         {
-            Assert.That(WeaponCatalog.Revision,Is.EqualTo(2));
+            Assert.That(WeaponCatalog.Revision,Is.EqualTo(3));
             Assert.That(WeaponCatalog.Get(WeaponKind.LineDriver).Damage,Is.EqualTo(13));
             Assert.That(WeaponCatalog.Get(WeaponKind.LineDriver).Ammo,Is.EqualTo(24));
             var m=Match();

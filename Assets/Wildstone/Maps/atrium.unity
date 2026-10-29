@@ -2294,7 +2294,7 @@ MonoBehaviour:
   Definition:
     Id: atrium
     DisplayName: Atrium
-    Revision: 1
+    Revision: 2
     Minimum: {x: -32, y: -2, z: -32}
     Maximum: {x: 32, y: 24, z: 32}
     KillHeight: -12
@@ -2468,6 +2468,12 @@ MonoBehaviour:
       Position: {x: -14, y: 0.45, z: 18}
     - Item: grenade
       Position: {x: 14, y: 0.45, z: 18}
+    - Item: laser-pistol
+      Position: {x: -6, y: 0.45, z: -8}
+    - Item: laser-shotgun
+      Position: {x: 6, y: 0.45, z: -8}
+    - Item: laser-sniper
+      Position: {x: 0, y: 4.45, z: 24}
     ZoneRoute:
     - {x: 0, y: 0, z: -8}
     - {x: 20, y: 0, z: -8}

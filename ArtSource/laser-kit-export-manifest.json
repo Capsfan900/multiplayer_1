@@ -1,0 +1,62 @@
+{
+  "generator": "Tools/Assets/build_assets.py laser-kit",
+  "blender": "4.2.0",
+  "provenance": "Original procedural laser pistol, twin-barrel shotgun and scoped sniper; no copied meshes or textures",
+  "axis": "Unity (X,Y,Z) -> Blender (X,-Z,Y); FBX -Z forward, Y up; metres",
+  "exports": [
+    {
+      "asset": "LaserPistol.fbx",
+      "bounds_min": [
+        -0.07500000298023224,
+        -0.2600000500679016,
+        -0.27000004053115845
+      ],
+      "bounds_max": [
+        0.07500000298023224,
+        0.22249996662139893,
+        0.38199999928474426
+      ],
+      "triangles": 984,
+      "mesh_count": 9,
+      "actions": [],
+      "source_sha256": "9248c10356468ffc5a6ecd9307921ef5e990bab151e927cdc21396247b9b42cd",
+      "fbx_sha256": "f38caa9e081aa0b7379267cd21eeae3854f940814eb2b1cca4f5b015e25d9fe7"
+    },
+    {
+      "asset": "LaserShotgun.fbx",
+      "bounds_min": [
+        -0.17399999499320984,
+        -0.24750003218650818,
+        -0.7050000429153442
+      ],
+      "bounds_max": [
+        0.17399999499320984,
+        0.20999997854232788,
+        0.7820000052452087
+      ],
+      "triangles": 1212,
+      "mesh_count": 11,
+      "actions": [],
+      "source_sha256": "f36d967d2bb8284eeedf3abaa7ba8f202285b1df98d1ee9096d5bf4d7674d1cb",
+      "fbx_sha256": "6a831c4b073c6b1dc7662ccae7eac3b2e9545175e014c50eaea34db6a67c7a62"
+    },
+    {
+      "asset": "LaserSniper.fbx",
+      "bounds_min": [
+        -0.08500000089406967,
+        -0.24750003218650818,
+        -0.7099999785423279
+      ],
+      "bounds_max": [
+        0.08500000089406967,
+        0.4350000023841858,
+        1.1119999885559082
+      ],
+      "triangles": 1300,
+      "mesh_count": 13,
+      "actions": [],
+      "source_sha256": "5fa67d354dc6a9ea7d5bf4f61adf4113e6763ed7081fd4bd85027fb0f5ce74f6",
+      "fbx_sha256": "4fd9364d5a162feeb3fb8d162a250e0d14d62a89dfa3204ccda94d383b8851b7"
+    }
+  ]
+}

@@ -194,7 +194,7 @@ namespace Wildstone.Networking
         void AddPose(string name,Action pose) => Add(name,pose,()=>fixtureView!=null);
         void ConfigureWeaponSteps()
         {
-            foreach(var weapon in new[]{WeaponKind.LineDriver,WeaponKind.PulseLobber,WeaponKind.ReboundDisc,WeaponKind.PushLens,WeaponKind.StunGun,WeaponKind.LaserSword,WeaponKind.Grenade})
+            foreach(var weapon in new[]{WeaponKind.LineDriver,WeaponKind.PulseLobber,WeaponKind.ReboundDisc,WeaponKind.PushLens,WeaponKind.StunGun,WeaponKind.LaserSword,WeaponKind.Grenade,WeaponKind.LaserPistol,WeaponKind.LaserShotgun,WeaponKind.LaserSniper})
                 for(int background=0;background<2;background++)
                 {
                     var kind=weapon; int facing=background;
@@ -223,10 +223,14 @@ namespace Wildstone.Networking
         void WeaponFixture(WeaponKind kind,int facing,CombatEventKind effect)
         {
             if(fixtureEffects!=null) DestroyImmediate(fixtureEffects.gameObject);
+            fixtureState.Position=new Vector3(0,.02f,-12);
             fixtureState.Yaw=facing==0?0:180;
             Pose(0,0,0,false,true,90);
             fixturePlayer.SelectedSpecial=kind!=WeaponKind.LineDriver && kind!=WeaponKind.Grenade;
             fixturePlayer.SpecialWeapon=fixturePlayer.SelectedSpecial?kind:WeaponKind.None;
+            session.LocalPlayer.SelectedSpecial=fixturePlayer.SelectedSpecial;
+            session.LocalPlayer.SpecialWeapon=fixturePlayer.SpecialWeapon;
+            session.LocalPlayer.SpecialAmmo=fixturePlayer.SelectedSpecial?WeaponCatalog.Get(kind).Ammo:0;
             AdvanceFixture(.01f);
             var definition=new ArenaDefinition { Id="atrium",Spawns=Array.Empty<ArenaSpawn>(),Pickups=Array.Empty<ArenaPickup>(),
                 ZoneRoute=new[]{Vector3.zero,Vector3.forward*8,Vector3.right*8} };
@@ -241,10 +245,9 @@ namespace Wildstone.Networking
             fixtureEvents.Clear(); fixtureEvents.AddRange(fixtureEffectMatch.Events);
             fixtureEffects=new GameObject("Diagnostic weapon effects",typeof(ArenaEffects)).GetComponent<ArenaEffects>();
             fixtureEffects.transform.SetParent(transform,false); fixtureEffects.Initialize(fixtureCatalog,fixtureEffectMatch);
-            Vector3? muzzle=fixtureWeapon.TryGetMuzzle(out var point)?point:(Vector3?)null;
             if(effect==CombatEventKind.Accepted || kind==WeaponKind.LaserSword)
             {
-                fixturePlayer.Pending=new PendingAttack {Weapon=kind,Action=new CombatAction {Tick=90},ResolveTick=110,EndTick=125};
+                fixturePlayer.Pending=new PendingAttack {Weapon=kind,Action=new CombatAction {Tick=80},ResolveTick=effect==CombatEventKind.Accepted?110:95,EndTick=115};
             }
             // Advance real projectile rules through an explicitly empty fixture world, not the live map.
             var empty=new EmptyCombatWorld();
@@ -256,10 +259,12 @@ namespace Wildstone.Networking
             }
             foreach(var shot in fixtureEvents)
             {
-                if(effect!=CombatEventKind.Accepted) fixtureEffects.Play(shot,fixtureEffectMatch,false,shooter.Feet,fixtureEvents,muzzle);
                 if(effect!=CombatEventKind.Accepted) fixtureWeapon.Play(shot,fixturePlayer.Participant);
             }
             AdvanceFixture(.025f);
+            Vector3? muzzle=fixtureWeapon.TryGetMuzzle(out var point)?point:(Vector3?)null;
+            if(effect!=CombatEventKind.Accepted)
+                foreach(var shot in fixtureEvents) fixtureEffects.Play(shot,fixtureEffectMatch,false,shooter.Feet,fixtureEvents,muzzle);
             if(effect!=CombatEventKind.Shot && effect!=CombatEventKind.Accepted)
             {
                 Vector3 impact=shooter.Eye+shooter.Aim*4;
@@ -271,7 +276,7 @@ namespace Wildstone.Networking
                     {
                         var spread=Quaternion.AngleAxis((i-3.5f)*3,Vector3.up)*shooter.Aim;
                         var other=new CombatAction {Participant=i+1,LifeGeneration=1,ConnectionGeneration=1,AuthorityGeneration=1,Sequence=2};
-                        var beam=new CombatEvent(CombatEventKind.Shot,other,20,position:shooter.Eye+session.Camera.transform.right*(i-3.5f)*.2f,
+                        var beam=new CombatEvent(CombatEventKind.Shot,other,20,position:shooter.Eye+shooter.Aim*3+session.Camera.transform.right*(i-3.5f)*.7f,
                             vector:spread,weapon:WeaponKind.LineDriver);
                         fixtureEffects.Play(beam,fixtureEffectMatch,false,shooter.Feet);
                     }

@@ -45,13 +45,32 @@ namespace Wildstone.Tests
 
         [TestCase(WeaponKind.LineDriver)] [TestCase(WeaponKind.PulseLobber)] [TestCase(WeaponKind.ReboundDisc)]
         [TestCase(WeaponKind.PushLens)] [TestCase(WeaponKind.Grenade)] [TestCase(WeaponKind.StunGun)] [TestCase(WeaponKind.LaserSword)]
+        [TestCase(WeaponKind.LaserPistol)] [TestCase(WeaponKind.LaserShotgun)] [TestCase(WeaponKind.LaserSniper)]
         public void EveryWeaponHasBoundedDistinctShotGeometry(WeaponKind weapon)
         {
             effects.Play(new CombatEvent(CombatEventKind.Shot,new CombatAction { Participant=1,LifeGeneration=1,Sequence=1 },0,position:Vector3.up*100,vector:Vector3.forward,weapon:weapon),match,false,Vector3.zero);
             int active=0;
             foreach(var line in root.GetComponentsInChildren<LineRenderer>(true)) if(line.name.StartsWith("Burst ") && line.enabled)
             { active++; Assert.That(line.positionCount,Is.InRange(2,24)); }
-            Assert.That(active,Is.InRange(1,6));
+            if(weapon==WeaponKind.Grenade) Assert.That(active,Is.Zero,"Thrown grenades use their projectile/fuse, not a gun muzzle flash.");
+            else Assert.That(active,Is.InRange(1,weapon==WeaponKind.LaserShotgun?12:6));
+        }
+
+        [Test] public void ShotgunFanMatchesSimulationDirectionsAndEachPelletUsesItsOwnHit()
+        {
+            var action=new CombatAction { Participant=1,LifeGeneration=1,Sequence=1 };
+            var shot=new CombatEvent(CombatEventKind.Shot,action,0,position:Vector3.up*100,vector:Vector3.forward,weapon:WeaponKind.LaserShotgun);
+            var hits=new CombatEvent[WeaponCatalog.HitscanPellets(shot.Weapon)];
+            for(int pellet=0;pellet<hits.Length;pellet++)
+                hits[pellet]=new CombatEvent(CombatEventKind.Hit,action,0,position:shot.Position+WeaponCatalog.HitscanDirection(shot.Weapon,shot.Vector,pellet)*(3+pellet),subIndex:pellet,weapon:shot.Weapon);
+            effects.Play(shot,match,false,Vector3.zero,hits);
+            for(int pellet=0;pellet<hits.Length;pellet++)
+            {
+                var line=GripAttachment.Find(root.transform,"Burst "+pellet).GetComponent<LineRenderer>();
+                Assert.That(line.positionCount,Is.EqualTo(2));
+                Assert.That(Vector3.Distance(line.GetPosition(1),hits[pellet].Position),Is.LessThan(.0001f));
+                Assert.That(Vector3.Dot((line.GetPosition(1)-line.GetPosition(0)).normalized,WeaponCatalog.HitscanDirection(shot.Weapon,shot.Vector,pellet)),Is.GreaterThan(.99999f));
+            }
         }
 
         [Test] public void CosmeticMuzzlePreservesEyeHitEndpointAndStopsAtNearCover()

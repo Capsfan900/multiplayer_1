@@ -15,7 +15,7 @@ MonoBehaviour:
   Maps:
   - Id: atrium
     DisplayName: Atrium
-    Revision: 1
+    Revision: 2
     Minimum: {x: -32, y: -2, z: -32}
     Maximum: {x: 32, y: 24, z: 32}
     KillHeight: -12
@@ -189,6 +189,12 @@ MonoBehaviour:
       Position: {x: -14, y: 0.45, z: 18}
     - Item: grenade
       Position: {x: 14, y: 0.45, z: 18}
+    - Item: laser-pistol
+      Position: {x: -6, y: 0.45, z: -8}
+    - Item: laser-shotgun
+      Position: {x: 6, y: 0.45, z: -8}
+    - Item: laser-sniper
+      Position: {x: 0, y: 4.45, z: 24}
     ZoneRoute:
     - {x: 0, y: 0, z: -8}
     - {x: 20, y: 0, z: -8}
@@ -201,7 +207,7 @@ MonoBehaviour:
     - {x: -20, y: 0, z: -8}
   - Id: split-gallery
     DisplayName: Split Gallery
-    Revision: 1
+    Revision: 2
     Minimum: {x: -42, y: -2, z: -24}
     Maximum: {x: 42, y: 24, z: 24}
     KillHeight: -12
@@ -370,6 +376,12 @@ MonoBehaviour:
       Position: {x: -26, y: 0.45, z: 7}
     - Item: grenade
       Position: {x: 26, y: 0.45, z: 7}
+    - Item: laser-pistol
+      Position: {x: -28, y: 0.45, z: -6}
+    - Item: laser-shotgun
+      Position: {x: 28, y: 0.45, z: 6}
+    - Item: laser-sniper
+      Position: {x: 0, y: 4.45, z: 10}
     ZoneRoute:
     - {x: -28, y: 0, z: -14}
     - {x: -20, y: 0, z: -14}
@@ -389,7 +401,7 @@ MonoBehaviour:
     - {x: -28, y: 0, z: 14}
   - Id: terrace-steps
     DisplayName: Terrace Steps
-    Revision: 1
+    Revision: 2
     Minimum: {x: -33, y: -2, z: -36}
     Maximum: {x: 33, y: 24, z: 36}
     KillHeight: -12
@@ -558,6 +570,12 @@ MonoBehaviour:
       Position: {x: -14, y: 0.45, z: 22}
     - Item: grenade
       Position: {x: 14, y: 0.45, z: 22}
+    - Item: laser-pistol
+      Position: {x: -19, y: 0.45, z: -20}
+    - Item: laser-shotgun
+      Position: {x: 14, y: 4.45, z: 14}
+    - Item: laser-sniper
+      Position: {x: -8, y: 4.45, z: 26}
     ZoneRoute:
     - {x: -24, y: 0, z: -21}
     - {x: 20, y: 0, z: -21}

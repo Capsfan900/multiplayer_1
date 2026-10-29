@@ -84,6 +84,25 @@ namespace Wildstone.Tests
             Assert.That(owner.GetComponentInChildren<FirstPersonBody>(),Is.Not.Null);
             session.DetachNetworkMatch();
         }
+        [Test] public void LocalLaserStartsAtRenderedMuzzleAfterRecoilAndDoesNotReplay()
+        {
+            var presentation=owner.AddComponent<ArenaPresentation>();
+            session.AttachNetworkMatch(match,1,avatars);
+            presentation.SendMessage("LateUpdate");
+            var action=new CombatAction {Participant=1,LifeGeneration=1,ConnectionGeneration=1,AuthorityGeneration=1,Sequence=1};
+            var shot=new CombatEvent(CombatEventKind.Shot,action,1,position:Vector3.up*1.65f,vector:Vector3.forward,weapon:WeaponKind.LineDriver);
+            session.PresentNetworkTick(new[]{shot},-1,false);
+            var effects=owner.GetComponentInChildren<ArenaEffects>();
+            var first=effects.transform.Find("Burst 0").GetComponent<LineRenderer>();
+            Assert.That(first.enabled,Is.False,"Local shot waits for the current rendered weapon pose.");
+            presentation.SendMessage("LateUpdate");
+            Assert.That(owner.GetComponent<WeaponView>().TryGetMuzzle(out var muzzle),Is.True);
+            Assert.That(Vector3.Distance(first.GetPosition(0),muzzle),Is.LessThan(.0001f));
+            var second=effects.transform.Find("Burst 4").GetComponent<LineRenderer>();
+            bool previouslyEnabled=second.enabled;
+            session.PresentNetworkTick(new[]{shot},-1,false); presentation.SendMessage("LateUpdate");
+            Assert.That(second.enabled,Is.EqualTo(previouslyEnabled),"Repeated network event does not create another beam.");
+        }
         [Test] public void ExternalRegistryCallsCannotReplaceOfflinePracticeMotors()
         {
             typeof(PracticeSession).GetMethod("Begin",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(session,new object[]{map});

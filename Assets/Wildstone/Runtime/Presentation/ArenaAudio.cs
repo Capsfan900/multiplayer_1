@@ -8,7 +8,7 @@ namespace Wildstone.Presentation
     {
         const int Voices=16;
         readonly AudioSource[] sources=new AudioSource[Voices];
-        readonly AudioClip[] clips=new AudioClip[14];
+        readonly AudioClip[] clips=new AudioClip[17];
         int next;
         public void Initialize()
         {
@@ -30,7 +30,7 @@ namespace Wildstone.Presentation
             int cue;
             switch(e.Kind)
             {
-                case CombatEventKind.Shot: cue=7+Mathf.Clamp((int)e.Weapon-1,0,6); break;
+                case CombatEventKind.Shot: cue=7+Mathf.Clamp((int)e.Weapon-1,0,9); break;
                 case CombatEventKind.Hit:
                 case CombatEventKind.Ricochet: cue=1; break;
                 case CombatEventKind.Explosion: cue=2; break;
@@ -49,7 +49,7 @@ namespace Wildstone.Presentation
         static AudioClip MakeShot(WeaponKind weapon)
         {
             const int rate=22050;
-            float length=weapon==WeaponKind.PulseLobber?.34f:weapon==WeaponKind.PushLens?.40f:weapon==WeaponKind.ReboundDisc?.25f:weapon==WeaponKind.LaserSword?.24f:weapon==WeaponKind.Grenade?.18f:.13f;
+            float length=weapon==WeaponKind.LaserSniper?.48f:weapon==WeaponKind.LaserShotgun?.38f:weapon==WeaponKind.LaserPistol?.17f:weapon==WeaponKind.PulseLobber?.34f:weapon==WeaponKind.PushLens?.40f:weapon==WeaponKind.ReboundDisc?.25f:weapon==WeaponKind.LaserSword?.24f:weapon==WeaponKind.Grenade?.18f:.13f;
             var data=new float[Mathf.CeilToInt(rate*length)];
             uint noise=(uint)weapon*747796405u;
             float phase=0,secondPhase=0,peak=0;
@@ -61,6 +61,9 @@ namespace Wildstone.Presentation
                 float frequency,ratio,noiseMix;
                 switch(weapon)
                 {
+                    case WeaponKind.LaserPistol: frequency=Mathf.Lerp(1400,250,x); ratio=1.75f; noiseMix=.10f; break;
+                    case WeaponKind.LaserShotgun: frequency=Mathf.Lerp(160,45,x); ratio=2.3f; noiseMix=.50f; break;
+                    case WeaponKind.LaserSniper: frequency=Mathf.Lerp(2400,80,Mathf.Sqrt(x)); ratio=1.07f; noiseMix=.22f; break;
                     case WeaponKind.LineDriver: frequency=Mathf.Lerp(1900,300,x); ratio=2.03f; noiseMix=.12f; break;
                     case WeaponKind.PulseLobber: frequency=Mathf.Lerp(190,55,x); ratio=1.5f; noiseMix=.07f; break;
                     case WeaponKind.ReboundDisc: frequency=Mathf.Lerp(680,290,x); ratio=1.414f; noiseMix=.04f; break;

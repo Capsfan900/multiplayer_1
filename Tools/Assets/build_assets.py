@@ -457,6 +457,38 @@ def weapon(root, name):
         C("BladeCore", (0, 0, .15), (0, 0, .91), .025, "cyan", .008)
         C("BladeSpine", (0, 0, .15), (0, 0, .88), .012, "ivory", .004)
         muzzle = (0, 0, .92)
+    elif name == "LaserPistol":
+        T("PistolSlide", [(-.27, .10, .13, .13), (.02, .115, .15, .14), (.31, .11, .12, .11)], "ivory")
+        B("LowerFrame", (0, .005, -.055), (.12, .09, .34), "graphite")
+        C("PistolEmitter", (0, .11, .25), (0, .11, .37), .047, "graphite")
+        R("EmitterSignal", (0, .11, .375), .044, .025, "cyan", depth=.014)
+        B("RearSight", (0, .205, -.20), (.095, .035, .035), "graphite")
+        B("FrontSight", (0, .19, .27), (.027, .025, .035), "cyan")
+        B("PowerCell", (0, -.20, -.18), (.07, .12, .07), "mid")
+        muzzle = (0, .11, .39)
+    elif name == "LaserShotgun":
+        T("ShotgunReceiver", [(-.40, .11, .25, .16), (-.13, .12, .29, .18), (.18, .12, .25, .16)], "ivory")
+        for side in (-1, 1):
+            C("ShotgunBarrel", (side * .10, .12, .10), (side * .10, .12, .76), .073, "graphite")
+            R("ShotgunEmitter", (side * .10, .12, .77), .074, .048, "amber", depth=.024)
+        B("PumpForeend", (0, -.015, .32), (.28, .10, .28), "mid")
+        B("ForeendSignal", (0, -.07, .34), (.13, .012, .15), "amber")
+        T("ShoulderStock", [(-.67, .035, .20, .15), (-.48, .07, .16, .10), (-.36, .10, .17, .10)], "graphite")
+        B("StockPad", (0, .035, -.68), (.23, .20, .05), "ivory")
+        muzzle = (0, .12, .80)
+    elif name == "LaserSniper":
+        T("SniperReceiver", [(-.42, .10, .15, .13), (-.10, .11, .17, .16), (.24, .11, .14, .13)], "ivory")
+        C("PrecisionBarrel", (0, .11, .19), (0, .11, 1.00), .043, "graphite")
+        C("MuzzleBrake", (0, .11, .96), (0, .11, 1.10), .066, "mid")
+        R("PrecisionEmitter", (0, .11, 1.105), .065, .033, "violet", depth=.014)
+        B("ScopeMount", (0, .23, -.02), (.07, .09, .27), "graphite")
+        C("ScopeTube", (0, .32, -.27), (0, .32, .29), .062, "graphite")
+        R("ScopeFront", (0, .32, .30), .078, .050, "ivory", depth=.045)
+        C("ScopeLens", (0, .32, .313), (0, .32, .319), .046, "violet")
+        B("ScopeTurret", (0, .40, .01), (.09, .07, .09), "mid")
+        T("PrecisionStock", [(-.71, .05, .17, .16), (-.48, .08, .11, .09), (-.34, .10, .14, .10)], "graphite")
+        B("SniperMagazine", (0, -.06, -.02), (.10, .22, .12), "graphite")
+        muzzle = (0, .11, 1.12)
     elif name == "BlinkPickup":
         R("BlinkOuter", (0, .15, 0), .15, .105, "ivory", axis="y", depth=.045)
         R("BlinkInner", (0, .18, 0), .092, .080, "violet", axis="y", depth=.01)
@@ -693,6 +725,9 @@ def verify_asset(path, kind):
             "LaserSword": ("BladeCore", "Guard"),
             "BlinkPickup": ("BlinkOuter", "BlinkNotch"),
             "ShieldPickup": ("ShieldBody", "ShieldStatus"),
+            "LaserPistol": ("PistolSlide", "PistolEmitter"),
+            "LaserShotgun": ("ShotgunBarrel", "PumpForeend"),
+            "LaserSniper": ("PrecisionBarrel", "ScopeTube"),
         }
         assert all(any(name.startswith(piece) for name in names) for piece in distinctive[path.stem]), (path.name, names)
     elif kind == "human":
@@ -731,9 +766,24 @@ def verify_asset(path, kind):
             "mesh_count": len(meshes), "actions": sorted(action.name for action in bpy.data.actions)}
 
 
+def build_laser_kit(root):
+    exports = []
+    for name in ("LaserPistol", "LaserShotgun", "LaserSniper"):
+        path = weapon(root, name)
+        result = verify_asset(path, "weapon")
+        result["source_sha256"] = hashlib.sha256((root / "ArtSource" / (name + ".blend")).read_bytes()).hexdigest()
+        result["fbx_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+        exports.append(result)
+    manifest = {"generator": "Tools/Assets/build_assets.py laser-kit", "blender": bpy.app.version_string,
+                "provenance": "Original procedural laser pistol, twin-barrel shotgun and scoped sniper; no copied meshes or textures",
+                "axis": "Unity (X,Y,Z) -> Blender (X,-Z,Y); FBX -Z forward, Y up; metres", "exports": exports}
+    (root / "ArtSource" / "laser-kit-export-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(manifest, indent=2))
+
+
 def build_all(root):
     output = []
-    for name in ("LineDriver", "PulseLobber", "ReboundDisc", "PushLens", "Grenade", "StunGun", "LaserSword", "BlinkPickup", "ShieldPickup"):
+    for name in ("LineDriver", "PulseLobber", "ReboundDisc", "PushLens", "Grenade", "StunGun", "LaserSword", "BlinkPickup", "ShieldPickup", "LaserPistol", "LaserShotgun", "LaserSniper"):
         path = weapon(root, name)
         output.append(verify_asset(path, "weapon"))
     for path in human(root):
@@ -756,7 +806,7 @@ def build_all(root):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["fixture", "human", "all"])
+    parser.add_argument("mode", choices=["fixture", "human", "all", "laser-kit"])
     parser.add_argument("--output-root", required=True, type=Path)
     args = parser.parse_args()
     root = args.output_root.resolve()
@@ -765,5 +815,7 @@ if __name__ == "__main__":
         fixture(root)
     elif args.mode == "human":
         print(json.dumps([verify_asset(path, "human") for path in human(root)], indent=2))
+    elif args.mode == "laser-kit":
+        build_laser_kit(root)
     else:
         build_all(root)

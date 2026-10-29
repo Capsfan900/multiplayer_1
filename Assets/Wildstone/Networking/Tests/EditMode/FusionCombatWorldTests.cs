@@ -37,21 +37,28 @@ namespace Wildstone.Tests
             public override bool Sweep(Vector3 origin,Vector3 displacement,float radius,int owner,int ignored,out CombatHit hit)
             { Present++; hit=default; return false; }
         }
-        [Test] public void OnlyLineDriverUsesHistoricalQueriesWhileTravellingProjectileStaysPresentTime()
+        [TestCase(WeaponKind.LineDriver)] [TestCase(WeaponKind.LaserPistol)]
+        [TestCase(WeaponKind.LaserShotgun)] [TestCase(WeaponKind.LaserSniper)]
+        public void LaserWeaponsUseHistoricalQueriesWhileTravellingProjectileStaysPresentTime(WeaponKind kind)
         {
             var map=ArenaLayouts.CreateAll()[0];
             var match=new ArenaMatch(map,120,true);
             Assert.That(match.AddPlayer(1,0,1,1,Vector3.zero),Is.True); Assert.That(match.Begin(),Is.True);
             var world=new QueryWorld();
+            if(kind!=WeaponKind.LineDriver)
+            {
+                var equipped=match.Find(1); equipped.SpecialWeapon=kind; equipped.SpecialAmmo=WeaponCatalog.Get(kind).Ammo; equipped.SelectedSpecial=true;
+            }
+            int expected=WeaponCatalog.HitscanPellets(kind);
             CombatAction Fire(int tick,int sequence) => new CombatAction {Participant=1,ConnectionGeneration=1,LifeGeneration=1,
                 AuthorityGeneration=1,Sequence=sequence,Tick=tick,Kind=CombatActionKind.Fire,Direction=Vector3.forward};
             Assert.That(match.Step(1,new[]{Fire(1,1)},world),Is.True);
-            Assert.That(world.Historical,Is.EqualTo(1)); Assert.That(world.Present,Is.Zero);
+            Assert.That(world.Historical,Is.EqualTo(expected)); Assert.That(world.Present,Is.Zero);
             var player=match.Find(1);
             // Grenades have their own accepted action and ammunition path.
             var grenade=Fire(2,2); grenade.Kind=CombatActionKind.Grenade; player.GrenadeAmmo=1;
             Assert.That(match.Step(2,new[]{grenade},world),Is.True);
-            Assert.That(match.Projectiles.Count,Is.EqualTo(1)); Assert.That(world.Historical,Is.EqualTo(1)); Assert.That(world.Present,Is.GreaterThan(0));
+            Assert.That(match.Projectiles.Count,Is.EqualTo(1)); Assert.That(world.Historical,Is.EqualTo(expected)); Assert.That(world.Present,Is.GreaterThan(0));
         }
     }
 }

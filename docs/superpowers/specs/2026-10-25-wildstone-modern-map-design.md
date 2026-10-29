@@ -130,3 +130,8 @@ Networking remains first in implementation order. Concept work can proceed along
 foundation design. Build reusable kit pieces in Blender where appropriate and assemble
 routes with Unity's adapted level tools under the [asset pipeline](../../ASSET-PIPELINE.md).
 This map brief does not fix numeric weapon balance or establish competitive fairness.
+
+Map revision 2 adds one laser pistol, shotgun and sniper pickup per arena. Placement
+uses existing supported floors and preserves baked scene geometry/lightmaps. The
+combat owner defines ammo/behavior; default layouts, saved catalog and scene metadata
+must agree. Native support/clearance checks cover the new pickup locations.

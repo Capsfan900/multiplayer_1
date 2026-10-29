@@ -14,7 +14,6 @@ namespace Wildstone.Networking
         public readonly int RunnerTick, ViewFrom, ViewTo, Target;
         public readonly float Alpha, RewindSeconds;
         public readonly bool Hit;
-        public WeaponKind Weapon => WeaponKind.LineDriver;
         public FusionHitscanRecord(CombatAction action,int now,int from,int to,float alpha,float rewind,bool hit,int target)
         { Action=action; RunnerTick=now; ViewFrom=from; ViewTo=to; Alpha=alpha; RewindSeconds=rewind; Hit=hit; Target=target; }
     }

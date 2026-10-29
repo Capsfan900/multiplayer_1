@@ -181,18 +181,18 @@ Live task status, evidence and rulings: [MVP progress](../../MVP-PROGRESS.md). T
 
 ### 2026-10-28 weapon expression continuation
 
-- [ ] Gameplay delegate: update WeaponCatalog/CombatState/CombatRules/ArenaMatch starter
+- [x] Gameplay delegate: update WeaponCatalog/CombatState/CombatRules/ArenaMatch starter
   tuning and revision; shared PracticeInput held cadence consumed by PracticeSession
   and FusionGameCoordinator. Update focused input/combat fixtures and diagnostic
   ammo expectations. Preserve tap edges, state generations and host validation.
-- [ ] World VFX delegate: extend ArenaEffects with fixed pooled laser cores/halos,
+- [x] World VFX delegate: extend ArenaEffects with fixed pooled laser cores/halos,
   animated impact/burst/shockwave shapes and distinct projectile trails/cores;
   infer missing event weapon context safely or request narrow payload integration.
   Add native lifecycle/geometry/budget/state-isolation checks.
-- [ ] Handling delegate: extend WeaponView with authored-muzzle pooled flashes,
+- [x] Handling delegate: extend WeaponView with authored-muzzle pooled flashes,
   distinct recoil/action/part motion and resets; ArenaAudio with distinct original
   weapon cues in existing voice pool. Add native handling/audio regressions.
-- [ ] Root: integrate optional local muzzle endpoint with authoritative eye trace,
+- [x] Root: integrate optional local muzzle endpoint with authoritative eye trace,
   add diagnostic packaged weapon sequences using production presentation paths,
   update HUD/control text only where needed. Run focused native, live Photon,
   inspect actual captures and build normal player; update owning specs/evidence.
@@ -200,3 +200,9 @@ Live task status, evidence and rulings: [MVP progress](../../MVP-PROGRESS.md). T
 Boundaries: root owns docs/ArenaPresentation/FusionVisualCheckDriver/QA tooling;
 workers own separate files named above. Root alone runs Unity after workers freeze.
 No source asset copy, new package, PlayFab, public release or GitHub visibility change.
+
+- [x] User-requested arsenal expansion: append Laser Pistol/Shotgun/Sniper through
+  combat/catalog/SDK tracing, distinct original Blender models and handling/audio,
+  pooled beam identities and every map's saved/default pickup definitions. Preserve
+  baked geometry; run native ammo/pellet/cover/replay, imported asset/socket,
+  saved-map support and packaged appearance checks before replacing current build.

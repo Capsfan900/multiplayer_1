@@ -11,7 +11,7 @@ namespace Wildstone.Tests
     public sealed class PresentationImportTests
     {
         const string Art="Assets/Wildstone/Art/";
-        static readonly string[] Weapons={"LineDriver","PulseLobber","ReboundDisc","PushLens","Grenade","StunGun","LaserSword"};
+        static readonly string[] Weapons={"LineDriver","PulseLobber","ReboundDisc","PushLens","Grenade","StunGun","LaserSword","LaserPistol","LaserShotgun","LaserSniper"};
 
         [Test]
         public void ImportedFixtureAndHumanClipsKeepTheirAxisAndOneShotContracts()

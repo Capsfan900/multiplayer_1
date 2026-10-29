@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Compile', 'Prepare', 'PrepareNetworking', 'Bake', 'Test', 'BuildWindows', 'BuildSmoke')]
+    [ValidateSet('Compile', 'Prepare', 'PreparePresentation', 'PrepareNetworking', 'Bake', 'Test', 'BuildWindows', 'BuildSmoke')]
     [string]$Action,
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path,
     [string]$UnityExe = 'C:\Program Files\Unity\Hub\Editor\6000.5.10f1\Editor\Unity.exe',
@@ -34,6 +34,7 @@ if ($Graphics) { $arguments += '-force-d3d11' }
 switch ($Action) {
     'Compile' { $arguments += @('-quit', '-executeMethod', 'Wildstone.Editor.ProjectSetup.Configure') }
     'Prepare' { $arguments += @('-quit', '-executeMethod', 'Wildstone.Editor.ContentBuild.Prepare') }
+    'PreparePresentation' { $arguments += @('-quit', '-executeMethod', 'Wildstone.Editor.PresentationBuilder.Build') }
     'PrepareNetworking' { $arguments += @('-quit', '-executeMethod', 'Wildstone.Networking.Editor.FusionContentBuild.Prepare') }
     'Bake' { $arguments += @('-quit', '-executeMethod', 'Wildstone.Editor.ArenaLighting.BakeAll') }
     'Test' {

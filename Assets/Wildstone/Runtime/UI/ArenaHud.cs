@@ -24,7 +24,7 @@ namespace Wildstone.UI
         public static string Team(int team) => Teams[Math.Max(0,Math.Min(3,team))];
         public static string WeaponName(WeaponKind kind)
         {
-            switch(kind) { case WeaponKind.LineDriver:return "Line Driver"; case WeaponKind.PulseLobber:return "Pulse Lobber"; case WeaponKind.ReboundDisc:return "Rebound Disc"; case WeaponKind.PushLens:return "Push Lens"; case WeaponKind.StunGun:return "Stun Gun"; case WeaponKind.LaserSword:return "Laser Sword"; default:return kind.ToString(); }
+            switch(kind) { case WeaponKind.LineDriver:return "Line Driver"; case WeaponKind.PulseLobber:return "Pulse Lobber"; case WeaponKind.ReboundDisc:return "Rebound Disc"; case WeaponKind.PushLens:return "Push Lens"; case WeaponKind.StunGun:return "Stun Gun"; case WeaponKind.LaserSword:return "Laser Sword"; case WeaponKind.LaserPistol:return "Laser Pistol"; case WeaponKind.LaserShotgun:return "Laser Shotgun"; case WeaponKind.LaserSniper:return "Laser Sniper"; default:return kind.ToString(); }
         }
         public void Step(PracticeSession session)
         {

@@ -13,7 +13,7 @@ New-Item -ItemType Directory -Path $run -Force|Out-Null
 $log=Join-Path $run 'player.log'
 $arguments=@('-batchmode','-force-d3d11','-screen-fullscreen','0','-screen-width','1280','-screen-height','720',
     '-logFile',('"'+$log+'"'),'--wildstone-visual-output',('"'+$run+'"'))
-$expectedCaptures=if($Weapons){20}elseif($Motion){13}else{16}
+$expectedCaptures=if($Weapons){26}elseif($Motion){13}else{16}
 if($Motion){$arguments+='--wildstone-motion-check'}
 if($Weapons){$arguments+='--wildstone-weapon-check'}
 $record=[ordered]@{mode=$(if($Weapons){'weapon-effect-fixtures-not-gameplay-proof'}elseif($Motion){'visual-pose-fixtures-not-gameplay-proof'}else{'static-screen-captures'});expectedCaptures=$expectedCaptures;executable=$Executable;arguments=$arguments;startedUtc=[DateTime]::UtcNow.ToString('o');passed=$false;error=$null}

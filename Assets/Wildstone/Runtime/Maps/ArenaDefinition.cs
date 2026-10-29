@@ -84,7 +84,8 @@ namespace Wildstone.Maps
             point.y >= Minimum.y && point.y <= Maximum.y && point.z >= Minimum.z && point.z <= Maximum.z;
 
         public static bool KnownItem(string id) => id == "line-driver" || id == "pulse-lobber" || id == "rebound-disc" ||
-            id == "push-lens" || id == "grenade" || id == "stun-gun" || id == "laser-sword" || id == "blink" || id == "shield";
+            id == "push-lens" || id == "grenade" || id == "stun-gun" || id == "laser-sword" || id == "blink" || id == "shield" ||
+            id == "laser-pistol" || id == "laser-shotgun" || id == "laser-sniper";
         private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
         private static bool Finite(Vector3 value) => Finite(value.x) && Finite(value.y) && Finite(value.z);
     }

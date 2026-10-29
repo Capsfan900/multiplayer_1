@@ -8,7 +8,8 @@ Read [HANDOFF](HANDOFF.md) for current evidence and next work,
 [BACKLOG](BACKLOG.md) for stages, and [DECISIONS](DECISIONS.md) for accepted choices.
 The root [README](../README.md) describes the workspace; [AGENTS](../AGENTS.md)
 defines contributor practice.
-Latest local polish includes sixteen inspected packaged captures and a five-minute
+Latest local work adds first-person legs/handling and a laser pistol/shotgun/sniper arsenal.
+Earlier polish includes sixteen inspected packaged captures and a five-minute
 eight-process Photon soak; [QA](QA.md#2026-10-28-unattended-polish-and-current-build)
 records the current build, exact results and remaining external/input gates.
 Use [QA](QA.md) for evidence limits and remaining acceptance commands,

@@ -253,3 +253,23 @@ Acceptance: native hold/release/cooldown/clip/reload/focus regressions; bounded 
 lifecycle and no simulation mutation; packaged weapon/effect captures; real Photon
 combat/reconnect regression and fresh normal player. Human feel/audio listening,
 full eight-machine/performance and adverse-network acceptance stay separate.
+
+User clarification: sci-fi arena direction **plus recognizable laser pistol,
+shotgun and sniper**. Append these weapons to the special-slot roster; preserve
+existing enum IDs and increase catalog revision to 3. New builder defaults:
+
+| Weapon | Initial behavior |
+| --- | --- |
+| Laser Pistol | 32 damage, 65 m hitscan, 0.28 s interval, 18 shots; compact precise sidearm |
+| Laser Shotgun | Eight deterministic 9-damage rays, 5-degree cone, 24 m range, 0.85 s interval, 8 shells; one ammo cost per trigger |
+| Laser Sniper | 80 damage, 110 m hitscan, 1.2 s interval, 6 shots; long white laser beam |
+
+Each ray uses existing authoritative bounded hitscan/rewind and cover checks.
+Shotgun pellet sub-identities prevent presentation dedup from dropping valid hits;
+a trigger emits one shot cue and spends one shell. No added headshot multiplier,
+scope input or special reload/reserve rules are implied. These weapons use the
+existing finite special-ammo inventory and replacements, with pickups on all three
+maps (map revision 2). Models must have distinct compact/wide/long silhouettes,
+editable Blender sources, original palette and validated grip/muzzle/support sockets.
+Shotgun rendering may use up to twelve transient lines per trigger (nine initially)
+within the unchanged 96-line global pool. Other triggers retain the six-line budget.

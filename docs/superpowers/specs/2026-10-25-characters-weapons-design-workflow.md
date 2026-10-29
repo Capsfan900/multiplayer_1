@@ -153,3 +153,15 @@ to the relevant stage. Weapon inclusion is settled; exact models, animation,
 framing and numeric statistics remain production work. Use the documented
 [Blender-to-Unity asset pipeline](../../ASSET-PIPELINE.md), auditing reusable source
 assets before replacing them. Concept illustrations are references, not final meshes.
+
+### Expanded laser arsenal (2026-10-28)
+
+The user explicitly requested recognizable pistol, shotgun and sniper forms alongside
+the sci-fi arena roster. Original `LaserPistol`, `LaserShotgun` and `LaserSniper`
+Blender sources/FBX extend the original palette and socket contract. Compact slide,
+wide paired barrels/fore-end and long barrel/scope distinguish their silhouettes.
+`Tools/Assets/build_assets.py laser-kit` generates only these three models;
+`ArtSource/laser-kit-export-manifest.json` records provenance and hashes. Gameplay
+and initial tuning belong to the combat owner; scope geometry is not a zoom control.
+Native import/contact checks and actual packaged weapon images remain the acceptance
+path. Earlier seven-weapon counts describe the historical starter roster.

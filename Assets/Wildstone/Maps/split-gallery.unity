@@ -2168,7 +2168,7 @@ MonoBehaviour:
   Definition:
     Id: split-gallery
     DisplayName: Split Gallery
-    Revision: 1
+    Revision: 2
     Minimum: {x: -42, y: -2, z: -24}
     Maximum: {x: 42, y: 24, z: 24}
     KillHeight: -12
@@ -2337,6 +2337,12 @@ MonoBehaviour:
       Position: {x: -26, y: 0.45, z: 7}
     - Item: grenade
       Position: {x: 26, y: 0.45, z: 7}
+    - Item: laser-pistol
+      Position: {x: -28, y: 0.45, z: -6}
+    - Item: laser-shotgun
+      Position: {x: 28, y: 0.45, z: 6}
+    - Item: laser-sniper
+      Position: {x: 0, y: 4.45, z: 10}
     ZoneRoute:
     - {x: -28, y: 0, z: -14}
     - {x: -20, y: 0, z: -14}

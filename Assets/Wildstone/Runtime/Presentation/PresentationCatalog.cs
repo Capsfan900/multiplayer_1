@@ -7,7 +7,7 @@ namespace Wildstone.Presentation
     {
         public GameObject[] Humans = new GameObject[4];
         public GameObject Hands;
-        public GameObject[] Weapons = new GameObject[7];
+        public GameObject[] Weapons = new GameObject[10];
         public GameObject BlinkPickup, ShieldPickup;
         public Material Beam, Pulse, Disc, Push, Stun, Blink, Shield, Danger, ZoneIdle, ZoneOwned, ZoneContested;
 

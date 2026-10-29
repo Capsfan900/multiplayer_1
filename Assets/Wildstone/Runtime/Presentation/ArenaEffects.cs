@@ -40,7 +40,7 @@ namespace Wildstone.Presentation
         {
             catalog=assets;
             brightCore=new Material(assets.Beam) { name="Weapon bright core" };
-            brightCore.SetColor("_BaseColor",new Color(.86f,1f,1f));
+            brightCore.SetColor("_BaseColor",new Color(3.44f,4f,4f));
             octahedron=CreateOctahedron();
             for(int i=0;i<BurstCapacity;i++) bursts[i]=Line("Burst "+i,assets.Beam,.035f);
             for(int i=0;i<ProjectileCapacity;i++)
@@ -115,15 +115,26 @@ namespace Wildstone.Presentation
             {
                 case CombatEventKind.Shot:
                     Remember(e);
-                    if(e.Weapon==WeaponKind.LineDriver)
+                    if(e.Weapon==WeaponKind.Grenade) break;
+                    if(e.Weapon==WeaponKind.LaserShotgun)
+                    {
+                        for(int pellet=0;pellet<WeaponCatalog.HitscanPellets(e.Weapon);pellet++)
+                        {
+                            ShotSegment(e,events,muzzle,out var start,out var end,pellet);
+                            Segment(start,end,catalog.Beam,reducedMotion?.025f:.04f,.15f);
+                        }
+                        if(!reducedMotion) Ring(muzzle??e.Position,e.Vector,.27f,catalog.Beam,.16f);
+                    }
+                    else if(WeaponCatalog.IsHitscan(e.Weapon))
                     {
                         ShotSegment(e,events,muzzle,out var start,out var end);
-                        Segment(start,end,catalog.Beam,reducedMotion?.055f:.11f,.14f);
+                        bool pistol=e.Weapon==WeaponKind.LaserPistol,sniper=e.Weapon==WeaponKind.LaserSniper;
+                        Segment(start,end,catalog.Beam,pistol?.045f:sniper?.065f:reducedMotion?.055f:.11f,pistol?.11f:sniper?.24f:.14f);
                         if(!reducedMotion)
                         {
-                            Segment(start,end,brightCore,.028f,.10f);
-                            Ring(start,e.Vector,.16f,catalog.Beam,.13f);
-                            Ring(end,e.Vector,.18f,catalog.Beam,.16f);
+                            Segment(start,end,brightCore,pistol?.014f:sniper?.018f:.028f,sniper?.28f:.10f);
+                            Ring(start,e.Vector,pistol?.10f:sniper?.22f:.16f,catalog.Beam,.13f);
+                            if(!pistol) Ring(end,e.Vector,sniper?.36f:.18f,sniper?brightCore:catalog.Beam,sniper?.30f:.16f);
                         }
                     }
                     else if(e.Weapon==WeaponKind.PushLens)
@@ -144,11 +155,12 @@ namespace Wildstone.Presentation
                     }
                     break;
                 case CombatEventKind.Hit:
-                    WeaponKind impact=ContextWeapon(e.Action);
+                    WeaponKind impact=e.Weapon!=WeaponKind.None?e.Weapon:ContextWeapon(e.Action);
                     Material impactMaterial=impact==WeaponKind.None?catalog.Danger:MaterialFor(impact);
                     Vector3 incoming=ContextDirection(e.Action);
-                    Ring(e.Position,incoming,.24f,impactMaterial,.22f);
-                    if(!reducedMotion) Sparks(e.Position,-incoming,impactMaterial,.65f,4,.20f);
+                    if(impact==WeaponKind.LaserShotgun && e.SubIndex>=0 && e.SubIndex<WeaponCatalog.HitscanPellets(impact)) incoming=WeaponCatalog.HitscanDirection(impact,incoming,e.SubIndex);
+                    Ring(e.Position,incoming,impact==WeaponKind.LaserSniper?.42f:impact==WeaponKind.LaserShotgun?.14f:.24f,impactMaterial,.22f);
+                    if(!reducedMotion) Sparks(e.Position,-incoming,impactMaterial,impact==WeaponKind.LaserSniper?.95f:.65f,impact==WeaponKind.LaserShotgun?2:4,.20f);
                     break;
                 case CombatEventKind.Ricochet:
                     Ring(e.Position,Vector3.up,.30f,catalog.Disc,.22f);
@@ -201,9 +213,10 @@ namespace Wildstone.Presentation
             for(int i=0;i<contextIds.Length;i++) if(contextWeapons[i]!=WeaponKind.None && contextIds[i].Equals(key)) return contextDirections[i];
             return Vector3.up;
         }
-        public static void ShotSegment(in CombatEvent shot,IReadOnlyList<CombatEvent> events,Vector3? muzzle,out Vector3 start,out Vector3 end)
+        public static void ShotSegment(in CombatEvent shot,IReadOnlyList<CombatEvent> events,Vector3? muzzle,out Vector3 start,out Vector3 end,int pellet=-1)
         {
             Vector3 direction=shot.Vector.sqrMagnitude>.0001f?shot.Vector.normalized:Vector3.forward;
+            if(pellet>=0) direction=WeaponCatalog.HitscanDirection(shot.Weapon,direction,pellet);
             float range=WeaponCatalog.Get(shot.Weapon).Range;
             end=shot.Position+direction*range;
             if(Physics.Raycast(shot.Position,direction,out var wall,range,Wildstone.Movement.MotorTuning.WorldMask,QueryTriggerInteraction.Ignore)) end=wall.point;
@@ -211,7 +224,7 @@ namespace Wildstone.Presentation
             if(events!=null) for(int i=0;i<events.Count;i++)
             {
                 var hit=events[i];
-                if(hit.Kind==CombatEventKind.Hit && identity.Equals(new PresentationActionKey(hit.Action)) && hit.Tick==shot.Tick &&
+                if(hit.Kind==CombatEventKind.Hit && (pellet<0 || hit.SubIndex==pellet) && identity.Equals(new PresentationActionKey(hit.Action)) && hit.Tick==shot.Tick &&
                     Vector3.Dot(hit.Position-shot.Position,direction)>=0 && (hit.Position-shot.Position).sqrMagnitude<(end-shot.Position).sqrMagnitude) end=hit.Position;
             }
             start=muzzle??shot.Position;
@@ -268,6 +281,7 @@ namespace Wildstone.Presentation
                 case WeaponKind.StunGun: return catalog.Stun;
                 case WeaponKind.Grenade: return catalog.Danger;
                 case WeaponKind.PushLens: return catalog.Push;
+                case WeaponKind.LaserSniper: return brightCore;
                 default: return catalog.Beam;
             }
         }

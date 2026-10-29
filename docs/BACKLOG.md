@@ -11,8 +11,9 @@ Delivery checkpoint: current-state snapshot `316a00f` is published as public pre
 `preview-20261028-316a00f` with user approval. Build/startup/package evidence is in
 [QA](QA.md). Ongoing development and remaining acceptance stages stay open.
 
-Current work: playtest D025 first-person legs, arm/hand animation and pronounced
+Current work: playtest D026 expanded laser arsenal/balance and D025 first-person legs, arm/hand animation and pronounced
 slide feel, then finish external-network acceptance and packaged input checks.
+D026 adds laser pistol/shotgun/sniper pickups on all maps, rapid starter fire and distinct weapon presentation; native155 EditMode/51 PlayMode plus35 final checks pass.
 D025 implementation passes 35 focused native checks, thirteen inspected pose
 captures and fresh combat/reconnect regressions. Same-PC separate-process Photon gameplay, reconnect,
 movement/fire deduplication, controlled stationary hits, late admission, eight-player

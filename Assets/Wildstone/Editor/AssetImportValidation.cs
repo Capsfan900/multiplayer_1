@@ -86,7 +86,7 @@ public sealed class WildstoneModelImportPostprocessor : AssetPostprocessor
     static readonly HashSet<string> AuthoredModels = new HashSet<string>(StringComparer.Ordinal)
     {
         "AxisFixture.fbx", "LineDriver.fbx", "PulseLobber.fbx", "ReboundDisc.fbx", "PushLens.fbx",
-        "Grenade.fbx", "StunGun.fbx", "LaserSword.fbx", "FirstPersonHands.fbx", "BlinkPickup.fbx",
+        "Grenade.fbx", "StunGun.fbx", "LaserSword.fbx", "LaserPistol.fbx", "LaserShotgun.fbx", "LaserSniper.fbx", "FirstPersonHands.fbx", "BlinkPickup.fbx",
         "ShieldPickup.fbx", "WildstoneHuman.fbx", "WildstoneHumanTeam02.fbx", "WildstoneHumanTeam03.fbx", "WildstoneHumanTeam04.fbx"
     };
 

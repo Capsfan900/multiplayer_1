@@ -104,13 +104,16 @@ namespace Wildstone.Presentation
             var prefab=catalog.Weapon(selected);
             if(prefab==null) return;
             weapon=Instantiate(prefab,socket);
+            if(selected==WeaponKind.LaserPistol || selected==WeaponKind.LaserShotgun || selected==WeaponKind.LaserSniper)
+                weapon.transform.localScale*=.7f;
             GripAttachment.Align(weapon.transform,socket);
             SetLayer(weapon.transform,ViewLayer);
             support=GripAttachment.Find(weapon.transform,"LeftHand");
             muzzle=GripAttachment.Find(weapon.transform,"Muzzle");
             string part=selected==WeaponKind.LineDriver?"SplitRail":selected==WeaponKind.PulseLobber?"OrbChamber":
                 selected==WeaponKind.ReboundDisc?"DiscSignal":selected==WeaponKind.PushLens?"InnerField":
-                selected==WeaponKind.StunGun?"WarningBar":selected==WeaponKind.LaserSword?"BladeCore":null;
+                selected==WeaponKind.StunGun?"WarningBar":selected==WeaponKind.LaserSword?"BladeCore":
+                selected==WeaponKind.LaserPistol?"PistolSlide":selected==WeaponKind.LaserShotgun?"PumpForeend":selected==WeaponKind.LaserSniper?"PrecisionBarrel":null;
             var geometry=part==null?null:GripAttachment.Find(weapon.transform,part);
             if(geometry!=null)
             {
@@ -176,14 +179,14 @@ namespace Wildstone.Presentation
                 if(kind!=WeaponKind.Grenade)
                 {
                     recoil=1;
-                    recoilDuration=kind==WeaponKind.PulseLobber?.28f:kind==WeaponKind.PushLens?.25f:kind==WeaponKind.ReboundDisc?.20f:kind==WeaponKind.LaserSword?.18f:.125f;
-                    recoilDistance=kind==WeaponKind.PulseLobber?.10f:kind==WeaponKind.PushLens?.085f:kind==WeaponKind.StunGun?.035f:.055f;
-                    recoilPitch=kind==WeaponKind.PulseLobber?14:kind==WeaponKind.StunGun?4:8;
-                    recoilTwist=kind==WeaponKind.ReboundDisc?-10:kind==WeaponKind.LaserSword?12:0;
+                    recoilDuration=kind==WeaponKind.LaserSniper?.38f:kind==WeaponKind.LaserShotgun?.30f:kind==WeaponKind.LaserPistol?.16f:kind==WeaponKind.PulseLobber?.28f:kind==WeaponKind.PushLens?.25f:kind==WeaponKind.ReboundDisc?.20f:kind==WeaponKind.LaserSword?.18f:.125f;
+                    recoilDistance=kind==WeaponKind.LaserSniper?.13f:kind==WeaponKind.LaserShotgun?.12f:kind==WeaponKind.LaserPistol?.06f:kind==WeaponKind.PulseLobber?.10f:kind==WeaponKind.PushLens?.085f:kind==WeaponKind.StunGun?.035f:.055f;
+                    recoilPitch=kind==WeaponKind.LaserSniper?17:kind==WeaponKind.LaserShotgun?16:kind==WeaponKind.LaserPistol?9:kind==WeaponKind.PulseLobber?14:kind==WeaponKind.StunGun?4:8;
+                    recoilTwist=kind==WeaponKind.LaserShotgun?5:kind==WeaponKind.LaserPistol?3:kind==WeaponKind.ReboundDisc?-10:kind==WeaponKind.LaserSword?12:0;
                 }
                 if(kind==currentWeapon && kind!=WeaponKind.LaserSword && kind!=WeaponKind.Grenade)
                 {
-                    flashDuration=kind==WeaponKind.PulseLobber?.18f:kind==WeaponKind.PushLens?.20f:.10f;
+                    flashDuration=kind==WeaponKind.LaserSniper?.11f:kind==WeaponKind.LaserShotgun?.16f:kind==WeaponKind.PulseLobber?.18f:kind==WeaponKind.PushLens?.20f:.10f;
                     flashRemaining=flashDuration;
                     shotDirection=value.Vector.sqrMagnitude>.001f?value.Vector.normalized:overlay.transform.forward;
                 }
@@ -257,8 +260,10 @@ namespace Wildstone.Presentation
         {
             switch(kind)
             {
+                case WeaponKind.LaserShotgun:
                 case WeaponKind.PulseLobber: return catalog.Pulse;
                 case WeaponKind.ReboundDisc: return catalog.Disc;
+                case WeaponKind.LaserSniper:
                 case WeaponKind.PushLens: return catalog.Push;
                 case WeaponKind.StunGun: return catalog.Stun;
                 default: return catalog.Beam;
@@ -282,7 +287,7 @@ namespace Wildstone.Presentation
             Vector3 forward=flashRemaining>0?shotDirection:overlay.transform.forward;
             Vector3 right=Vector3.Cross(overlay.transform.up,forward).normalized,up=Vector3.Cross(forward,right);
             float progress=flashRemaining>0?1-flashRemaining/flashDuration:0;
-            float radius=charge>0?Mathf.Lerp(.15f,.055f,charge):Mathf.Lerp(.035f,currentWeapon==WeaponKind.PushLens?.22f:.09f,progress);
+            float radius=charge>0?Mathf.Lerp(.15f,.055f,charge):Mathf.Lerp(.035f,currentWeapon==WeaponKind.PushLens?.22f:currentWeapon==WeaponKind.LaserShotgun?.16f:.09f,progress);
             float size=reducedMotion?.5f:1;
             for(int i=0;i<muzzleElements.Length;i++)
             {
@@ -290,7 +295,7 @@ namespace Wildstone.Presentation
                 line.startWidth=line.endWidth=(i==0?.022f:.009f)*size;
             }
             var core=muzzleElements[0];
-            float length=(currentWeapon==WeaponKind.LineDriver?.22f:currentWeapon==WeaponKind.PulseLobber?.12f:.08f)*size;
+            float length=(currentWeapon==WeaponKind.LaserSniper?.35f:currentWeapon==WeaponKind.LaserShotgun?.16f:currentWeapon==WeaponKind.LaserPistol?.13f:currentWeapon==WeaponKind.LineDriver?.22f:currentWeapon==WeaponKind.PulseLobber?.12f:.08f)*size;
             core.SetPosition(0,origin); core.SetPosition(1,origin+forward*length*.5f); core.SetPosition(2,origin+forward*length);
             var ring=muzzleElements[1];
             for(int i=0;i<17;i++)

@@ -17,8 +17,10 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
   startup and ZIP/digest checks pass; [QA](QA.md) records exact evidence. Concurrent
   edits made after capture remain outside that release. No new online/visual acceptance.
 
-- Active follow-up D026: creative weapon/laser/VFX pass. The body/slide build below
-  predates this weapon continuation; validation/build replacement is in progress.
+- D026 implemented: laser pistol/shotgun/sniper, held rapid starter fire, distinct
+  models/handling/audio and bounded colored blast effects. Native155 EditMode/51
+  PlayMode plus35 final focused regressions pass. Current local build includes this
+  continuation; the separately published snapshot predates final edits. See QA.
 
 - Implemented continuation: visible first-person legs, articulated hands/arms and stronger
   slide presentation requested by the user (D025). Source audit confirms slide
@@ -51,10 +53,10 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
   pass; human animation loop contracts and attachment checks pass.
 - Four Python map regressions pass. Fourteen model/source hash pairs and all 73
   saved map meshes were verified without regenerating the approved source assets.
-- Latest local Windows build: `Artifacts/Unity/Windows-20261028-200856-804/WildstoneArena.exe`.
+- Latest local Windows build: `Artifacts/Unity/Windows-20261028-203918-018/WildstoneArena.exe`.
   Photon-only Host/Join and offline Practice are packaged; no account login.
   Build succeeded and 15-second headless startup showed no logged exceptions.
-  Source stayed unchanged during compilation (1,157 inputs; 200 output hashes).
+  Source stayed unchanged during compilation (1,173 inputs; 200 output hashes).
   This preserves uncommitted inputs and is local-playtest-only, not published or
   accepted as a full online MVP. [QA](QA.md) records commands/manifests.
 - Unattended polish fixes menu focus, HUD lifetime/layout, settings scrollbar contrast

@@ -35,6 +35,15 @@ namespace Wildstone.Tests
             var map = Valid(); map.Spawns[0].Team = 1;
             Assert.That(map.Validate(), Has.Some.Contains("Team 0 needs two"));
         }
+        [Test] public void EveryArenaOffersTheThreeLaserWeaponPickups()
+        {
+            foreach(var map in ArenaLayouts.CreateAll())
+                foreach(string item in new[]{"laser-pistol","laser-shotgun","laser-sniper"})
+                {
+                    Assert.That(System.Array.FindAll(map.Pickups,p=>p.Item==item).Length,Is.EqualTo(1),map.Id+" "+item);
+                    Assert.That(map.Revision,Is.EqualTo(2));
+                }
+        }
         [Test] public void UnknownPickupCannotShip()
         {
             var map = Valid(); map.Pickups[0].Item = "typo";

@@ -30,6 +30,9 @@ namespace Wildstone.Maps
             kit.Pick("push-lens", 10, 0, -10);
             kit.Pick("laser-sword", 0, 4, 18);
             kit.Pick("stun-gun", 0, 0, 8);
+            kit.Pick("laser-pistol", -6, 0, -8);
+            kit.Pick("laser-shotgun", 6, 0, -8);
+            kit.Pick("laser-sniper", 0, 4, 24);
             kit.Utilities(14, 18);
             return kit.Finish(new[] { V(0, 0, -8), V(20, 0, -8), V(20, 0, -4), V(20, 4, 12),
                 V(20, 4, 22), V(-20, 4, 22), V(-20, 4, 12), V(-20, 0, -4), V(-20, 0, -8) });
@@ -53,6 +56,9 @@ namespace Wildstone.Maps
             kit.Pick("push-lens", 28, 0, 0);
             kit.Pick("laser-sword", -12, 0, -5);
             kit.Pick("stun-gun", 12, 0, 5);
+            kit.Pick("laser-pistol", -28, 0, -6);
+            kit.Pick("laser-shotgun", 28, 0, 6);
+            kit.Pick("laser-sniper", 0, 4, 10);
             kit.Utilities(26, 7);
             return kit.Finish(new[] { V(-28, 0, -14), V(-20, 0, -14), V(-6, 4, -14), V(0, 4, -14),
                 V(0, 4, 14), V(6, 4, 14), V(20, 0, 14), V(28, 0, 14), V(28, 0, -14),
@@ -80,6 +86,9 @@ namespace Wildstone.Maps
             kit.Pick("push-lens", 14, 4, 7);
             kit.Pick("laser-sword", -19, 0, -15);
             kit.Pick("stun-gun", 0, 4, 26);
+            kit.Pick("laser-pistol", -19, 0, -20);
+            kit.Pick("laser-shotgun", 14, 4, 14);
+            kit.Pick("laser-sniper", -8, 4, 26);
             kit.Utilities(14, 22);
             return kit.Finish(new[] { V(-24, 0, -21), V(20, 0, -21), V(20, 0, -16), V(20, 4, 0),
                 V(20, 4, 22), V(-25, 4, 22), V(-25, 4, 12), V(-25, 0, -4), V(-25, 0, -21) });
@@ -95,7 +104,7 @@ namespace Wildstone.Maps
             private readonly List<ArenaPickup> pickups = new List<ArenaPickup>();
             public Kit(string id, string name, float width, float depth)
             {
-                map = new ArenaDefinition { Id = id, DisplayName = name, Minimum = V(-width / 2, -2, -depth / 2), Maximum = V(width / 2, 24, depth / 2) };
+                map = new ArenaDefinition { Id = id, DisplayName = name, Revision = 2, Minimum = V(-width / 2, -2, -depth / 2), Maximum = V(width / 2, 24, depth / 2) };
                 Slab("Foundation", 0, 0, 0, width, depth, 2, StoneTone.Ash);
                 Box("South boundary", 0, 3, -depth / 2 + .5f, width, 6, 1);
                 Box("North boundary", 0, 3, depth / 2 - .5f, width, 6, 1);

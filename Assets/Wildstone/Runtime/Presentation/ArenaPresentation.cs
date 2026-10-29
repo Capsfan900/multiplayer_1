@@ -20,6 +20,7 @@ namespace Wildstone.Presentation
         WeaponView view;
         FirstPersonBody body;
         int localDiscontinuity;
+        readonly List<CombatEvent> localEffects=new List<CombatEvent>(256);
         void Awake()
         {
             session=GetComponent<PracticeSession>();
@@ -46,6 +47,7 @@ namespace Wildstone.Presentation
         {
             StopPresentation();
             history=new PresentationEventHistory();
+            localEffects.Clear();
             lastFeet.Clear();
             effects=new GameObject("Arena effects",typeof(ArenaEffects)).GetComponent<ArenaEffects>();
             effects.transform.SetParent(transform,false);
@@ -64,6 +66,7 @@ namespace Wildstone.Presentation
         void OnSettingsChanged() { view?.SyncProjection(session.Camera); }
         void StopPresentation()
         {
+            localEffects.Clear();
             if(view!=null) { view.Teardown(session!=null?session.Camera:null); Destroy(view); view=null; }
             if(body!=null) { Destroy(body.gameObject); body=null; }
             if(effects!=null) { Destroy(effects.gameObject); effects=null; }
@@ -80,13 +83,17 @@ namespace Wildstone.Presentation
             {
                 var e=session.CombatEvents[i];
                 if(!history.Accept(e)) continue;
-                if(session.LocalPlayer!=null && session.LocalPlayer.Alive && session.LocalPlayer.Connected)
+                if(e.Kind!=CombatEventKind.Shot && session.LocalPlayer!=null && session.LocalPlayer.Alive && session.LocalPlayer.Connected)
                     view?.Play(e,session.LocalParticipantId);
                 lastFeet.TryGetValue(e.Action.Participant,out var departure);
-                Vector3? muzzle=null;
-                if(e.Kind==CombatEventKind.Shot && e.Action.Participant==session.LocalParticipantId &&
-                   view!=null && view.TryGetMuzzle(out var muzzlePosition)) muzzle=muzzlePosition;
-                effects.Play(e,match,session.Settings.ReducedMotion,departure,session.CombatEvents,muzzle);
+                bool localWeapon=e.Action.Participant==session.LocalParticipantId &&
+                    (e.Kind==CombatEventKind.Shot || e.Kind==CombatEventKind.Hit || e.Kind==CombatEventKind.Explosion || e.Kind==CombatEventKind.Ricochet);
+                if(localWeapon)
+                {
+                    // Bound deferred cosmetics even after a long frame; gameplay and audio already consumed the event.
+                    if(localEffects.Count<256) localEffects.Add(e);
+                }
+                else effects.Play(e,match,session.Settings.ReducedMotion,departure,session.CombatEvents);
                 var target=match.Find(e.Target);
                 var position=(e.Kind==CombatEventKind.Stunned || e.Kind==CombatEventKind.ShieldBroken || e.Kind==CombatEventKind.ShieldActivated) && target!=null?target.Feet:e.Position;
                 audio.Play(e,position,session.Settings.EffectsVolume);
@@ -102,6 +109,8 @@ namespace Wildstone.Presentation
             if(session.Match!=null && effects!=null)
             {
                 PresentState();
+                if(session.LocalPlayer!=null && session.LocalPlayer.Alive && session.LocalPlayer.Connected)
+                    for(int i=0;i<localEffects.Count;i++) if(localEffects[i].Kind==CombatEventKind.Shot) view?.Play(localEffects[i],session.LocalParticipantId);
                 if(session.Motor!=null && session.LocalPlayer!=null)
                 {
                     var motor=session.Motor.CaptureState();
@@ -115,6 +124,11 @@ namespace Wildstone.Presentation
                     view?.Present(session.LocalPlayer,catalog,motor,session.Match.Tick,dt,session.Settings.ReducedMotion);
                     body?.Present(session.LocalPlayer,motor,dt,session.Settings.ReducedMotion);
                 }
+                Vector3? muzzle=view!=null && view.TryGetMuzzle(out var point)?point:(Vector3?)null;
+                for(int i=0;i<localEffects.Count;i++)
+                    effects.Play(localEffects[i],session.Match,session.Settings.ReducedMotion,Vector3.zero,localEffects,
+                        localEffects[i].Kind==CombatEventKind.Shot?muzzle:null);
+                localEffects.Clear();
                 effects.Present(session.Match,session.Settings.ReducedMotion,session.ZoneCaptor,session.ZoneContested);
             }
         }

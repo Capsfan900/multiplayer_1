@@ -8,7 +8,7 @@ namespace Wildstone.Tests
     [TestFixture,Category("Native")]
     public sealed class ArenaWeaponAudioTests
     {
-        [Test] public void SevenWeaponsHaveDistinctBoundedOriginalCuesAndReuseSixteenVoices()
+        [Test] public void TenWeaponsHaveDistinctBoundedOriginalCuesAndReuseSixteenVoices()
         {
             var root=new GameObject("Audio fixture",typeof(ArenaAudio));
             try
@@ -18,13 +18,13 @@ namespace Wildstone.Tests
                 Assert.That(sources.Length,Is.EqualTo(16));
                 var clips=new System.Collections.Generic.HashSet<AudioClip>();
                 double previousFingerprint=0;
-                for(int i=1;i<=7;i++)
+                for(int i=1;i<=10;i++)
                 {
                     var shot=new CombatEvent(CombatEventKind.Shot,new CombatAction { Participant=1 },10,weapon:(WeaponKind)i);
                     audio.Play(shot,Vector3.zero,.5f);
                     var clip=sources[i-1].clip;
                     Assert.That(clips.Add(clip),Is.True);
-                    Assert.That(clip.length,Is.InRange(.1f,.41f));
+                    Assert.That(clip.length,Is.InRange(.1f,.49f));
                     var samples=new float[clip.samples]; Assert.That(clip.GetData(samples,0),Is.True);
                     float peak=0; double energy=0,fingerprint=0;
                     for(int j=0;j<samples.Length;j++)

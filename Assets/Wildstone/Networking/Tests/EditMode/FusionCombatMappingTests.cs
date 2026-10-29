@@ -58,6 +58,17 @@ namespace Wildstone.Tests
             Exact(pickup, FusionPickupState.FromPickup(pickup).ToPickup());
         }
 
+        [TestCase(WeaponKind.LaserPistol)] [TestCase(WeaponKind.LaserShotgun)] [TestCase(WeaponKind.LaserSniper)]
+        public void ExpandedSpecialRoundTripsWithoutChangingEnumIds(WeaponKind kind)
+        {
+            var player=new CombatState {Participant=1,Team=0,LifeGeneration=1,ConnectionGeneration=1,
+                SpecialWeapon=kind,SpecialAmmo=WeaponCatalog.Get(kind).Ammo,SelectedSpecial=true};
+            var restored=FusionCombatState.FromCombat(player).ToCombat();
+            Assert.That(CombatRules.ValidPlayer(restored),Is.True);
+            Assert.That(restored.SpecialWeapon,Is.EqualTo(kind)); Assert.That(restored.SpecialAmmo,Is.EqualTo(player.SpecialAmmo));
+            restored.SpecialAmmo++;
+            Assert.That(CombatRules.ValidPlayer(restored),Is.False);
+        }
         [Test]
         public void NullPendingIsDistinctFromAnAttackWithDefaultFields()
         {
