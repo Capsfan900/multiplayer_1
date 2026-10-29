@@ -45,6 +45,10 @@ namespace Wildstone.Match
         public MovingZone Zone { get; }
         public Vector3 ZonePosition => Zone.Position(Tick-startTick);
         public int ElapsedTicks => Tick-startTick;
+        public int StartTick => startTick;
+        public int AbsenceSince => absenceSince;
+        public int OppositionStableSince => oppositionStableSince;
+        public IReadOnlyList<int> ScoreTicks => scoreTicks;
         public IReadOnlyList<CombatState> Players => players;
         public IReadOnlyList<PickupState> Pickups => pickups;
         public IReadOnlyList<ArenaProjectile> Projectiles => projectiles;
@@ -87,16 +91,17 @@ namespace Wildstone.Match
             if(p==null || p.LifeGeneration!=life || !CombatRules.Finite(feet) || !CombatRules.Direction(aim) || !CombatRules.Finite(capsuleHeight) || capsuleHeight<.8f || capsuleHeight>1.8f) return false;
             p.Feet=feet; p.Aim=aim; p.CapsuleHeight=capsuleHeight; return true;
         }
-        public bool SetConnection(int participant,int generation,bool connected)
+        public bool SetConnection(int participant,int generation,bool connected,bool forceFreshLife=false)
         {
             var p=Find(participant);
             if(p==null || generation<p.ConnectionGeneration || (connected && !p.Connected && generation<=p.ConnectionGeneration)) return false;
             if(!connected && generation!=p.ConnectionGeneration) return false;
             if(p.Connected==connected && generation==p.ConnectionGeneration) return true;
-            if(connected && p.LifeGeneration>=int.MaxValue-1) { Phase=ArenaMatchPhase.Aborted; return false; }
+            bool retainAvatar=connected && !forceFreshLife && !p.Connected && p.Alive && Tick<p.DisconnectUntil;
+            if(connected && !retainAvatar && p.LifeGeneration>=int.MaxValue-1) { Phase=ArenaMatchPhase.Aborted; return false; }
             p.ConnectionGeneration=generation; p.Connected=connected;
             if(!connected) { p.DisconnectUntil=Tick+5*TickRate; p.Pending=null; }
-            else { p.DisconnectUntil=0; Respawn(p); }
+            else { p.DisconnectUntil=0; if(!retainAvatar) Respawn(p); }
             return true;
         }
         public bool Step(int tick,IReadOnlyList<CombatAction> commands,ICombatWorld world,bool authority=true,Action simulateMovement=null)
@@ -144,7 +149,7 @@ namespace Wildstone.Match
             foreach(var p in players)
             {
                 if(p.Shield>0 && Tick>=p.ShieldUntil) { p.Shield=0; Emit(CombatEventKind.ShieldExpired,SystemAction(p),p.Participant); }
-                if(p.ReloadUntil>0 && Tick>=p.ReloadUntil) { p.ReloadUntil=0; p.StarterAmmo=12; }
+                if(p.ReloadUntil>0 && Tick>=p.ReloadUntil) { p.ReloadUntil=0; p.StarterAmmo=WeaponCatalog.StarterAmmo; }
                 if(!p.Alive && p.Connected && Tick>=p.RespawnTick) Respawn(p);
             }
         }
@@ -164,7 +169,7 @@ namespace Wildstone.Match
                 case CombatActionKind.SelectSpecial:
                     if(p.SpecialWeapon==WeaponKind.None) return Reject(a,"No special weapon."); p.SelectedSpecial=true; break;
                 case CombatActionKind.Reload:
-                    if(p.Suppressed(Tick) || p.SelectedSpecial || p.StarterAmmo==12 || p.ReloadUntil>0 || p.Pending!=null) return Reject(a,"Cannot reload.");
+                    if(p.Suppressed(Tick) || p.SelectedSpecial || p.StarterAmmo==WeaponCatalog.StarterAmmo || p.ReloadUntil>0 || p.Pending!=null) return Reject(a,"Cannot reload.");
                     p.ReloadUntil=Tick+Ticks(WeaponCatalog.ReloadSeconds); break;
                 case CombatActionKind.Shield:
                     if(p.ShieldCharges==0 || p.Shield>0) return Reject(a,"Shield unavailable or already active.");
@@ -212,7 +217,7 @@ namespace Wildstone.Match
             if(item.Item=="blink") { if(p.BlinkCharges==1) return Reject(a,"Blink slot full."); p.BlinkCharges=1; }
             else if(item.Item=="shield") { if(p.ShieldCharges==1) return Reject(a,"Shield slot full."); p.ShieldCharges=1; }
             else if(weapon==WeaponKind.Grenade) { if(p.GrenadeAmmo==2) return Reject(a,"Grenades full."); p.GrenadeAmmo=2; }
-            else if(weapon==WeaponKind.LineDriver) { if(p.StarterAmmo==12) return Reject(a,"Starter clip full."); p.StarterAmmo=12; p.ReloadUntil=0; }
+            else if(weapon==WeaponKind.LineDriver) { if(p.StarterAmmo==WeaponCatalog.StarterAmmo) return Reject(a,"Starter clip full."); p.StarterAmmo=WeaponCatalog.StarterAmmo; p.ReloadUntil=0; }
             else { p.SpecialWeapon=weapon; p.SpecialAmmo=WeaponCatalog.Get(weapon).Ammo; p.SelectedSpecial=true; p.Pending=null; }
             item.Generation++; item.AvailableTick=Tick+Ticks(WeaponCatalog.PickupSeconds); Emit(CombatEventKind.Pickup,a,p.Participant,position:item.Position); return true;
         }
@@ -220,7 +225,8 @@ namespace Wildstone.Match
         {
             if(weapon==WeaponKind.None) return;
             var p=Find(a.Participant); var spec=WeaponCatalog.Get(weapon);
-            Emit(CombatEventKind.Shot,a,p.Participant,position:p.Eye,vector:a.Direction,weapon:weapon);
+            if(IsProjectile(weapon) || weapon==WeaponKind.LineDriver)
+                Emit(CombatEventKind.Shot,a,p.Participant,position:p.Eye,vector:a.Direction,weapon:weapon);
             if(IsProjectile(weapon))
             {
                 reservedProjectiles--;
@@ -232,7 +238,11 @@ namespace Wildstone.Match
             }
             else if(weapon==WeaponKind.LineDriver)
             {
-                if(world.Sweep(p.Eye,a.Direction*spec.Range,0,p.Participant,0,out var hit) && hit.Participant!=0)
+                CombatHit hit;
+                bool found=world is IHitscanCombatWorld hitscan?
+                    hitscan.Hitscan(a,p.Eye,a.Direction*spec.Range,0,out hit):
+                    world.Sweep(p.Eye,a.Direction*spec.Range,0,p.Participant,0,out hit);
+                if(found && hit.Participant!=0)
                     Hit(a,p.Team,Find(hit.Participant),spec.Damage,world,false,hit.Point);
             }
             else
@@ -250,6 +260,8 @@ namespace Wildstone.Match
                 if(pending==null || Tick<pending.ResolveTick) continue;
                 if(!p.Alive || (Tick<p.StunUntil && pending.Action.Tick<Tick) || p.DiscontinuityTick>pending.Action.Tick) { p.Pending=null; continue; }
                 var spec=WeaponCatalog.Get(pending.Weapon);
+                if(pending.LastSampleTick<0)
+                    Emit(CombatEventKind.Shot,pending.Action,p.Participant,position:p.Eye,vector:pending.Direction,weapon:pending.Weapon);
                 if(pending.Weapon==WeaponKind.PushLens)
                 {
                     foreach(var target in players)
@@ -361,7 +373,7 @@ namespace Wildstone.Match
             if(p.LifeGeneration>=int.MaxValue-1) { Phase=ArenaMatchPhase.Aborted; return; }
             CombatRules.ClearLife(p); p.Health=100; p.Alive=true; p.LifeGeneration++; p.LastActionSequence=-1;
             p.CapsuleHeight=1.8f;
-            p.StarterAmmo=12; p.FireReadyTick=Tick; p.GrenadeReadyTick=Tick; p.RespawnTick=0;
+            p.StarterAmmo=WeaponCatalog.StarterAmmo; p.FireReadyTick=Tick; p.GrenadeReadyTick=Tick; p.RespawnTick=0;
             int count=0; for(int i=0;i<map.Spawns.Length;i++) if(map.Spawns[i].Team==p.Team) count++;
             if(count>0)
             {

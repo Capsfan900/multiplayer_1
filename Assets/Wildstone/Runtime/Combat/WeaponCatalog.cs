@@ -12,14 +12,14 @@ namespace Wildstone.Combat
     }
     public static class WeaponCatalog
     {
-        public const int Revision=1, DefaultTickRate=120, MaximumProjectiles=64;
+        public const int Revision=2, StarterAmmo=24, DefaultTickRate=120, MaximumProjectiles=64;
         public const float Health=100, Shield=60, ShieldSeconds=6, ReloadSeconds=1.2f, RespawnSeconds=3, PickupSeconds=15;
         public static int Ticks(float seconds,int rate) => (int)Math.Ceiling(seconds*rate-0.00001);
         public static WeaponSpec Get(WeaponKind kind)
         {
             switch(kind)
             {
-                case WeaponKind.LineDriver: return new WeaponSpec(26,70,.30f,12);
+                case WeaponKind.LineDriver: return new WeaponSpec(13,70,.15f,StarterAmmo);
                 case WeaponKind.PulseLobber: return new WeaponSpec(60,90,.90f,10,18,4,20,lifetime:5);
                 case WeaponKind.ReboundDisc: return new WeaponSpec(35,112,.60f,10,28,lifetime:4);
                 case WeaponKind.PushLens: return new WeaponSpec(0,8,.85f,6,windup:.18f);

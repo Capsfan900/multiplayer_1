@@ -76,36 +76,25 @@ After import, Photon documents entering the App ID through Fusion Hub or
 checkout. Import and a configured App ID alone do not implement the missing online
 adapters or establish internet compatibility.
 
-## 3. Identity/profile configuration
+## 3. Photon-only private matches
 
-The foundation requires verified, recoverable player identity for secure reconnect.
-Photon room codes alone are not account authentication. The initial provider client
-now implements recoverable PlayFab email login/registration/recovery and Photon-token
-acquisition. Its current Development Mode allows no-charge, low-volume evaluation
-with up to **1,000 lifetime player accounts per title** and ten development titles.
-This fits initial friend testing, but its terms exclude high-volume load testing;
-production and endurance-test eligibility must be resolved separately. Foundation
-Mode requires an Xbox publishing commitment and is not assumed here.
-[Pricing](https://developer.microsoft.com/en-us/games/products/playfab/pricing/),
-[service modes](https://developer.microsoft.com/en-us/games/products/playfab/terms/).
+PlayFab was removed at the user's direction (D023). Do not create a PlayFab title,
+request a Title ID or configure its Photon add-on. The game has no account login.
+The existing Fusion App ID remains the service configuration; do not request it again.
+An optional ignored `Assets/Wildstone/Resources/WildstoneOnline.json` selects
+`{"region":"us"}`. All participants must use the same region and exact build.
+When omitted, the game uses `us` as the common region.
 
-The user requested a dashboard walkthrough; Title ID and setup completion have not
-yet been supplied. No account request was made by the development tools and no paid
-plan was selected. When proceeding,
-create a development title through your own Microsoft sign-in and provide its Title
-ID. Associate the Fusion App ID with that title's Photon add-on; in Photon configure
-the title's `/photon/authenticate` URL and disable anonymous connections. The client
-must obtain a Photon authentication token after recoverable player sign-in; a local
-device/custom ID is insufficient for this project's identity requirement. Keep
-passwords, session tickets and tokens out of files/logs, and never put a provider
-administrator secret in a build. Exact configuration still needs live verification.
-[Official Fusion/PlayFab integration](https://doc.photonengine.com/fusion/v2/manual/connection-and-matchmaking/authentication/playfab),
-[PlayFab Photon token API](https://learn.microsoft.com/en-us/rest/api/playfab/client/authentication/get-photon-authentication-token?view=playfab-rest).
+Temporary Photon guest IDs and match credentials remain in memory. Reconnect can
+recover a held seat while the game remains open; closing/restarting it creates a
+new guest. This does not offer verified accounts, persistent profiles or recovery
+across devices. Private room codes locate a match, not a person's account.
 
-The Photon-side URL, anonymous-client setting and token flow above were rechecked
-against the official integration page on 2026-10-27; dashboard/title configuration
-remains unverified. Its sample uses a device Custom ID and logs the token: do not
-copy those parts into this project. Retain recoverable login and omit token logging.
+If an old custom-auth provider was configured in the Photon dashboard, remove that
+obsolete PlayFab requirement before Photon-only testing. The configured app passed a live private-host/admission/team/ready smoke in `us`;
+remote-client and cloud migration acceptance still need verification. No paid upgrade
+is authorized or needed by this code change. The game's host/join flow must report service errors without exposing
+credentials. Photon service quotas still apply.
 
 ## 4. Real internet and feel checks
 

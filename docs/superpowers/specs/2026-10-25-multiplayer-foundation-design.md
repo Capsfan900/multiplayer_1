@@ -1,37 +1,113 @@
 # Multiplayer foundation — design for review
 
-Updated: 2026-10-27. Movement, session and combat state/rules have managed and
-native offline checks. Real Fusion/provider integration, full visual/gameplay and
+Updated: 2026-10-28. Movement, session and combat state/rules have managed and
+native checks plus separate-process Photon gameplay, reconnect, capacity and
+graceful/crash migration evidence. External-network, full visual/gameplay and
 performance acceptance remain open. The targets below are requirements, not measured results;
 see [current evidence](../../MVP-PROGRESS.md).
 
 2026-10-27 integration checkpoint: the real Fusion SDK and local App ID are present.
 `Assets/Wildstone/Networking` contains lossless input/motor wire structs, a networked
-movement behaviour, proxy presentation, private runner lifecycle and a recoverable
-PlayFab client. [QA](../../QA.md) owns native results. These components are not yet
-composed into the full menu/lobby/match/recovery path; no internet acceptance is implied.
+movement behaviour, proxy presentation and private runner lifecycle. D023 removes
+PlayFab and account sign-in. Photon guest admission, match/combat replication,
+bounded SDK hitscan rewind and reconnect are now composed. Host migration code uses
+the SDK token and complete checkpoint validation before spawning replacement objects.
+[QA](../../QA.md) owns native results and remaining gates; no internet acceptance is implied.
 
 Movement restores the whole motor state before each SDK simulation tick. An
 authoritative spawn supplies its position, life and runner tick origin explicitly;
 the motor's Awake snapshot may predate Fusion's placement of the clone. Client
 sample sequences only deduplicate intent and cannot set authoritative motor time.
-The deduplication cursor is networked so rollback restores it. Missing/repeated
+The deduplication cursor is networked so rollback restores it. On the first forward
+prediction after input authority arrives, the received avatar snapshot can precede
+the current client tick. Catch up that initial confirmed snapshot using the existing
+missing-input hold policy, capped at the existing 360-tick recovery budget, then
+apply the current SDK input only to its own tick. Keep the tick origin unchanged.
+Host, resimulation and subsequent prediction steps still require exact sequential
+state. Historical orb contacts use the corresponding runner tick. Authority changes
+reset only the one-time bootstrap eligibility; they never waive snapshot validation.
+This follows Fusion's snapshot-reset/prediction lifecycle, with the initial arrival
+gap reproduced in real separate-process testing; see [Photon controller timing](https://doc.photonengine.com/fusion/v2/concepts-and-patterns/networked-controller-code).
+ Missing/repeated
 samples use the existing bounded hold policy. Proxy colliders use current state;
 a separate visual child may interpolate real SDK snapshot buffers, snapping across
-life/teleport epochs. This initial adapter refuses runner-local physics scenes and
-shared launch-orb state until their queries/world state participate in rollback.
+life/teleport epochs. Runner-local physics scenes remain unsupported. Up to sixteen
+stable-ID launch orbs now share replicated state on the simulated match object;
+consumption uses runner ticks even when player motor origins differ. SDK rollback
+restores the orb array, and recovery rebases remaining cooldowns onto the new runner.
+Missing initial world state denies orb consumption without mutating offline state.
 
-Provider implementation uses PlayFab email/password login, registration and recovery,
-then requests a Photon token bound to the returned PlayFab ID. HTTPS requests are
-bounded, cancellable and do not log or persist credentials. A configuration flag
-or client-supplied account string is not proof of verified identity. Host-side
-admission still must bind the actual authenticated Photon subject before any seat
-or avatar is assigned; dashboard setup and live rejection tests remain mandatory.
+The Photon-only flow uses a random guest identifier for the running game and a
+separate cryptographic credential for each match. Neither is a recoverable account.
+Admission binds the SDK-reported peer identifier; reclaiming a held seat also requires
+the original credential. Display labels never grant control. Credentials remain in
+memory, outside room metadata and logs. App restart and cross-device account recovery
+are outside this flow. Live admission and rejected-takeover tests remain mandatory.
+
+The current implementation uses bounded network arrays for eight combatants,
+32 pickup slots, 64 projectiles and 128 presentation events. Presentation events
+never mutate gameplay and may be evicted under overload; acknowledgement/rejection
+diagnostic text is not replicated. Woven object sizes must fit the SDK allocation
+limit, verified separately from compilation. Hitscan queries use SDK-observed view
+ticks with the section 8 rewind cap; static cover and travelling projectiles retain
+current-time queries. Combat RPCs use the SDK send tick and reject commands older
+than the implemented 150 ms window, future ticks and retired connection/life epochs.
+Client render snapshots currently allocate at 20 Hz. Avatar discovery polls at
+5 Hz using reusable runner-local SDK lists. Rebuild the presentation registry only
+when membership, avatar reference, network ID or effective render root changes;
+late arrivals, despawns and replacement roots must still propagate. Allocation
+comparisons require a positive calibration probe. The current Unity BCL counter
+failed calibration, so no measured allocation saving is claimed; performance
+acceptance remains open.
+
+Graceful departure freezes gameplay objects before validating the final checkpoint.
+Transport continues pumping; a replicated final-freeze marker caps recovery's observed
+gameplay tick so upload time cannot masquerade as lost simulation. Its clock anchor
+is latched once, includes delayed receipt/upload time, and cannot extend wall-clock
+holds. Final publication follows any in-flight periodic upload within one five-second
+budget. New input, combat, admission and lobby changes are rejected while frozen.
+The resumed lobby clears this marker before normal recovery warmup.
+
+During migration, retain an already loaded matching map and its colliders when the
+loader is idle and map ID/revision match. A replacement runner must not unload the
+environment underneath restored avatars during neutral warmup ticks.
+
+Recovery checkpoints include canonical session deadlines, credential hashes, full
+combat/motor state and original pending load/vulnerability deadlines. A replacement
+host validates the entire object set and restores into an isolated rules instance;
+retired SDK peer bindings never grant control. Rejoining peers must present the
+retained Photon guest identity and match credential, acknowledge loaded content
+and pass the history warmup. A living held avatar keeps
+its state only within the original vulnerability window; a released/replaced seat
+gets a fresh life. Local hook tests are not evidence of service-driven host migration.
+
+`HostMigrationResume` is synchronous: complete checkpoint validation, isolated rule
+installation and world restoration finish inside that callback. The SDK may invoke
+it after the replacement runner's `StartGame` task returns. The elected host awaits
+a separate callback-completion task before accepting startup, bounded by the same
+recovery deadline. Callback failure, cancellation or a missing completion aborts
+recovery; an asynchronous callback must not report success while restoration is
+still pending. The [separate-process checks](../../TOOLING.md#separate-process-photon-checks)
+distinguish graceful departure from orchestrator-injected process termination.
+
+A transport `Timeout` on an already running or warming-up remote client may precede
+the SDK migration token. Given a valid recovery baseline, freeze gameplay on that
+disconnected runner and retain its cloud connection and callback ownership so Photon
+can complete election. Do not start a custom election or close transport before the
+token arrives. Other disconnect reasons, including a host kick, retain the immediate
+cleanup and explicit guest-reconnect path. The first timeout starts the single
+recovery deadline; repeated timeouts, token receipt and replacement startup cannot
+reset it. Leave/cancel and deadline expiry close the waiting connection and clear
+its wait state. Retired-runner callbacks cannot revive a cancelled attempt. The
+post-fix process-kill scenario and reconnect/graceful regressions pass in the
+same-machine Photon checks recorded in [QA](../../QA.md). This does not establish
+every callback ordering, adverse network profile or independent-network acceptance.
 
 SDK provisioning checkpoint: Fusion 2.1.3 Stable build 2390 is imported, its supplied
 App ID is configured locally and native compilation passes. [QA](../../QA.md) records
-the package/hash evidence and required Physics 2D dependency. Live service behavior,
-simulation/rewind configuration and gameplay adapters remain unverified.
+the package/hash evidence, required Physics 2D dependency, observed service behavior
+and remaining simulation, rewind and recovery acceptance gates. SDK import and
+compilation alone do not establish those results.
 
 ## 1. Intent, decisions and scope
 
@@ -82,8 +158,8 @@ Proposed choices to approve with this design:
 - A player-hosted authoritative simulation with predicted remote-client movement,
   reconciliation and bounded hitbox rewind. The host runs the same gameplay rules,
   but its machine is trusted by the other players and has a latency advantage.
-- Managed Photon sessions/NAT traversal/relay and proposed managed PlayFab identity
-  and minimal profiles. No bespoke allocator, admission service or result backend.
+- Managed Photon sessions/NAT traversal/relay and temporary guest identifiers.
+  No account/profile backend (D023). No bespoke allocator, admission service or result backend.
   Start with private friend sessions in one common Photon region.
 - Initial target: 120 Hz simulation, 60 Hz authoritative snapshots, uncapped rendering
   with a 144 FPS reference target. These are budgets to prove, not measured results.
@@ -147,7 +223,7 @@ The source reuse inventory remains in the historical arena proposal.
 ## 3. Smallest complete foundation deliverable
 
 A packaged Windows game able to host or join, a plain host-session/join-code interface,
-recoverable login and minimal profile, and a generated test course with walls,
+temporary guest sessions, and a generated test course with walls,
 ramps, water, a launch orb, target dummies and player spawn points. It supports eight
 players total (one host plus seven remote clients), team assignment, late join,
 reconnect, bounded host migration, one hitscan test gun, one projectile, a
@@ -164,8 +240,8 @@ Automated input clients are test machinery, not gameplay bots.
 | --- | --- | --- |
 | Remote client / host's local player input | Input sampling, prediction where applicable, camera, presentation, local settings | Supplying final damage, health, ammo, team or score through player commands |
 | Player host | Fixed-tick simulation, movement resolution, collisions, combat, pickups, teams, zone, match summary and seat reservations | Other players' login credentials, service administrator secrets, blocking service calls on the simulation thread |
-| Managed identity/profile service | Verified account identity and display profile | Frame-by-frame gameplay or certification of host-reported scores |
-| Photon Cloud | Session discovery, authenticated service connections, NAT/relay and migration coordination | Independently verifying gameplay run on the player's PC |
+| Photon guest identifier | Identifies a connection within the temporary session | Proving a person's identity or a recoverable account |
+| Photon Cloud | Session discovery, service connections, NAT/relay and migration coordination | Independently verifying account ownership or gameplay run on the player's PC |
 
 The host is also a combatant and the room organizer. Local inputs pass through the
 same rule validation as remote inputs, but the host process can bypass that code.
@@ -174,13 +250,12 @@ simulate honestly or keep a session alive. Scope is responsive friend matches,
 not ranked integrity or dedicated-server competitive fairness. Host departure
 invokes the bounded migration/failure behavior in section 7.
 
-Client requests carry bounded inputs and identifiers. Validate authenticated sender,
+Client requests carry bounded inputs and identifiers. Validate SDK-bound sender,
 membership, ownership, tick age, action rate, enums, ranges, finite numbers and packet
 size. Never trust damage values or movement delta supplied by a client. Use Fusion
 and provider-supported transport/security features; no bespoke encryption protocol.
 Service administrator credentials remain outside every game build and repository.
-Player login tokens go only to the intended managed provider, never another player.
-Do not treat a connection token or caller-selected account ID as proof of identity.
+Do not treat a connection token or caller-selected guest ID as proof of account identity.
 
 ## 5. Simulation, input and movement replay
 
@@ -298,14 +373,13 @@ late callbacks and commands from a retired generation. A retry cannot duplicate 
 seat or start a second local runner. UI distinguishes joining, full team,
 incompatible build, reconnecting, migrating and failed recovery.
 
-Flow: authenticate with managed providers -> create or join a private Photon room
+Flow: establish a temporary Photon guest connection -> create or join a private room
 by code in the same region -> host assigns a seat -> load matching content ->
 exchange readiness -> spawn. The code locates the session; it is not account
-identity. Use Photon-supported authentication and session APIs; no fleet allocation,
-custom admission tickets, server leases or self-hosted endpoints. A host is an
-ordinary authenticated player, not a certified trusted server. Validate the SDK's
-mapping from authenticated account to connected peer during compatibility work;
-never accept a claimed identity from a gameplay RPC or connection token alone.
+identity. Use Photon-supported session APIs; no fleet allocation, server leases or
+self-hosted endpoints. A host is an ordinary player, not a certified trusted server.
+Validate the SDK's mapping from guest ID to connected peer; gameplay RPCs cannot
+select their own sender or acquire another seat.
 
 Capacity is four teams by two slots, including the host. The host serializes seat
 assignment with reconnect holds in authoritative match state. Two simultaneous joins
@@ -316,11 +390,11 @@ in a match. Starting requires at least two occupied teams. Clients pin protocol,
 build, map and ruleset versions; another player cannot supply executable content.
 
 On a remote-client disconnect, neutralize inputs, remove zone presence and reserve
-the account's seat for 30 seconds. Keep its avatar vulnerable for five seconds
-before despawning. Reconnect must bind the verified account and its session-scoped
+the guest's seat for 30 seconds. Keep its avatar vulnerable for five seconds
+before despawning. Reconnect must bind the same guest ID and its session-scoped
 reconnect credential to the same seat; invalidate the old connection generation
 before restoring input authority. A second connection cannot control it concurrently.
-An already active account is rejected rather than silently taking over. A despawned
+An already active guest ID is rejected rather than silently taking over. A despawned
 avatar uses ordinary respawn and starter gear. No pickup-ammo restoration,
 invulnerability or score reset. An expired seat is released. Connection tokens help
 restore ownership but are not authentication; keep tokens out of room metadata and
@@ -406,32 +480,28 @@ rules. [Photon connection loss](https://doc.photonengine.com/fusion/v2/manual/co
 
 ## 8. Player data and persistence
 
-Proposed managed PlayFab authentication integrates with Photon; no custom auth API
-is deployed. A recoverable provider account and validated display name are the
-persistent foundation scope. The proposed initial login uses PlayFab's SDK
-email/password and provider-supported recovery flow; anonymous development identities stay in test
-configuration. Disable anonymous Photon admission in the authenticated configuration.
-Passwords/tokens go to the intended provider only and are redacted from diagnostics;
-never ship service secret keys or save credentials in PlayerPrefs. Steam linking is
-not assumed.
-[Photon/PlayFab integration](https://doc.photonengine.com/fusion/v2/manual/connection-and-matchmaking/authentication/playfab)
+D023 removes PlayFab. Private friend matches use Photon guest connections without
+email, passwords, account registration or a separate profile backend. A random
+identifier lasts for the game process; the reconnect credential lasts for the match.
+These are temporary capabilities, not verified identities. A fresh process starts
+as a new guest and cannot recover a previous seat or persistent profile. Never save
+reconnect credentials in PlayerPrefs or ship service administrator secrets.
 
 Keep these records separate:
 
 | Record | Minimal fields | Authority/lifetime |
 | --- | --- | --- |
-| Account/profile | Stable provider account ID, validated display name | Managed provider; recoverable across reinstall |
+| Guest identifier | Random identifier reported through Photon | In memory for the running game; not recoverable across restart/reinstall |
 | Local settings | Sensitivity, binds, video/audio/accessibility preferences | Local only; separate product/key namespace, clamped values |
-| Session member | Account ID, team/seat, match ID, connection generation, reconnect/absence state | Host network state; migratable, expires with match |
+| Session member | Guest ID, credential hash, team/seat, match ID, connection generation, reconnect/absence state | Host network state; migratable, expires with match |
 | Player simulation | Entity/spawn IDs, motor state, health, weapon/ammo | Host network state; never loaded from a player save |
 | Match summary | Match ID, build/ruleset, participants, final scores, completion/abort state | Session display only; host-reported and untrusted |
 
-Use the provider's profile validation, ownership and error handling. Keep no extra
-profile database or bespoke revision/migration service for one display name. Serialize
-local writes and re-read provider state after an uncertain response. Concurrent
-changes from another device follow the provider's documented behavior, verified in
-tests. Local settings upgrades remain versioned and fixture-tested if needed.
-Missing profile data must not fabricate rewards or gameplay power.
+There is no account/profile database or profile synchronization. Local settings
+upgrades remain versioned and fixture-tested if needed. The existing core field
+name `VerifiedSubject` denotes the peer-bound guest ID in this adapter; its name
+does not establish provider verification. Reclaiming a held seat additionally
+requires the original credential, even if a caller copies that guest ID.
 
 There is no trusted persistent result pipeline, durable submission queue, ranking,
 currency or reward ledger. Final summaries are replicated for the session only and
@@ -441,11 +511,10 @@ An interrupted match with no terminal state is aborted/unknown, never silently a
 If saved match history is requested later, it requires an explicitly unverified
 format and retention decision, not an implied competitive record.
 
-Provider outages block new login/admission when identity cannot be verified. Existing
-validated matches may continue while transport permits; profile writes show a retry
-state without blocking simulation. No per-tick service reads/writes. These managed
-services still require account/configuration work, connectivity and usage limits;
-they remove server administration, not service dependency or possible fees.
+Photon outages can block room creation, joining or migration. Existing matches may
+continue while transport permits. There are no per-tick external service calls or
+profile writes. Photon still requires an app, connectivity and usage limits; removing
+PlayFab does not remove Photon service dependency or guarantee unlimited free use.
 
 ## 9. Performance targets and evidence
 
@@ -509,16 +578,16 @@ are distinct. No screenshot polling during timed measurement.
 ## 10. Foundation acceptance order
 
 1. **Compatibility and source baseline:** pin Fusion/Unity versions, compile the
-   Windows host/client build, record original movement trajectories, verify managed
-   identity-to-peer binding and SDK migration APIs, settle client/host test hardware.
+   Windows host/client build, record original movement trajectories, verify SDK
+   guest-to-peer binding and held-seat credential checks and SDK migration APIs, settle client/host test hardware.
 2. **Movement proof:** a player host plus two remote clients, fixed-tick source motor
    adaptation, state restore/replay, remote interpolation, all representative traversal
    cases under the network matrix. Failure here stops content work.
 3. **Combat proof:** one hitscan and one projectile, rewind/cover behavior, deflection,
    ammo/cooldown rejection, duplicate suppression, authoritative knockback and respawn.
-4. **Session and data proof:** recoverable identity, private room code, serialized
-   team assignment, mixed-version rejection, late join, authenticated reconnect,
-   duplicate-identity rejection, expiry, provider interruption, profile-write failure,
+4. **Session and data proof:** temporary guest identity, private room code, serialized
+   team assignment, mixed-version rejection, late join, credential-bound reconnect,
+   duplicate-ID and wrong-credential rejection, expiry and service interruption,
    all section 7 host migration/abort cases and truthful unverified match summaries.
 5. **Load and endurance:** one rendering host plus seven remote clients with
    continuous representative actions;
@@ -531,6 +600,18 @@ are distinct. No screenshot polling during timed measurement.
    exercise graceful and crash host migration. Verify relay fallback from a network
    where direct connectivity fails; rotate the host between external networks.
    Local multi-process success is not internet or multi-human acceptance.
+
+Diagnostic builds may enable a compile-time-only driver that exercises the actual
+menu/controller/runner path in separate Windows processes. Keep automation absent
+from normal builds, bound deadlines, redact identifiers/credentials, and require
+observable replicated state plus successful cleanup. Same-PC cloud sessions are
+local functional evidence, never a substitute for the independent-network matrix.
+Late admission must preserve existing seats and authority while the new client
+loads and gains its own avatar. Controlled hitscan fixtures may place stationary
+targets through the existing host-authoritative teleport API, then use real client
+fire commands and compare actual health, ammunition and event identities across
+peers. Mark that placement explicitly; it does not prove natural traversal or
+moving-target behavior under the latency profiles above.
 
 Each gate records commands/builds, raw logs, failures and limitations. Successful
 compile, average FPS or vendor marketing are insufficient. Capture moving Windows
@@ -545,9 +626,9 @@ Both reviews checked document consistency only. This revision applies the user's
 no-server-administration request. The art direction now records C / Ink & Concrete
 with the accepted C3.1 / Wildstone Modern map and simple human character directions.
 Weapon identities and added categories are accepted; detailed behavior and simplified
-production art are specified separately. SDK compatibility, identity binding, migration budgets,
-performance, internet behavior and final asset/layout choices remain unverified or pending.
-No runtime readiness is inferred from documentation.
+production art are specified separately. These historical document reviews did not
+verify runtime behavior. [QA](../../QA.md) owns current SDK, identity and migration
+evidence and the remaining performance, external-network and visual gates.
 
 ## 12. Implementation boundaries and remaining decisions
 
@@ -557,7 +638,7 @@ in the multiplayer runtime. Preserve original movement tests and add replay/netw
 tests that exercise behavior, not merely serialized field equality.
 
 New responsibilities are player simulation/presentation separation, Fusion session
-and admission integration inside the game, match/team state, managed identity/profile,
+and admission integration inside the game, match/team state, temporary guest identity,
 session-only summaries, host migration, the generated test course and failure/performance
 harness. Use the selected SDK directly; avoid adapters for unselected frameworks.
 
@@ -566,9 +647,9 @@ test tooling and presentation details within these contracts. It may not downgra
 host authority rules, remove prediction or rewind, weaken acceptance tests, spend on services,
 or substitute a generic motor without reporting the effect on source movement.
 
-Before internet setup, select the managed Photon/PlayFab accounts, common region,
+Before internet setup, verify the existing Photon app, common region,
 exact plans and spending caps. No game-server hosting provider or custom backend
-deployment is part of the plan. Before acceptance, fix hardware/uplink, login UX and
+deployment is part of the plan. Before acceptance, fix hardware/uplink, host/join UX and
 any budget changes openly. No cloud accounts, subscriptions, servers or game project
 have been created by this design work. The next deliverable is a staged implementation
 plan beginning with compatibility and movement proof, then recovery and measured

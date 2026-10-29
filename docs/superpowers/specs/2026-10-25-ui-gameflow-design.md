@@ -3,7 +3,12 @@
 User requirement: minimalist, good-looking menus matching the soft modern FPS.
 This is the UI owner; simulation/security/performance remain in the foundation,
 and weapons/match rules remain in the combat spec. Menus, local settings and
-offline Practice are authored; native interaction and online flows remain open.
+offline Practice are authored. Photon-only host/join,
+team/ready/load, pause/results and retained-session reconnect are composed with
+the networking adapter. No account sign-in is required (D023). Missing Photon app configuration keeps online
+actions unavailable; guest reconnect lasts only while the game remains open.
+Packaged keyboard interaction, moving visual/feel and external-network acceptance remain open;
+[QA](../../QA.md) owns current local service evidence.
 
 ## Presentation
 
@@ -20,15 +25,28 @@ settings. Keyboard focus is visible, Escape consistently backs out/cancels, and 
 never stays trapped after leaving a session. Team symbols accompany team colors.
 Editable slider values and dropdown selections use ivory text on graphite fields,
 with visible hover and keyboard-focus borders. `ArenaMenu.uss` owns these native
-UI Toolkit input styles; packaged Settings screenshot verification remains required.
+UI Toolkit input styles. The menu scrollbar uses a restrained graphite track,
+ivory thumb and visible focus border. Static packaged captures now verify Settings
+contrast and layout; [QA](../../QA.md) records the images and interaction limits.
 Transitions must be interruptible; reduce-motion preference disables decorative motion.
+Same-screen status and roster refreshes preserve the focused logical control,
+including focus inside a text field. A new Settings screen focuses sensitivity
+before the controls list. Scheduled focus belongs to the card that created it;
+an old detached card must not focus a replacement screen.
+
+Keep the HUD tree for the same actual match through pause/settings/resume and
+replace it when the match changes. Hit feedback starts hidden until a hit event.
+The crosshair is centered in the viewport; HUD text wraps within its available
+width instead of overflowing at larger UI scales. Packaged off-screen captures
+cover 720p, maximum UI scale, 1080p and an ultrawide title; this does not replace
+moving readability, keyboard/mouse interaction or human feel acceptance.
 
 ## Screens and transitions
 
 | Screen | Primary content and behavior |
 | --- | --- |
 | Title | Game identity, Play, Practice, Settings, Quit; current connection state quietly visible |
-| Online play | Host and Join actions; join code with validation and region where relevant; managed profile/login only when configured |
+| Online play | Host and Join actions; join code with validation and region where relevant; no account sign-in or profile setup |
 | Host setup | Map preview/name, private room creation, concise retry on service error |
 | Lobby | Room code/copy, four two-slot team cards with symbols, ready state, host map selection and start; explain unmet two-team minimum |
 | Loading/connecting | Bounded progress/state and cancel; all paths release old runners and ignore stale callbacks |
@@ -36,6 +54,20 @@ Transitions must be interruptible; reduce-motion preference disables decorative 
 | Pause | Resume, settings, controls, leave; local menu never pauses network simulation |
 | Recovery | Honest reconnect/migration state and countdown; input/scoring behavior belongs to foundation; failed recovery offers retry/back |
 | Results | Win/draw/abort distinction, team totals, rematch/back; no invented persistent ranking or trusted progression |
+
+Loading Cancel, Escape and failure Back must leave an active network session even
+before gameplay attaches. Clear the exposed session immediately on leave so a late
+load cannot acknowledge or spawn. An online loading failure must not offer an offline
+retry while that session is active.
+
+Automatic recovery takes the foreground instead of leaving a frozen gameplay HUD.
+Show the ceiling of the remaining seconds from the session's original recovery
+deadline; presentation never starts or extends that deadline. Hide stale lobby
+team/ready/start actions and suppress a second reconnect while recovery is pending.
+Leave, Back and Practice still cancel the active session. Once recovery completes,
+resume only an attached current match with an active session; cancellation must
+never reopen the retired gameplay presentation. Focused regressions are authored
+in `MenuPresentationTests` and `OnlineMenuTests`; native results belong in QA.
 
 Practice is explicitly offline, useful for validating movement, maps and weapons.
 It may have target fixtures but no claimed online players or gameplay bots. An absent

@@ -162,7 +162,7 @@ the authoring flow needs them. Distances are Unity meters, times simulation seco
 
 | Item | Initial behavior and cost |
 | --- | --- |
-| Line Driver (starter) | 26 damage; 70 m hitscan; 0.30 s shot interval; 12-round clip; 1.2 s reload; unlimited starter reserve |
+| Line Driver (starter, revision 2) | 13 damage; 70 m hitscan; 0.15 s shot interval; 24-round clip; hold to repeat; 1.2 s reload; unlimited starter reserve |
 | Pulse Lobber | 60 center / 20 edge damage over 4 m; 18 m/s visible orb; 0.90 s interval; 10 rounds; bounded 5 s flight; cover blocks blast |
 | Rebound Disc | 35 damage; 28 m/s; 0.60 s interval; 10 rounds; at most 2 wall ricochets / 4 s life; one hit per target per flight |
 | Push Lens | No direct damage; 8 m range, 55-degree total cone; 0.18 s windup / 0.85 s total cycle; 6 uses; horizontal impulse 14 m/s plus 4 m/s up; world cover blocks |
@@ -210,3 +210,46 @@ the roster incrementally. Required cases include:
 - Moving captures and eight-player host/client measurements under the foundation's
   latency, loss and direct/relay matrix. Graphics and network budgets remain unproved
   until measured; summaries remain host-reported rather than trusted ranked results.
+
+
+A committed same-life attack recovered from a migration snapshot retains its original
+attack identity, including the earlier connection generation. Snapshot validation
+accepts that historical generation only when positive and no newer than the player's
+current generation. New attack requests still require the current generation; a stale
+connection cannot spend ammo or enqueue another attack. The committed attack resolves
+once under the restored host state. Native and managed regression evidence is in [QA](../../QA.md).
+
+### 2026-10-28 weapon expression continuation (D026)
+
+The user requests substantially more developed, creative guns, laser blasts and
+strong VFX. Builder direction: expand the existing sci-fi arena roster, preserving
+its distinct plasma, ricochet, displacement, stun and melee mechanics. Visual-only
+polish would leave starter firing unchanged; a new alternate-fire/weapon roster
+would expand inventory/network scope unnecessarily. Chosen implementation combines
+held rapid starter fire with distinct presentation for the existing roster. This
+is a delegated builder choice, not a claim the user approved individual stats.
+
+Line Driver revision 2 defaults: **13 damage, 0.15 s interval, 24-round clip**;
+range70m/reload1.2s unchanged. This preserves nominal damage per second and total
+clip damage while delivering rapid laser fire. Held fire uses the same shared input
+path in Practice and Fusion, bounded by simulation-tick cadence; press/release taps
+remain valid. Menus/focus loss/life changes/reconnect clear repeat state; no per-frame
+RPC flooding. Host cooldown/ammo/action generation checks remain final authority.
+Special weapons retain their current explicit click/timeline behavior.
+
+Presentation identity: cyan core laser with impact sparks; amber plasma core/trail
+and expanding blast; coral spinning disc/ricochet flare; violet charge/release
+shockwave; electric cyan stun forks/arcs; broad cyan sword sweep. Authored muzzle
+positions, distinct recoil/weapon-part motion and original synthesized audio make
+each weapon legible. Events/real timers drive effects; no visual hit detection,
+extra damage, global slow motion or new network-owned entities. Eye-based gameplay
+traces retain their original authority even when a local cosmetic beam starts at
+the weapon muzzle. Keep cover endpoints correct and don't draw through near cover.
+
+Use fixed effect/voice pools, shared materials, capped geometry and explicit expiry.
+Reduced motion suppresses flourish/strobe and large recoil while retaining attack
+identity. Death/disconnect/equip/teleport/teardown clears stale local effects.
+Acceptance: native hold/release/cooldown/clip/reload/focus regressions; bounded VFX
+lifecycle and no simulation mutation; packaged weapon/effect captures; real Photon
+combat/reconnect regression and fresh normal player. Human feel/audio listening,
+full eight-machine/performance and adverse-network acceptance stay separate.

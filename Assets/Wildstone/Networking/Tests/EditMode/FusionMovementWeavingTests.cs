@@ -31,7 +31,7 @@ namespace Wildstone.Tests
         {
             var metadata = Attribute.GetCustomAttribute(typeof(FusionPlayer), typeof(NetworkBehaviourWeavedAttribute)) as NetworkBehaviourWeavedAttribute;
             Assert.That(metadata, Is.Not.Null, "Fusion must weave the player behaviour");
-            Assert.That(metadata.WordCount, Is.EqualTo(103));
+            Assert.That(metadata.WordCount, Is.EqualTo(105));
         }
     }
 }

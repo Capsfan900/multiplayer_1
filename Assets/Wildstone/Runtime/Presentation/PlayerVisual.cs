@@ -23,11 +23,11 @@ namespace Wildstone.Presentation
             hand=GripAttachment.Find(model.transform,"WeaponHand_R");
             if(hand==null) throw new System.ArgumentException("Human model is missing WeaponHand_R.");
         }
-        public void Present(CombatState player,in MotorState motor,PresentationCatalog catalog)
+        public void Present(CombatState player,in MotorState motor,PresentationCatalog catalog, Transform renderPose = null)
         {
             aim=player.Aim.sqrMagnitude>.001f?player.Aim.normalized:Quaternion.Euler(0,motor.Yaw,0)*Vector3.forward;
             float yaw=Mathf.Atan2(aim.x,aim.z)*Mathf.Rad2Deg;
-            transform.SetPositionAndRotation(player.Feet,Quaternion.Euler(0,yaw,0));
+            transform.SetPositionAndRotation(renderPose!=null?renderPose.position:player.Feet, renderPose!=null?renderPose.rotation:Quaternion.Euler(0,yaw,0));
             if(!player.Alive)
             {
                 if(wasAlive)
@@ -42,7 +42,7 @@ namespace Wildstone.Presentation
             }
             if(!wasAlive) animationName=null;
             wasAlive=true;
-            gameObject.SetActive(player.Connected);
+            gameObject.SetActive(true);
             if(!gameObject.activeSelf) return;
             string next=SelectAnimation(player,motor);
             if(next!=animationName && animator!=null) { animator.CrossFade(next,.12f); animationName=next; }

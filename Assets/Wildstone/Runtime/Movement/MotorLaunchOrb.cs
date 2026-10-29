@@ -9,7 +9,7 @@ namespace Wildstone.Movement
     public sealed class MotorLaunchOrb : MotorSurface
     {
         public const float LaunchSpeed=11;
-        const int RespawnTicks=300;
+        public const int RespawnTicks=300;
         LaunchOrbState state;
         void Awake()
         {
@@ -26,7 +26,7 @@ namespace Wildstone.Movement
         public bool TryConsume(int tick,out int action)
         {
             action=0;
-            if(Id<=0 || tick<state.ReadyTick || tick<0) return false;
+            if(Id<=0 || tick<state.ReadyTick || tick<0 || tick>int.MaxValue-RespawnTicks || state.ActionSequence==int.MaxValue) return false;
             state.ReadyTick=tick+RespawnTicks; action=++state.ActionSequence; return true;
         }
     }

@@ -6,6 +6,7 @@ namespace Wildstone.Movement
     [RequireComponent(typeof(CharacterController))]
     public sealed class ArenaMotor : MonoBehaviour
     {
+        public ILaunchOrbWorld LaunchOrbWorld { get; set; }
         readonly MotorTuning t = MotorTuning.Source;
         readonly RaycastHit[] hits = new RaycastHit[32];
         readonly Collider[] overlaps = new Collider[32];
@@ -30,18 +31,22 @@ namespace Wildstone.Movement
             cc.excludeLayers=1<<MotorTuning.PlayerLayer;
             // Recreate the native query shape after changing the capsule's startup geometry.
             cc.enabled=wasEnabled;
-            s=new MotorState { Tick=-1, Generation=1, LastInputSequence=-1, LastFreshInputTick=-1000,
-                Position=transform.position, Yaw=transform.eulerAngles.y, CapsuleHeight=t.height, CapsuleCenter=t.center,
-                GroundNormal=Vector3.up, GroundStale=true, Stamina=t.max,
+            s=InitialState(transform.position,transform.eulerAngles.y);
+        }
+
+        public static MotorState InitialState(Vector3 position,float yaw)
+        {
+            var tuning=MotorTuning.Source;
+            return new MotorState { Tick=-1, Generation=1, LastInputSequence=-1, LastFreshInputTick=-1000,
+                Position=position, Yaw=yaw, CapsuleHeight=tuning.height, CapsuleCenter=tuning.center,
+                GroundNormal=Vector3.up, GroundStale=true, Stamina=tuning.max,
                 LastGroundedAt=-99, JumpPressedAt=-99, LastSlideEndedAt=-99, WallLeftAt=-99,
                 LaunchedAt=-99, WaterUntil=-99, DashStartedAt=-99, LastImpulseTick=-1 };
         }
 
         public void RestoreState(in MotorState saved)
         {
-            if(!Finite(saved.Position) || !Finite(saved.Velocity) || !Finite(saved.Yaw) || !Finite(saved.Pitch)
-                || !Finite(saved.CapsuleHeight) || saved.CapsuleHeight<t.radius*2 || saved.CapsuleHeight>t.height
-                || !Finite(saved.CapsuleCenter) || !ValidTraversalState(saved) || saved.Generation<1 || saved.Tick< -1)
+            if(!ValidSnapshot(saved))
                 throw new ArgumentException("Invalid authoritative motor snapshot",nameof(saved));
             // A restore preserves the simulation contact answer; the next Move replaces CC's hidden contact cache.
             cc.enabled=false;
@@ -51,6 +56,11 @@ namespace Wildstone.Movement
             s=saved;
             groundNormalThisMove=Vector3.zero; groundIdThisMove=0;
         }
+
+        public static bool ValidSnapshot(in MotorState saved) =>
+            Finite(saved.Position) && Finite(saved.Velocity) && Finite(saved.Yaw) && Finite(saved.Pitch) &&
+            Finite(saved.CapsuleHeight) && saved.CapsuleHeight>=MotorTuning.Source.radius*2 && saved.CapsuleHeight<=MotorTuning.Source.height &&
+            Finite(saved.CapsuleCenter) && ValidTraversalState(saved) && saved.Generation>=1 && saved.Tick>=-1;
 
         public void SetSuppressed(bool suppressed) { s.Suppressed=suppressed; }
 
@@ -507,7 +517,12 @@ namespace Wildstone.Movement
             if(water!=null)
             { s.WaterContactId=water.Id; s.WaterFlow=TraversalMath.Flow(water.FlowDirection,water.FlowSpeed); s.WaterUntil=Now+t.waterGrace; }
             var orb=contact.GetComponent<MotorLaunchOrb>();
-            if(orb!=null && orb.TryConsume(s.Tick,out int action)) ApplyLaunch(orb.Id,action,MotorLaunchOrb.LaunchSpeed);
+            if(orb!=null)
+            {
+                int action;
+                bool consumed=LaunchOrbWorld==null?orb.TryConsume(s.Tick,out action):LaunchOrbWorld.TryConsume(orb,out action);
+                if(consumed) ApplyLaunch(orb.Id,action,MotorLaunchOrb.LaunchSpeed);
+            }
         }
     }
 }

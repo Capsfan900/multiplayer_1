@@ -82,7 +82,7 @@ namespace Wildstone.Session
         }
 
         public bool SetReady(string subject, long generation, bool ready) => Phase == SessionPhase.Lobby && seats.TrySetReady(subject, generation, ready);
-        public bool SetLoaded(string subject, long generation) => Phase == SessionPhase.Loading && seats.TrySetReady(subject, generation, true);
+        public bool SetLoaded(string subject, long generation) => (Phase == SessionPhase.Loading || Phase == SessionPhase.Warmup || Phase == SessionPhase.Running) && seats.TrySetReady(subject, generation, true);
         public bool SelectTeam(string subject, long generation, int team) => Phase == SessionPhase.Lobby && seats.TrySelectTeam(subject, generation, team);
         public bool MarkSpawned(string subject, long generation) =>
             (Phase == SessionPhase.Warmup || Phase == SessionPhase.Running) && seats.MarkSpawned(subject, generation);
@@ -110,7 +110,7 @@ namespace Wildstone.Session
             if (recovering && now >= migrationStarted + RecoveryTimeoutSeconds) { End(SessionPhase.Aborted); return; }
             if ((Phase == SessionPhase.Connecting || Phase == SessionPhase.Loading) && now >= phaseDeadline) End(SessionPhase.Failed);
             else if (Phase == SessionPhase.Migrating && now >= phaseDeadline) End(SessionPhase.Aborted);
-            else if (Phase == SessionPhase.Warmup && now >= phaseDeadline && seats.ConnectedTeamCount >= 2)
+            else if (Phase == SessionPhase.Warmup && now >= phaseDeadline && seats.ConnectedTeamCount >= 2 && (!recovering || seats.AllConnectedReady))
             { Phase = SessionPhase.Running; recovering = false; }
             EvaluateOpposition(now);
         }
@@ -159,6 +159,34 @@ namespace Wildstone.Session
                 throw new InvalidOperationException("Cannot publish a terminal session checkpoint.");
             return new SessionCheckpoint(matchId, content, AuthorityGeneration, tick, Phase, AbsenceDeadline, seats.Capture(now),
                 oppositionStableSince, absenceResolvedAt);
+        }
+
+        // Bootstrap only an isolated replacement rules instance, never overwrite the retired runner's live rules.
+        public bool TryInstallMigrationBaseline(SessionCheckpoint checkpoint, double now)
+        {
+            if (Phase != SessionPhase.Closed || AttemptGeneration != 0 || AuthorityGeneration != 0 ||
+                !SessionBounds.Time(now) || checkpoint == null || checkpoint.MatchId != matchId || !content.Matches(checkpoint.Content) ||
+                !SessionBounds.Generation(checkpoint.AuthorityGeneration) || checkpoint.SimulationTick < 0 ||
+                (checkpoint.Phase != SessionPhase.Running && checkpoint.Phase != SessionPhase.Warmup) || checkpoint.Seats == null ||
+                !SessionBounds.Time(checkpoint.Seats.CapturedAt) || checkpoint.Seats.CapturedAt > now ||
+                !SessionBounds.Time(checkpoint.AbsenceDeadline) || !SessionBounds.Time(checkpoint.AbsenceResolvedAt) ||
+                checkpoint.AbsenceResolvedAt > checkpoint.Seats.CapturedAt ||
+                (checkpoint.AbsenceDeadline != 0 && (checkpoint.AbsenceDeadline > checkpoint.Seats.CapturedAt + SeatTable.HoldSeconds ||
+                    checkpoint.AbsenceDeadline < checkpoint.AbsenceResolvedAt + SeatTable.HoldSeconds)) ||
+                (checkpoint.OppositionStableSince != -1 && (!SessionBounds.Time(checkpoint.OppositionStableSince) ||
+                    checkpoint.OppositionStableSince > checkpoint.Seats.CapturedAt || checkpoint.AbsenceDeadline == 0 ||
+                    checkpoint.OppositionStableSince + SeatTable.HoldSeconds < checkpoint.AbsenceDeadline))) return false;
+            var restored = new SeatTable();
+            if (!restored.TryRestore(checkpoint.Seats, checkpoint.Seats.CapturedAt)) return false;
+            seats = restored;
+            AuthorityGeneration = checkpoint.AuthorityGeneration;
+            AttemptGeneration = 1;
+            AbsenceDeadline = checkpoint.AbsenceDeadline;
+            oppositionStableSince = checkpoint.OppositionStableSince;
+            absenceResolvedAt = checkpoint.AbsenceResolvedAt;
+            Phase = checkpoint.Phase;
+            lastTime = now;
+            return true;
         }
 
         public bool BeginMigration(long lastObservedTick, int simulationTickRate, double now)

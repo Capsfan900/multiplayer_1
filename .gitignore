@@ -24,3 +24,7 @@ __pycache__/
 Assets/Wildstone/Resources/LocalServiceConfig.json
 Assets/Wildstone/Resources/LocalServiceConfig.json.meta
 Assets/Photon/Fusion/Resources/PhotonAppSettings.asset
+# Local public service identifiers and setup confirmation; no credentials belong in this file.
+Assets/Wildstone/Resources/WildstoneOnline.json
+Assets/Wildstone/Resources/WildstoneBuild.txt
+Assets/Wildstone/Resources/WildstoneBuild.txt.meta

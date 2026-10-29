@@ -30,6 +30,14 @@ the destination or used as a distributable dependency.
   imported. The existing `ai_skelly_tool` Python/bpy environment is invoked in an
   isolated subprocess with outputs contained in this destination; its GPU stack
   and mutable output folders are unused.
+- First-person body/slide continuation (2026-10-28): inspected source `PlayerBody`,
+  `ViewmodelArm`, `ViewmodelMotion`, `MovementPose`, `PlayerFeedback`/`SlideFx` and
+  shipped prefab tuning. Adapted yaw-only local legs, asymmetric slide posing,
+  closed-form body spring and hand/sleeve attachment concepts to existing original
+  Wildstone human/hand meshes. Source clocks, global managers and assets were not
+  copied. Source slide movement constants already match `MotorTuning`; cosmetic
+  feedback preserves authoritative eye and aim. The character contract owns the
+  requested behavior; native/visual checks are recorded separately in QA.
 - Photon authority, sessions, combat rules and prediction integration are separate
   work. Host-only managed rules now exist; no source single-player manager is used
   as a multiplayer foundation, and no real Fusion adapter has been completed.

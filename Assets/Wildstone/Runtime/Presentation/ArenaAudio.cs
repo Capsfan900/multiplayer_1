@@ -8,7 +8,7 @@ namespace Wildstone.Presentation
     {
         const int Voices=16;
         readonly AudioSource[] sources=new AudioSource[Voices];
-        readonly AudioClip[] clips=new AudioClip[7];
+        readonly AudioClip[] clips=new AudioClip[14];
         int next;
         public void Initialize()
         {
@@ -22,7 +22,7 @@ namespace Wildstone.Presentation
                 sources[i].rolloffMode=AudioRolloffMode.Linear;
                 sources[i].maxDistance=30;
             }
-            for(int i=0;i<clips.Length;i++) clips[i]=MakeCue(i);
+            for(int i=0;i<clips.Length;i++) clips[i]=i<7?MakeCue(i):MakeShot((WeaponKind)(i-6));
         }
         public void Play(in CombatEvent e,Vector3 position,float volume)
         {
@@ -30,7 +30,7 @@ namespace Wildstone.Presentation
             int cue;
             switch(e.Kind)
             {
-                case CombatEventKind.Shot: cue=e.Weapon==WeaponKind.LaserSword?3:e.Weapon==WeaponKind.PushLens?4:0; break;
+                case CombatEventKind.Shot: cue=7+Mathf.Clamp((int)e.Weapon-1,0,6); break;
                 case CombatEventKind.Hit:
                 case CombatEventKind.Ricochet: cue=1; break;
                 case CombatEventKind.Explosion: cue=2; break;
@@ -45,6 +45,39 @@ namespace Wildstone.Presentation
             source.Stop(); source.transform.position=position;
             source.clip=clips[cue]; source.volume=Mathf.Clamp01(volume)*.26f;
             source.Play();
+        }
+        static AudioClip MakeShot(WeaponKind weapon)
+        {
+            const int rate=22050;
+            float length=weapon==WeaponKind.PulseLobber?.34f:weapon==WeaponKind.PushLens?.40f:weapon==WeaponKind.ReboundDisc?.25f:weapon==WeaponKind.LaserSword?.24f:weapon==WeaponKind.Grenade?.18f:.13f;
+            var data=new float[Mathf.CeilToInt(rate*length)];
+            uint noise=(uint)weapon*747796405u;
+            float phase=0,secondPhase=0,peak=0;
+            for(int i=0;i<data.Length;i++)
+            {
+                float t=i/(float)rate,x=t/length;
+                noise=noise*1664525u+1013904223u;
+                float random=((noise>>8)&65535)/32767.5f-1;
+                float frequency,ratio,noiseMix;
+                switch(weapon)
+                {
+                    case WeaponKind.LineDriver: frequency=Mathf.Lerp(1900,300,x); ratio=2.03f; noiseMix=.12f; break;
+                    case WeaponKind.PulseLobber: frequency=Mathf.Lerp(190,55,x); ratio=1.5f; noiseMix=.07f; break;
+                    case WeaponKind.ReboundDisc: frequency=Mathf.Lerp(680,290,x); ratio=1.414f; noiseMix=.04f; break;
+                    case WeaponKind.PushLens: frequency=Mathf.Lerp(115,35,x); ratio=2; noiseMix=.32f; break;
+                    case WeaponKind.StunGun: frequency=1100+Mathf.Sin(t*2*Mathf.PI*75)*450; ratio=2.7f; noiseMix=.12f; break;
+                    case WeaponKind.LaserSword: frequency=Mathf.Lerp(700,120,x); ratio=1.25f; noiseMix=.45f; break;
+                    default: frequency=Mathf.Lerp(300,80,x); ratio=1.8f; noiseMix=.25f; break;
+                }
+                phase+=2*Mathf.PI*frequency/rate;
+                secondPhase+=2*Mathf.PI*frequency*ratio/rate;
+                float attack=Mathf.Min(1,t/.003f),envelope=attack*(1-x)*(1-x);
+                data[i]=((Mathf.Sin(phase)*.65f+Mathf.Sin(secondPhase)*.25f)*(1-noiseMix)+random*noiseMix)*envelope;
+                peak=Mathf.Max(peak,Mathf.Abs(data[i]));
+            }
+            if(peak>0) for(int i=0;i<data.Length;i++) data[i]*=.85f/peak;
+            var clip=AudioClip.Create("Wildstone shot "+weapon,data.Length,1,rate,false);
+            clip.SetData(data,0); return clip;
         }
         static AudioClip MakeCue(int kind)
         {

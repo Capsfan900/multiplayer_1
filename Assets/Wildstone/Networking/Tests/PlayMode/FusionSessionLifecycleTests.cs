@@ -25,12 +25,12 @@ namespace Wildstone.Tests
             Assert.That(task.IsFaulted, Is.False, task.Exception?.ToString());
             Assert.That(task.IsCanceled, Is.False);
         }
-        [UnityTest] public IEnumerator MissingProviderRejectsWithoutCreatingRunner()
+        [UnityTest] public IEnumerator MissingGuestIdentityRejectsWithoutCreatingRunner()
         {
             var before = Runners();
             var session = Session();
-            var error = Assert.Throws<InvalidOperationException>(() => session.StartAsync(true, "ROOM", null, null, false));
-            StringAssert.Contains("provider authentication", error.Message);
+            var error = Assert.Throws<InvalidOperationException>(() => session.StartAsync(true, "ROOM", null, null));
+            StringAssert.Contains("anonymous Photon guest ID", error.Message);
             CollectionAssert.AreEquivalent(before, Runners());
             Assert.That(session.Phase, Is.EqualTo(SessionPhase.Closed));
             yield return Finish(session.StopAsync());
@@ -43,16 +43,16 @@ namespace Wildstone.Tests
             using (var cancellation = new CancellationTokenSource())
             {
                 cancellation.Cancel();
-                // No auth material: cancellation must exit before config loading or service/runner work.
-                var first = session.StartAsync(true, "ROOM", null, null, false, cancellation.Token);
+                // No guest ID: cancellation must exit before config loading or service/runner work.
+                var first = session.StartAsync(true, "ROOM", null, null, cancellation.Token);
                 Assert.That(first.IsCompleted, Is.True);
                 Assert.That(first.Result, Is.False);
                 Assert.That(session.Phase, Is.EqualTo(SessionPhase.Closed));
                 Assert.That(session.Failure, Is.Null);
                 CollectionAssert.AreEquivalent(before, Runners());
-                var retry = session.StartAsync(false, "ROOM", null, null, false, cancellation.Token);
+                var retry = session.StartAsync(false, "ROOM", null, null, cancellation.Token);
                 Assert.That(retry.Result, Is.False);
-                Assert.Throws<InvalidOperationException>(() => session.StartAsync(false, "ROOM", null, null, false));
+                Assert.Throws<InvalidOperationException>(() => session.StartAsync(false, "ROOM", null, null));
             }
             yield return Finish(session.StopAsync());
             CollectionAssert.AreEquivalent(before, Runners());

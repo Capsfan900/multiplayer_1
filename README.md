@@ -7,7 +7,7 @@ access are required; the link does not grant access. These are development previ
 not accepted online multiplayer releases. See [build workflow](docs/TOOLING.md#github-builds-and-private-releases).
 
 **Active MVP development, resumed on 2026-10-27 in the isolated `mvp-2` worktree.** Current evidence and
-account/setup dependencies live in [docs/HANDOFF.md](docs/HANDOFF.md). The
+setup and acceptance dependencies live in [docs/HANDOFF.md](docs/HANDOFF.md). The
 [complete pause handoff](docs/handoffs/2026-10-25-paused-project.md) is historical.
 
 A Unity first-person arena game for internet friend matches: four teams of up to
@@ -15,15 +15,18 @@ two, uneven teams allowed, weapon races and a moving capture zone.
 
 The full MVP includes three distinct maps, the approved weapon roster, human models,
 readable VFX and minimalist finished menus. The workspace now contains the adapted
-movement, host-only rules, offline Practice/UI integration and editable models/maps.
-Native tests, three-map lighting and an offline Windows build now pass. Real Fusion
-integration and internet acceptance remain open. Run
-`Artifacts/Unity/Windows-20261027-204502-089/WildstoneArena.exe` for local offline Practice. The separate
+movement, host-owned simulation, Photon-only private host/join, lobby/recovery,
+offline Practice/UI and editable models/maps. PlayFab is removed (D023).
+Focused native checks and separate-process Photon gameplay, reconnect, late joining,
+controlled hits, eight-player capacity and graceful/crash host migration pass. Full
+external-network, visual and performance acceptance remain open. Run
+`Artifacts/Unity/Windows-20261028-000246-678/WildstoneArena.exe` for the latest local
+playtest. This build contains uncommitted inputs and is not published. The separate
 source projects and original authoring checkout remain unchanged.
 
 Selected direction: Photon Fusion Host Mode, with one participating player hosting;
 C3.1 / Wildstone Modern, soft-lit mostly monochrome architecture and simple human
-characters. Managed service setup and detailed technical proposals remain pending.
+characters. Fusion and the local App ID are configured; no PlayFab setup is needed.
 
 Production assets use Blender sources and Unity authoring scripts, reusing suitable
 `vibegame1` work and selected `ai_skelly_tool` leads under the [asset pipeline](docs/ASSET-PIPELINE.md).

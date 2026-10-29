@@ -16,16 +16,27 @@ namespace Wildstone.Game
     public sealed class PracticeSession : MonoBehaviour
     {
         public const int LocalParticipant=1, TargetParticipant=2;
+        public int LocalParticipantId { get; private set; } = LocalParticipant;
+        public bool ExternalSimulation { get; private set; }
         public static string MapScenePath(string id) => "Assets/Wildstone/Maps/"+id+".unity";
         public Camera Camera;
         public ArenaCatalog Catalog;
         public readonly MenuFlow Flow=new MenuFlow();
         public LocalSettings Settings { get; private set; }
         public ArenaMatch Match { get; private set; }
-        public ArenaMotor Motor => motors.TryGetValue(LocalParticipant,out var value)?value:null;
+        public ArenaMotor Motor => motors.TryGetValue(LocalParticipantId,out var value)?value:null;
         public FirstPersonView View { get; private set; }
-        public CombatState LocalPlayer => Match?.Find(LocalParticipant);
+        public CombatState LocalPlayer => Match?.Find(LocalParticipantId);
         public IReadOnlyDictionary<int,ArenaMotor> Motors => motors;
+        IReadOnlyDictionary<int,Transform> networkRenderPoses;
+        IReadOnlyList<CombatEvent> networkEvents = Array.Empty<CombatEvent>();
+        int networkCaptor = -1;
+        bool networkContested;
+        public IReadOnlyList<CombatEvent> CombatEvents => ExternalSimulation ? networkEvents : Match?.Events ?? Array.Empty<CombatEvent>();
+        public int ZoneCaptor => ExternalSimulation ? networkCaptor : Match?.Captor ?? -1;
+        public bool ZoneContested => ExternalSimulation ? networkContested : Match != null && Match.Contested;
+        public Transform RenderPose(int participant) => ExternalSimulation && networkRenderPoses != null &&
+            networkRenderPoses.TryGetValue(participant, out var pose) ? pose : null;
         public string MapId { get; private set; }="atrium";
         public string Failure { get; private set; }
         public float LoadProgress { get; private set; }
@@ -65,7 +76,7 @@ namespace Wildstone.Game
         public void ApplySettings(LocalSettings value,bool save=true)
         {
             Settings=value.Copy(); Settings.Normalize(); Settings.Apply(Camera); if(save) Settings.Save();
-            if(View!=null) View.ReducedMotion=Settings.ReducedMotion;
+            if(View!=null) { View.ReducedMotion=Settings.ReducedMotion; View.SetBaseFieldOfView(Settings.Fov); }
             Input?.Dispose(); Input=new PracticeInput(Settings); SettingsChanged?.Invoke();
         }
         public void Show(MenuScreen screen)
@@ -79,12 +90,51 @@ namespace Wildstone.Game
             LoadProgress=0; Failure=null; SetCursor(); ScreenChanged?.Invoke();
             if(loader==null) loader=StartCoroutine(LoadWorker());
         }
+        public bool TryRetainNetworkMap(string id)
+        {
+            if(loader!=null || requestedMap!=null || Failure!=null || MapId!=id || Catalog==null || !mapScene.IsValid() || !mapScene.isLoaded) return false;
+            ArenaDefinition expected;
+            try { expected=Catalog.Find(id); }
+            catch(ArgumentException) { return false; }
+            foreach(var root in mapScene.GetRootGameObjects())
+            {
+                var map=root.GetComponentInChildren<ArenaMap>();
+                if(map!=null && map.Definition!=null && map.Definition.Id==id && map.Definition.Revision==expected.Revision)
+                    return SceneManager.SetActiveScene(mapScene);
+            }
+            return false;
+        }
         public void CancelLoad() { Flow.CancelLoad(); requestedMap="atrium"; requestedPractice=false; requestGeneration=Flow.Generation; SetCursor(); ScreenChanged?.Invoke(); }
         public void Leave()
         {
             StopMatch(); SetBackdrop(); Show(MenuScreen.Title);
         }
         public void Rematch() => Load(MapId,true);
+        public void AttachNetworkMatch(ArenaMatch match,int localParticipant,IReadOnlyDictionary<int,ArenaMotor> avatars)
+        {
+            if(match==null || match.Find(localParticipant)==null || !avatars.ContainsKey(localParticipant))
+                throw new ArgumentException("An admitted local avatar and complete match are required.");
+            StopMatch(); ExternalSimulation=true; LocalParticipantId=localParticipant; Match=match;
+            RefreshNetworkAvatars(avatars, null);
+            View=Motor.gameObject.AddComponent<FirstPersonView>();
+            View.Motor=Motor; View.ViewCamera=Camera; View.OwnsLocalView=true; View.ReducedMotion=Settings.ReducedMotion;
+            var state=Motor.CaptureState(); View.ResetView(state.Yaw,state.Pitch);
+            Input.Clear(); SessionStarted?.Invoke(); Show(MenuScreen.Playing);
+        }
+        public void RefreshNetworkAvatars(IReadOnlyDictionary<int,ArenaMotor> avatars, IReadOnlyDictionary<int,Transform> renderPoses)
+        {
+            if(!ExternalSimulation) return;
+            motors.Clear();
+            foreach(var pair in avatars) if(pair.Value!=null) motors.Add(pair.Key,pair.Value);
+            networkRenderPoses=renderPoses;
+        }
+        public void PresentNetworkTick(IReadOnlyList<CombatEvent> events = null, int captor = -1, bool contested = false)
+        {
+            if(!ExternalSimulation || Match==null) return;
+            networkEvents=events ?? Array.Empty<CombatEvent>(); networkCaptor=captor; networkContested=contested;
+            Stepped?.Invoke();
+        }
+        public void DetachNetworkMatch() { if(ExternalSimulation) { StopMatch(); Show(MenuScreen.Online); } }
         IEnumerator LoadWorker()
         {
             // Unity scene loads cannot be cancelled; finish and unload stale results before the newest request.
@@ -153,6 +203,7 @@ namespace Wildstone.Game
         }
         void Begin(ArenaDefinition definition)
         {
+            ExternalSimulation=false; LocalParticipantId=LocalParticipant;
             Match=new ArenaMatch(definition,120,true); world=new UnityCombatWorld(definition);
             for(int participant=1;participant<=2;participant++)
             {
@@ -172,9 +223,15 @@ namespace Wildstone.Game
         }
         void StopMatch()
         {
+            if(View!=null) View.ResetPresentation();
             if(Match!=null) SessionStopped?.Invoke();
-            foreach(var motor in motors.Values) if(motor!=null) { motor.gameObject.SetActive(false); Destroy(motor.gameObject); }
-            motors.Clear(); freshStates.Clear(); View=null; Match=null; world=null; accumulator=0; Input?.Clear();
+            if(!ExternalSimulation)
+                foreach(var motor in motors.Values) if(motor!=null) { motor.gameObject.SetActive(false); Destroy(motor.gameObject); }
+            else if(View!=null) { View.OwnsLocalView=false; Destroy(View); }
+            motors.Clear(); freshStates.Clear(); networkRenderPoses=null; networkEvents=Array.Empty<CombatEvent>();
+            networkCaptor=-1; networkContested=false;
+            View=null; Match=null; world=null; accumulator=0; Input?.Clear();
+            ExternalSimulation=false; LocalParticipantId=LocalParticipant;
         }
         void Update()
         {
@@ -183,12 +240,12 @@ namespace Wildstone.Game
             {
                 if(Flow.Screen==MenuScreen.Playing) Show(MenuScreen.Pause);
                 else if(Flow.Screen==MenuScreen.Pause) Show(MenuScreen.Playing);
-                else if(Flow.Screen==MenuScreen.Loading) CancelLoad();
                 else BackRequested?.Invoke();
             }
             bool active=focused&&Flow.GameplayInput;
             if(active && View!=null && Mouse.current!=null) View.SampleLook(Mouse.current.delta.ReadValue()*Settings.Sensitivity);
             Input.Sample(active);
+            if(ExternalSimulation) return;
             if(Match==null || Match.Phase!=ArenaMatchPhase.Running) return;
             accumulator+=Math.Min(Time.unscaledDeltaTime,.25f);
             while(accumulator>=MotorTuning.TickDelta)
@@ -201,7 +258,7 @@ namespace Wildstone.Game
         }
         void Step(bool active)
         {
-            int tick=Match.Tick+1; Input.ConsumeActions(pending); commands.Clear();
+            int tick=Match.Tick+1; Input.ConsumeActions(pending,tick,Match.TickRate,LocalPlayer,active); commands.Clear();
             var player=LocalPlayer; Vector3 aim=Quaternion.Euler(View.Pitch,View.Yaw,0)*Vector3.forward;
             foreach(var kind in pending)
             {

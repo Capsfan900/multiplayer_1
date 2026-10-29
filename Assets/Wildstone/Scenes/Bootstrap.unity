@@ -269,6 +269,8 @@ GameObject:
   - component: {fileID: 1390242243}
   - component: {fileID: 1390242242}
   - component: {fileID: 1390242241}
+  - component: {fileID: 1390242247}
+  - component: {fileID: 1390242246}
   m_Layer: 0
   m_Name: Wildstone
   m_TagString: Untagged
@@ -352,6 +354,30 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1390242246
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1390242240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6648394a71668d74fb7ba779ffbb11f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Wildstone.Fusion::Wildstone.Networking.FusionGameCoordinator
+--- !u!114 &1390242247
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1390242240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d49ad64c1ad47579e4421baadbd86b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Wildstone.Fusion::Wildstone.Networking.FusionMenuController
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

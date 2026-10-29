@@ -1,11 +1,17 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using Fusion;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using Wildstone.Movement;
+using Wildstone.Game;
+using Wildstone.Maps;
+using Wildstone.Match;
+using Wildstone.UI;
 using Wildstone.Networking;
 using Object = UnityEngine.Object;
 using Assert = NUnit.Framework.Assert;
@@ -16,7 +22,7 @@ namespace Wildstone.Tests
     public sealed class FusionPlayerRunnerTests
     {
         NetworkRunner runner;
-        GameObject prefab;
+        GameObject prefab,discoveryOwner,discoveryCamera;
         CancellationTokenSource cancellation;
 
         [UnityTest]
@@ -79,7 +85,69 @@ namespace Wildstone.Tests
             player.Teleport(new Vector3(4, 12, 6), 35);
             Assert.That(player.PoseEpoch, Is.EqualTo(epoch + 1));
             Assert.That(Vector3.Distance(player.State.Position, new Vector3(4, 12, 6)), Is.LessThan(.0001f));
-            runner.Despawn(spawned);
+            // Discovery uses a real runner registry; no service identity/admission is implied by this fixture.
+            player.Participant=1;
+            discoveryOwner=new GameObject("runner-local discovery fixture");
+            var presentation=discoveryOwner.AddComponent<PracticeSession>(); presentation.enabled=false;
+            discoveryCamera=new GameObject("discovery presentation camera",typeof(Camera));
+            discoveryCamera.GetComponent<Camera>().enabled=false; presentation.Camera=discoveryCamera.GetComponent<Camera>();
+            var settings=new LocalSettings();
+            typeof(PracticeSession).GetField("<Settings>k__BackingField",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(presentation,settings);
+            typeof(PracticeSession).GetField("<Input>k__BackingField",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(presentation,new PracticeInput(settings));
+            discoveryOwner.AddComponent<FusionMenuController>().enabled=false;
+            var coordinator=discoveryOwner.AddComponent<FusionGameCoordinator>(); coordinator.enabled=false;
+            const BindingFlags privateInstance=BindingFlags.Instance|BindingFlags.NonPublic;
+            var discover=(Action<NetworkRunner>)Delegate.CreateDelegate(typeof(Action<NetworkRunner>),coordinator,
+                typeof(FusionGameCoordinator).GetMethod("RefreshAvatars",privateInstance));
+            var registry=(Dictionary<int,ArenaMotor>)typeof(FusionGameCoordinator).GetField("motors",privateInstance).GetValue(coordinator);
+            discover(runner); Assert.That(registry.Count,Is.EqualTo(1)); Assert.That(registry[1],Is.SameAs(player.GetComponent<ArenaMotor>()));
+            var model=new ArenaMatch(ArenaLayouts.CreateAll()[0],120);
+            Assert.That(model.AddPlayer(1,0,1,player.State.Generation,player.State.Position),Is.True);
+            Assert.That(model.AddPlayer(2,1,2,1,new Vector3(8,12,6)),Is.True);
+            presentation.AttachNetworkMatch(model,1,registry);
+            typeof(FusionGameCoordinator).GetField("attached",privateInstance).SetValue(coordinator,true);
+            var late=runner.Spawn(prefabId,new Vector3(8,12,6),Quaternion.identity,onBeforeSpawned:(r,instance)=>
+            {
+                var state=instance.GetComponent<ArenaMotor>().CaptureState(); state.Position=new Vector3(8,12,6); state.Generation=1;
+                var avatar=instance.GetComponent<FusionPlayer>(); avatar.Initialize(state,r.Tick.Raw+1); avatar.Participant=2;
+            });
+            discover(runner); Assert.That(registry.Count,Is.EqualTo(2),"A later registered spawn must join the presentation registry.");
+            Assert.That(presentation.Motors[2],Is.SameAs(late.GetComponent<ArenaMotor>()));
+            var replacementVisual=new GameObject("replacement render root").transform;
+            replacementVisual.SetParent(player.transform,false); player.VisualRoot=replacementVisual;
+            discover(runner);
+            Assert.That(presentation.RenderPose(1),Is.SameAs(replacementVisual),"Changing only a render root must refresh the attached presentation bridge.");
+            var counter=typeof(GC).GetMethod("GetAllocatedBytesForCurrentThread",Type.EmptyTypes);
+            if(counter!=null)
+            {
+                var bytes=(Func<long>)Delegate.CreateDelegate(typeof(Func<long>),counter);
+                for(int i=0;i<32;i++) discover(runner);
+                bytes(); long before=bytes();
+                var calibration=new byte[64*1024]; calibration[0]=1;
+                long calibrationBytes=bytes()-before; GC.KeepAlive(calibration);
+                bool calibrated=calibrationBytes>=64*1024;
+                before=bytes();
+                for(int i=0;i<128;i++) discover(runner);
+                long discoveryBytes=bytes()-before;
+                var legacyResults=new FusionPlayer[128][];
+                Object.FindObjectsByType<FusionPlayer>(); before=bytes();
+                for(int i=0;i<legacyResults.Length;i++) legacyResults[i]=Object.FindObjectsByType<FusionPlayer>();
+                long sceneQueryBytes=bytes()-before;
+                int retainedObjects=0; foreach(var result in legacyResults) retainedObjects+=result.Length;
+                GC.KeepAlive(legacyResults);
+                if(calibrated)
+                {
+                    Assert.That(discoveryBytes,Is.Zero,"Warmed attached discovery must reuse buffers and skip unchanged presentation copies.");
+                    Assert.That(sceneQueryBytes,Is.GreaterThan(0),"The calibrated counter must observe retained scene-query arrays.");
+                    TestContext.Out.WriteLine($"Calibrated allocation counter: probe={calibrationBytes} bytes; 128 attached discovery scans={discoveryBytes} bytes; 128 retained scene queries={sceneQueryBytes} bytes ({retainedObjects} returned objects). Snapshots and frame presentation are outside this measurement.");
+                }
+                else TestContext.Out.WriteLine($"Allocation measurement unavailable: a retained 65536-byte probe reported {calibrationBytes} bytes. Discovery={discoveryBytes} and scene-query={sceneQueryBytes} counter results are untrusted ({retainedObjects} scene-query objects retained); no zero-allocation or savings claim. Spawn/despawn/render-root behavior remains tested.");
+            }
+            else TestContext.Out.WriteLine("Allocation measurement unavailable: no per-thread allocation counter. Spawn/despawn/render-root behavior remains tested; no allocation claim.");
+            runner.Despawn(late); discover(runner); Assert.That(registry.Count,Is.EqualTo(1),"A despawn must leave the presentation registry.");
+            Assert.That(presentation.Motors.ContainsKey(2),Is.False);
+            runner.Despawn(spawned); discover(runner); Assert.That(registry.Count,Is.Zero);
+
         }
 
         [UnityTearDown]
@@ -101,7 +169,9 @@ namespace Wildstone.Tests
             {
                 if (runner != null) Object.Destroy(runner.gameObject);
                 if (prefab != null) Object.Destroy(prefab);
-                cancellation?.Dispose(); cancellation = null; runner = null; prefab = null;
+                if (discoveryOwner != null) Object.Destroy(discoveryOwner);
+                if (discoveryCamera != null) Object.Destroy(discoveryCamera);
+                cancellation?.Dispose(); cancellation = null; runner = null; prefab = null; discoveryOwner=null; discoveryCamera=null;
             }
             yield return null;
         }

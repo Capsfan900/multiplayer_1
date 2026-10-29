@@ -18,7 +18,7 @@ namespace Wildstone.Combat
         public int Participant, Team, ConnectionGeneration, LifeGeneration;
         public bool Connected=true, Alive=true, SelectedSpecial;
         public float Health=WeaponCatalog.Health, Shield, CapsuleHeight=1.8f;
-        public int StarterAmmo=12, SpecialAmmo, GrenadeAmmo, BlinkCharges, ShieldCharges;
+        public int StarterAmmo=WeaponCatalog.StarterAmmo, SpecialAmmo, GrenadeAmmo, BlinkCharges, ShieldCharges;
         public WeaponKind SpecialWeapon;
         public int LastActionSequence=-1, FireReadyTick, GrenadeReadyTick, ReloadUntil, ShieldUntil, StunUntil, ImmunityUntil, RespawnTick, DisconnectUntil;
         public Vector3 Feet, Aim=Vector3.forward, SupportPoint, SupportNormal=Vector3.up;

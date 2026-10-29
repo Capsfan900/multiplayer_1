@@ -149,6 +149,10 @@ namespace Wildstone.Tests
             Assert.That(session.Reconnect("a", 3, 8), Is.True);
             Assert.That(session.Reconnect("b", 4, 8), Is.True);
             session.Tick(8.2);
+            Assert.That(session.Phase, Is.EqualTo(SessionPhase.Warmup), "Recovered clients must acknowledge loaded content before simulation resumes");
+            Assert.That(session.SetLoaded("a",3), Is.True);
+            Assert.That(session.SetLoaded("b",4), Is.True);
+            session.Tick(8.21);
             Assert.That(session.Phase, Is.EqualTo(SessionPhase.Running));
             Assert.That(session.AcceptsAuthority(1), Is.False);
             Assert.That(session.AcceptsAuthority(2), Is.True);

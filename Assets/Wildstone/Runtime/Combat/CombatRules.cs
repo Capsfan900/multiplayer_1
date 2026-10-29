@@ -31,7 +31,7 @@ namespace Wildstone.Combat
             if(p==null || p.Participant<1 || p.Participant>8 || p.Team<0 || p.Team>3 || p.ConnectionGeneration<1 || p.LifeGeneration<1 || p.LifeGeneration==int.MaxValue ||
                 !Finite(p.Health) || p.Health<0 || p.Health>100 || !Finite(p.Shield) || p.Shield<0 || p.Shield>60 ||
                 !Finite(p.CapsuleHeight) || p.CapsuleHeight<.8f || p.CapsuleHeight>1.8f ||
-                p.StarterAmmo<0 || p.StarterAmmo>12 || p.GrenadeAmmo<0 || p.GrenadeAmmo>2 ||
+                p.StarterAmmo<0 || p.StarterAmmo>WeaponCatalog.StarterAmmo || p.GrenadeAmmo<0 || p.GrenadeAmmo>2 ||
                 p.BlinkCharges<0 || p.BlinkCharges>1 || p.ShieldCharges<0 || p.ShieldCharges>1 ||
                 !Finite(p.Feet) || !Direction(p.Aim) || !Finite(p.SupportPoint) || !Finite(p.SupportNormal) ||
                 p.LastActionSequence< -1 || p.LastActionSequence>=int.MaxValue-2 || p.FireReadyTick<0 || p.GrenadeReadyTick<0 || p.ReloadUntil<0 || p.ShieldUntil<0 ||
@@ -45,7 +45,7 @@ namespace Wildstone.Combat
             {
                 var a=p.Pending;
                 if((a.Weapon!=WeaponKind.PushLens && a.Weapon!=WeaponKind.LaserSword) || a.Action.Participant!=p.Participant ||
-                    a.Action.LifeGeneration!=p.LifeGeneration || a.Action.ConnectionGeneration!=p.ConnectionGeneration || a.Action.Sequence<0 || a.Action.Sequence>p.LastActionSequence ||
+                    a.Action.LifeGeneration!=p.LifeGeneration || a.Action.ConnectionGeneration<1 || a.Action.ConnectionGeneration>p.ConnectionGeneration || a.Action.Sequence<0 || a.Action.Sequence>p.LastActionSequence ||
                     a.Action.Kind!=CombatActionKind.Fire || a.ResolveTick<a.Action.Tick || a.EndTick<a.ResolveTick || !Direction(a.Direction) ||
                     !Direction(a.Action.Direction) || !Finite(a.PreviousTip) || (a.HitMask&~510)!=0) return false;
             }

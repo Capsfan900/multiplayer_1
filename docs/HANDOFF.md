@@ -1,6 +1,6 @@
 # Handoff
 
-Updated: 2026-10-27. **Native offline build available; full multiplayer MVP remains open.**
+Updated: 2026-10-28. **Photon-only Windows playtest available; full multiplayer MVP remains open.**
 Active worktree: `C:\Users\tyler\orca\workspaces\multiplayer_1\mvp-2`, branch `mvp-2`.
 The original project at `C:\Users\tyler\Main Storage\multiplayer_1` remains untouched.
 
@@ -10,6 +10,16 @@ and SHA-256 checked before/copy/after. Evidence: `Artifacts/Resume/recovered-che
 The original design/pause packet under `docs/handoffs/` remains historical and unchanged.
 
 ## Current evidence
+
+- Active follow-up D026: creative weapon/laser/VFX pass. The body/slide build below
+  predates this weapon continuation; validation/build replacement is in progress.
+
+- Implemented continuation: visible first-person legs, articulated hands/arms and stronger
+  slide presentation requested by the user (D025). Source audit confirms slide
+  simulation tuning already matches `vibegame1`; changes are cosmetic and use
+  Wildstone geometry. Focused native checks pass 35/35; thirteen packaged pose
+  captures were inspected, and fresh Photon combat/reconnect regressions pass.
+  Human animation/slide feel remains open. [QA](QA.md) records exact evidence.
 
 - GitHub delivery is authorized: personal private repository `Capsfan900/multiplayer_1`
   and a manual Windows Practice prerelease workflow. [TOOLING](TOOLING.md#github-builds-and-private-releases)
@@ -23,24 +33,36 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
 - Unity 6000.5.10f1 licensing, import, Compile and full content preparation now work.
 - Fusion 2.1.3 Stable build 2390 is imported; the user-supplied App ID is configured
   in ignored local Photon settings and survives reload. A fresh native compile passes.
-  No Photon service connection or gameplay networking has been tested.
+  An explicit native live smoke now creates a private Photon Host room, admits its
+  guest, changes team/readies and closes cleanly. Separate Windows processes also
+  pass real Photon gameplay, reconnect, movement/fire deduplication, controlled
+  stationary hit replication, late admission, eight-player capacity and
+  graceful/crash host migration. Real
+  external-network and performance acceptance remain open. [QA](QA.md) owns evidence.
 - Native EditMode, PlayMode, explicit preparation and fresh managed checks pass;
   [QA](QA.md) records their exact totals and run identities.
 - All three maps build and bake in Unity. Axis/anchor/bounds/normals/material checks
   pass; human animation loop contracts and attachment checks pass.
 - Four Python map regressions pass. Fourteen model/source hash pairs and all 73
   saved map meshes were verified without regenerating the approved source assets.
-- Post-integration Windows build succeeded. Run
-  `Artifacts\Unity\Windows-20261027-204502-089\WildstoneArena.exe` for
-  **offline Practice**, with the approved equipment, three maps and a stationary target.
-  This is a local development build, not an online MVP or release.
-- A packaged Practice frame was visually inspected. It renders the arena, weapon,
-  hands and HUD; the player log contains no reported exception at that checkpoint.
-  Title, online-unavailable/invalid-code feedback, settings resolution/apply,
-  Atrium and Split Gallery loading, restart and leave were exercised. A settings
-  contrast fix is authored; its rebuilt appearance remains unverified. Computer
-  Use was stopped with physical Escape; desktop automation remains paused.
-  This is not a completed all-map visual pass or human feel approval.
+- Latest local Windows build: `Artifacts/Unity/Windows-20261028-200856-804/WildstoneArena.exe`.
+  Photon-only Host/Join and offline Practice are packaged; no account login.
+  Build succeeded and 15-second headless startup showed no logged exceptions.
+  Source stayed unchanged during compilation (1,157 inputs; 200 output hashes).
+  This preserves uncommitted inputs and is local-playtest-only, not published or
+  accepted as a full online MVP. [QA](QA.md) records commands/manifests.
+- Unattended polish fixes menu focus, HUD lifetime/layout, settings scrollbar contrast
+  and visible recovery status. Runner-local discovery preserves late avatar changes
+  without rebuilding unchanged presentation registries. Focused native checks pass
+  (65 EditMode, 17 PlayMode); allocation measurement is unavailable after calibration.
+- Sixteen packaged offscreen captures were inspected across menus and all three maps,
+  including 720p, maximum UI scale, 1080p and ultrawide title. Settings contrast and
+  static layouts pass. Desktop input remains untouched; physical input, moving
+  readability and human feel remain open.
+- Eight separate Photon processes held coherent gameplay for five minutes, with
+  positive Windows memory observations and clean logs/exits. Fresh late-join,
+  combat and abrupt-host-crash regressions pass. This is same-PC functional evidence,
+  not external-network, eight-machine performance or endurance acceptance.
 
 [QA](QA.md) owns exact run paths, failed attempts, coverage and remaining acceptance.
 [TOOLING](TOOLING.md) owns reproducible commands; [MVP progress](MVP-PROGRESS.md)
@@ -63,26 +85,28 @@ isolation layer was added. CPU bake teardown now handles an initially empty batc
 
 ## Next actionable work
 
-1. Complete the packaged visual/input checks in [QA](QA.md), coordinating with the user
-   who is trying the running build. Inspect all maps, menu/settings flow, weapon framing,
-   rig animation, pickups, death/respawn and zone completion. Fix actual failures.
+1. Continue packaged physical-input and moving-readability checks in [QA](QA.md)
+   when desktop control is available. Static menu/settings/all-map captures are
+   inspected; rig animation, traversal, pickups, death/respawn, zone completion and
+   human feel still need direct acceptance. Do not repeat completed static checks.
 2. SDK provisioning is complete: Fusion 2.1.3 Stable build 2390 is imported and the
    user-supplied App ID is configured locally. Native compile and package/file-GUID
    checks pass; evidence is in `Artifacts/Resume/photon-setup.md` and [QA](QA.md).
-   Proceed to real service/runner validation; do not request the SDK or App ID again.
-3. Initial real SDK adapters now live in `Assets/Wildstone/Networking`: lossless motor
-   wire state, a networked movement behaviour, proxy poses and a private runner
-   lifecycle. Focused native EditMode 42/42 and PlayMode 9/9 checks pass, including
-   a real Single runner; [QA](QA.md) owns exact evidence and limits.
-   They are not connected to the game menus or a complete online match. Implement
-   host-verified seat admission, lobby/team/ready flow, full match/combat replication,
-   actual lag compensation and one whole-match migration checkpoint next.
-4. Recoverable PlayFab email login/registration/recovery and Photon token acquisition
-   are implemented with bounded HTTPS calls and offline response tests. The user is
-   being guided through title/add-on/custom-auth setup; the Title ID and live provider
-   verification remain pending. No account request has run. Never substitute a
-   client-supplied identity or ship service secrets. See [USER-SETUP](USER-SETUP.md).
-5. Run actual client/host tests, then external-network, eight-player, recovery,
+   Live private-host service validation passed. Continue remote gameplay/recovery;
+   do not request the SDK or App ID again.
+3. The networking continuation now connects Photon guest host/join, peer-bound
+   admission, lobby/team/ready/load, network prefabs, match simulation, combat state,
+   hitscan history, shared-orb rollback and existing presentation. Late join,
+   reconnect and complete host-recovery hooks are integrated. Final focused native runs passed 248 EditMode and 61 PlayMode checks, with no
+   skips; later separate-process Photon tests pass gameplay, reconnect, movement/fire,
+   eight-player capacity, graceful migration and abrupt-crash recovery. [QA](QA.md)
+   owns the failed attempts, fixes and passing reruns; external acceptance remains open.
+4. **No PlayFab (D023).** Its client and account UI have been removed. Photon-only
+   private matches use a temporary guest ID and match credential in memory; no email,
+   password, Title ID or profile backend is required. Held-seat recovery requires
+   the same credential; app restart and cross-device account recovery are unsupported.
+   Do not ask for PlayFab setup again. See [USER-SETUP](USER-SETUP.md).
+5. Complete external-network, eight-machine,
    endurance and measured latency/performance gates from the foundation spec.
    Only after acceptance should a release-quality package be produced.
 

@@ -230,3 +230,225 @@ Only after these gates pass: copy the actual Windows output to a versioned build
 folder, verify copied file hashes, record source commit and dirty inputs, include
 the exact QA report, and ZIP that verified copy. Preserve previous builds. Public
 release is outside the current authorization.
+
+# Networking continuation, 2026-10-27
+
+- `PlayMode-20261027-212938-098.xml`: broader focused integration passes 22/22.
+- `EditMode-20261027-213932-695.xml`: 217/218 pass after recovery integration. The existing recovery test needed loaded acknowledgements for the new mandatory recovery-ready gate; corrected with an explicit assertion that warmup cannot end before those acknowledgements.
+- `PlayMode-20261027-214027-588.xml`: 56/57 pass, including motor regressions. The local recovery fixture used object-wide state copying between different SDK IDs, which Fusion correctly rejected.
+- `PlayMode-20261027-214259-821.xml`: corrected local recovery hook fixture passes. It uses SDK behaviour-state copying under Single mode, validates complete gameplay/motor restoration, clears authority and tests warmup. Object-ID preservation with an actual migration token remains a live gate. Production follows the SDK resume-object flow, documented in [Photon's recovery sample](https://doc.photonengine.com/fusion/v2/technical-samples/fusion-disconnect-reconnect).
+
+Native integration is ongoing; these runs do not establish live provider or internet acceptance.
+
+- `Compile-20261027-211110-663.log`: integrated menu/lobby/match code compiles.
+- `NetworkPrepare-20261027-211132-647.log`: registered network lobby/match/player prefabs and Bootstrap composition generated successfully.
+- `EditMode-20261027-211946-281.xml`: 154/154 focused networking, identity, menu and combat rules checks pass, no skips.
+- `PlayMode-20261027-212008-854.xml`: 19/22 pass. Three new multi-prefab fixtures used the same asset path; unique fixture paths corrected registration.
+- `PlayMode-20261027-212139-442.xml`: three match spawns exposed actual SDK per-object limit (41,164 bytes versus 32,768). The presentation-only event ring was reduced to 128 entries, with a woven-state size regression.
+- `PlayMode-20261027-212401-201.xml`: all three reruns pass: authoritative combat/movement plus canonical checkpoint restore, event delivery/eviction, and actual SDK hitscan damage during disconnect grace.
+
+Initial `EditMode-20261027-211244-497.xml` had 79/82 passing: invalid fixture zone route, NUnit attribute encoding replacing an unpaired surrogate, and an outdated expected player wire size were corrected. The surrogate is now constructed at runtime so the rejection case remains meaningful.
+
+No PlayFab HTTP request, authenticated Photon room, external-client session, packaged visual pass or performance acceptance was performed by these checks. Desktop automation remains paused.
+
+
+- Pre-identity-change final focused runs: `EditMode-20261027-220250-290.xml` **242/242**, `PlayMode-20261027-220339-162.xml` **58/58**, no failures/skips. Networking preparation passed in `PrepareNetworking-20261027-220543-063.log`.
+- Core managed checks at `Artifacts/ManagedCompile/20261027-214840-881`: **174/174**. These precede the final guest/migration validation changes and do not prove service behavior.
+- D023 subsequently removed PlayFab; earlier identity tests and configuration requirements above are historical. Current private matches use temporary Photon guests and held-seat credentials. Focused guest binding check **11/11** at `Artifacts/Resume/photon-guest-check/managed-check/results.xml`; native guest-flow checks follow separately.
+
+
+## Photon-only verification, 2026-10-27
+
+- `EditMode-20261027-221901-948.xml`: **231/231** focused native checks, no failures/skips. Removed PlayFab fixtures; covers guest startup validation, copied-ID/wrong-credential rejection, menu actions, session/recovery and the committed-attack rebind regression.
+- `PrepareNetworking-20261027-221954-358.log`: regenerated registered prefabs and online build fingerprint successfully.
+- Explicit live service test `PlayMode-20261027-222118-458.xml`: **1/1**, no skips. Used the configured Fusion App ID in region `us`, created a transient private Host room, admitted its actual SDK guest peer, changed team, readied and shut down cleanly. No PlayFab or account request. This proves one host's cloud connection and lobby commands, not remote-client, direct/relay, match or migration acceptance.
+- First live run `PlayMode-20261027-222009-059.xml` reached the ready-state assertion but failed because NUnit compared boxed Fusion `NetworkBool` to a CLR bool. Casting the assertion to `bool` corrected the fixture; production behavior was unchanged for the passing rerun.
+- Review found a pending committed attack retained its original connection generation across migration while snapshot validation required the replacement generation. Validation now permits positive historical generations for an already committed same-life attack; new commands still require the current generation. Focused baseline regression failed before the fix; **51/51** managed combat checks passed after it at `Artifacts/Resume/pending-attack-check/managed-check/results.xml`.
+
+- Map retention and presentation: `PlayMode-20261027-222538-355.xml` **10/10**. The new fixture keeps the same scene and floor collider through 180 sequential suppressed motor ticks; different/stale/pending maps reject reuse.
+- Online cancellation/failure UI: `EditMode-20261027-222706-395.xml` **13/13**. Tests exercise actual menu handlers and rendered Retry gating while network loading has no attached external simulation. Physical Escape now delegates to the same menu cancellation path.
+
+- Final graceful-departure freeze integration: `EditMode-20261027-223104-070.xml` **238/238**, no failures/skips. Includes validated frozen-tick/clock-anchor behavior and all current guest/menu/session/combat checks. The preceding compile attempt `Test-20261027-223037-314.log` exposed missing test-assembly internal access; the existing assembly friend list now includes the PlayMode test assembly, without broadening production APIs.
+
+- Final focused native PlayMode `PlayMode-20261027-223211-340.xml`: **59/59**, no failures/skips. Includes actual SDK freeze primitive with coherent final motor state while transport ticks continue, map retention, movement, match/events/orbs/hitscan and recovery hooks. Explicit live service test is excluded from this run.
+- Final content preparation `PrepareNetworking-20261027-223313-704.log` passed. Independent Sol source review of the graceful-freeze delta found no confirmed important defect; this is not cloud migration evidence.
+
+
+## Earlier local Windows playtest checkpoint
+
+`Artifacts/Unity/Windows-20261027-223327-783/WildstoneArena.exe` built successfully
+with Unity 6000.5.10f1; log `GuestWindows-20261027-223327-783.log`. Reproducible command
+and exact arguments are saved in `Artifacts/Resume/Build-GuestPreview.ps1` and
+`guest-build-20261027-223327-783.json`. `guest-manifest-20261027-223327-783.json`
+records HEAD `8d88f1569f39a53208c4c184530457bd325509a2`, all 1,131 source hashes
+before/after (zero changes), the generated content identity and 200 output hashes.
+This preserves uncommitted inputs, is **local-playtest-only**, and was not published
+or substituted for the earlier private offline preview.
+
+A separate owned player process ran `-batchmode -nographics` for 15 seconds, remained
+alive, and logged no exceptions/errors before the tool stopped it. Evidence:
+`Artifacts/Resume/guest-startup-20261027-223327-783.json` and
+`Artifacts/Unity/GuestStartup-20261027-223327-783.log`. This verifies headless standalone
+startup only, not rendering, input, gameplay, remote transport or cloud migration.
+The earlier running build was not touched. Desktop automation remains paused.
+
+Documentation link check: 89 local links, zero missing targets at this checkpoint.
+`git diff --check` reports only two Unity-generated empty `m_Name` field trailing
+spaces in Bootstrap; no gameplay source whitespace defects. Remaining full gates:
+remote clients, real cloud migration/reconnect, external direct/relay networks,
+eight-player load/endurance/performance, and the packaged visual/human-feel pass.
+
+
+## Separate Windows process continuation
+
+Diagnostic build `Artifacts/Unity/Smoke-20261028-025035-388/WildstoneArena.exe`
+(first exact path is owned by `Artifacts/Smoke/latest-build.json`) was built through
+`BuildSmoke-20261027-225025-891.log`. The first actual host/client run at
+`Artifacts/Smoke/20261027-225108-139-basic` reached two-player gameplay in both
+processes with replicated avatars and advancing match ticks for ten continuous
+seconds. However, the client log contains two sequential movement-tick exceptions.
+The initial state-only pass was invalidated in `result.json`; this run is **failed**.
+The runner now additionally rejects runtime exceptions/assertions in either player
+log. Root cause and a clean rerun are required before treating this as accepted.
+
+- Diagnostic rerun `Artifacts/Smoke/20261027-225528-626-basic` correctly failed the new log gate: first client forward prediction received motor tick 9 while the current callback expected tick 15 (`runner=335`, `origin=319`). One-time confirmed-snapshot catch-up now replays the missing steps with the existing missing-input policy, preserving tick origin and strict subsequent checks.
+- Focused native bootstrap/orb/match tests: `PlayMode-20261027-230343-217.xml` **4/4**; boundary cases `EditMode-20261027-230432-831.xml` **8/8**, no failures. A clean separate-process rerun remains required; these tests alone do not close the integration failure.
+
+
+### Confirmed separate-process results
+
+- `Artifacts/Smoke/20261027-230638-668-basic`: **passed** actual two-process Host/Join/team/ready/load and ten seconds of running gameplay, with no runtime exceptions/assertions in either player log. Closes the initial prediction-arrival regression for this setup.
+- `Artifacts/Smoke/20261027-231445-459-reconnect`: **passed** host-triggered client disconnect and retained-session retry. Both peers observed connection generation 2 -> 3 in about 1.41 seconds, preserving seat, life, health 100 and starter ammo 12, followed by ten seconds of stable play and clean cleanup.
+- Earlier reconnect runs `20261027-230714-754-reconnect` and `20261027-231018-570-reconnect` remain failed: gameplay recovery succeeded but atomic status-file reporting hit Windows sharing errors. Shared-delete readers and bounded diagnostic-file replacement retries fixed the harness; the passing rerun above also had no runtime log exceptions. A focused Windows file-sharing reproduction confirmed restrictive readers block replacement.
+- `Artifacts/Smoke/20261027-232436-756-combat`: **passed** real SDK input and duplicate fire RPCs. Both processes observed local and remote horizontal displacement of about 2.809 m, starter clips 12 -> 11, and exactly one replicated shot per action with matching event IDs. This does not prove hit damage against a controlled moving target.
+- `Artifacts/Smoke/20261027-232806-735-capacity`: **passed** eight separate Windows processes through real Photon admission. All eight independently confirmed eight connected players, eight avatars and four teams with sizes `[2,2,2,2]`, ten seconds of advancing gameplay, no logged runtime exceptions/assertions and clean exits. This is same-PC functional capacity evidence, not the eight-machine performance/endurance or external-network matrix.
+- Migration runs `20261027-231543-174-migration`, `20261027-232236-475-migration` and `20261027-232614-831-migration` **failed**. The original host left; survivors changed runners, but the elected host returned `StartGame.Ok=true` without completing the restore callback. Strict state/content checks were not waived. Current diagnostics distinguish missing uploaded snapshots, callback timing and actual restore failures; migration acceptance remains open.
+- `Artifacts/Smoke/20261027-233354-813-migration`: **passed** graceful host departure with two surviving Windows processes. The SDK can return a successful `StartGame` before invoking its resume callback; startup now awaits that callback within the existing recovery deadline and retains its cancellation source until restoration finishes. Both survivors replaced their runner, kept the same match/content/seat, advanced authority 1 -> 2 and observed exactly one new host, zero lost match ticks and ten further seconds of running play. All three exited cleanly with no runtime exception/assertion logs. The recorded migration duration includes the ten-second stability observation; it is not a pure recovery latency measurement.
+- `Artifacts/Smoke/20261027-234225-897-migration-crash`: **failed** after the orchestrator forcibly terminated its owned original-host process following a confirmed periodic snapshot. Both survivors entered session failure around the transport's ten-second disconnect timeout, before runner replacement. Graceful migration does not cover this failure. The original host's unfinished/unsuccessful status and expected killed exit are preserved rather than relabeled as a pass.
+- The timeout path previously called `StopAsync` immediately, closing the cloud connection before the migration token could arrive. Only an active client transport timeout with a valid recovery baseline now preserves that connection, freezes old-runner simulation and awaits the token within one non-extending recovery deadline. Explicit kicks still fail immediately and expose retained-session retry. `EditMode-20261027-234813-738.xml`: **248/248**, no failures/skips, including the disconnect-policy boundary checks and safe diagnostic formatting.
+- `Artifacts/Smoke/20261027-234918-922-migration-crash`: **passed** actual owned-host process termination after periodic snapshot publication. Both survivors restored the same match/seat/content with authority 1 -> 2, exactly one new host, 17 match ticks of observed rollback and ten further seconds of stable running gameplay. Both survivors exited zero; the killed host remains unfinished and is explicitly marked as the expected crash. All three logs pass the runtime exception/assertion gate. This run proves the scenario, not every transport callback ordering.
+- Post-fix reconnect `Artifacts/Smoke/20261027-235017-897-reconnect`: **passed**, connection generation 2 -> 3 in about 1.11 seconds and ten seconds of further play. Post-fix graceful migration `Artifacts/Smoke/20261027-235112-556-migration`: **passed**. Both preserve clean runtime logs and normal owned-process cleanup.
+- Sol review found the log gate omitted bare `Exception:` records. Its pattern now covers those, with a focused PowerShell self-check. Rechecking all five earlier accepted live runs with the corrected pattern found zero runtime exceptions/assertions. Routine periodic snapshot success logs are diagnostic-build-only.
+
+## Focused checks and pre-fixture Windows build
+
+- `EditMode-20261027-234813-738.xml`: **248/248** focused checks, zero failures/skips.
+- `PlayMode-20261027-235152-137.xml`: **61/61** focused checks, zero failures/skips. Includes SDK movement/match/orb/recovery fixtures, initial prediction bootstrap, map retention and presentation composition; excludes the explicit service test already recorded separately.
+- `PrepareNetworking-20261027-235249-558.log`: network content preparation passed.
+- Fresh normal Windows player: `Artifacts/Unity/Windows-20261027-235301-648/WildstoneArena.exe`; build log `GuestWindows-20261027-235301-648.log`. `Artifacts/Resume/guest-build-20261027-235301-648.json` records exact arguments and HEAD; `guest-manifest-20261027-235301-648.json` records 1,143 source hashes before/after with zero changes and 200 output hashes. Built using `Artifacts/Resume/Build-GuestPreview.ps1`.
+- `Artifacts/Resume/guest-startup-20261027-235301-648.json`: fifteen-second owned headless startup remained alive with zero runtime exception/assertion records. The shipped `Wildstone.Fusion.dll` contains no `FusionSmokeDriver` type name; the normal build excludes the diagnostic define. Startup log: `GuestStartup-20261027-235301-648.log`.
+
+The new normal build contains the production prediction, migration-callback and
+transport-timeout fixes exercised by the preceding diagnostic players. It preserves
+uncommitted inputs and is **local-playtest-only**, not published or a clean release.
+The earlier private offline preview and earlier player directories are preserved.
+Same-PC cloud tests do not establish external direct/relay paths, eight-machine
+performance, adverse latency/loss profiles or endurance. Controlled moving-target
+hit verdicts and the paused full packaged visual/human-feel pass remain open.
+
+## 2026-10-28 additional local acceptance and current build
+
+- `Artifacts/Smoke/20261028-000141-951-late-join`: **passed**. Two original clients independently verified ten seconds of play before the runner launched a third process. All three then confirmed three connected players/avatars/teams, coherent lobby bindings and existing seats, unchanged authority, and ten more seconds of gameplay. All exited zero with clean runtime logs.
+- `Artifacts/Smoke/20261028-000141-946-combat`: **passed** actual movement/deduplication followed by controlled stationary hit replication. Host-authoritative test placement is explicitly recorded; the client then sent one real fire RPC. Both peers observed health 100 -> 74, shooter ammo 11 -> 10, target ammo unchanged at 11, one shot and one hit with matching identities and target life, and unchanged shooter health. This is not moving-target/adverse-latency acceptance. Review found the final distance metrics included the later fixture teleport; the movement threshold itself had been verified beforehand. Do not quote this run's final distances as input-only movement.
+- Current normal Windows build: `Artifacts/Unity/Windows-20261028-000246-678/WildstoneArena.exe`, log `GuestWindows-20261028-000246-678.log`. Exact command/HEAD: `Artifacts/Resume/guest-build-20261028-000246-678.json`; source/output manifest: `guest-manifest-20261028-000246-678.json`. All 1,145 source inputs stayed unchanged during build; 200 output files were hashed.
+- `Artifacts/Resume/guest-startup-20261028-000246-678.json`: fifteen-second owned headless startup stayed alive, no runtime exceptions/assertions, no smoke driver in the shipped assembly. Startup log: `GuestStartup-20261028-000246-678.log`. The subsequent movement-metric correction changes only code excluded from normal builds.
+
+This remains an unpublished local playtest with uncommitted inputs. The full MVP
+still needs independent external networks, eight-machine latency/performance,
+adverse network profiles/endurance, moving-target combat acceptance and the paused
+packaged visual/input/human-feel pass. No PlayFab setup or account dependency exists.
+- Corrected-distance combat rerun `Artifacts/Smoke/20261028-000411-316-combat`: **passed** all movement, deduplication and controlled-hit gates with clean logs/exits. Input-only horizontal distances were about 2.28-2.62 m at each process's completion observation, retained before fixture teleport; both peers again observed exactly 26 damage and one hit/shot.
+- Final documentation check: 83 local links resolve. PowerShell smoke-runner syntax passes. `git diff --check` reports only the same two Unity-generated empty `m_Name` trailing spaces in Bootstrap; no new source whitespace issue.
+
+## 2026-10-28 unattended polish and current build
+
+This batch preserves the approved game/art and Photon-only flow. Menu focus survives
+same-screen updates; settings starts on sensitivity rather than a binding action;
+the same match retains its HUD through pause/settings. The crosshair is centered,
+hit cue starts hidden, zone distance is horizontal, and enlarged HUD labels wrap.
+Recovery occupies the foreground with the original deadline and suppresses stale
+lobby/reconnect actions. Settings has a readable scrollbar and keyboard focus.
+Coordinator discovery uses reusable runner-local SDK lists at the existing cadence
+and rebuilds presentation only after participant/avatar/network-ID/render-root change.
+
+### Native and live evidence
+
+- `./Tools/Unity/Invoke-Unity.ps1 -Action Test -TestPlatform EditMode -TestFilter 'Wildstone.Tests.Menu;Wildstone.Tests.LocalSettings;Wildstone.Tests.OnlineMenu;Wildstone.Tests.FusionSessionBoundary' -TimeoutMinutes 5`: **65/65**, no skips, `Artifacts/Unity/EditMode-20261028-081207-323.xml`.
+- `./Tools/Unity/Invoke-Unity.ps1 -Action Test -TestPlatform PlayMode -TestFilter 'Wildstone.Tests.FusionPlayerRunnerTests;Wildstone.Tests.NetworkPresentationBridgeTests;Wildstone.Tests.PracticeSessionTests;Wildstone.Tests.FusionSessionLifecycleTests' -TimeoutMinutes 5`: **17/17**, no skips, `Artifacts/Unity/PlayMode-20261028-102420-846.xml`. Includes real SDK spawn/despawn and changed visual-root propagation through actual presentation.
+- Earlier `PlayMode-20261028-081315-197.xml` failed one allocation-comparison assertion (16/17). The BCL counter reported zero even for known allocations. The corrected fixture retains a 64 KiB calibration allocation and legacy query arrays; calibration still reports zero, so measurement is explicitly unavailable. Behavioral assertions remain active. Do not claim zero allocations or quantified savings; 20 Hz render snapshots still allocate.
+- Final diagnostic build: `Artifacts/Unity/Smoke-20261028-143650-489/WildstoneArena.exe`, built with `./Tools/Unity/Invoke-Unity.ps1 -Action BuildSmoke -TimeoutMinutes 10`; log `BuildSmoke-20261028-103642-789.log`. All final live/capture runs below used it.
+- `./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario capacity -SoakSeconds 300`: **passed**, `Artifacts/Smoke/20261028-103753-715-capacity/result.json`. All eight processes held coherent eight-player/eight-avatar/four-team `[2,2,2,2]` gameplay for at least 300 seconds, entirely Running (zero Finished time), with advancing SDK ticks, clean runtime logs and zero exit codes.
+- Windows-owned process memory samples: 550–556 observations per role, spanning 299.26–299.99 seconds of the hold. Per-process endpoint private-byte changes were +76 to +2,252 KiB; working-set changes +5.30 to +7.70 MiB. These are short-run observations, not leak absence, frame budgets or long endurance acceptance. Exact timestamps/bytes are in `result.capacityMemory`.
+- Earlier `Artifacts/Smoke/20261028-102443-743-capacity` remains **failed**: gameplay held for five minutes, but Unity/Mono process counters returned zero. The runner now measures its actual Windows processes; zero/missing/incomplete evidence still fails. Focused runner duration/bounds/memory gate self-checks passed under `Artifacts/Resume/capacity-soak-check/`.
+- `./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario late-join -TimeoutSeconds 210`: **passed**, `Artifacts/Smoke/20261028-104654-655-late-join`. Existing two peers continued through third-player admission with coherent seats, avatars and authority.
+- Same command with `-Scenario combat`: **passed**, `Artifacts/Smoke/20261028-104654-659-combat`, including actual movement, duplicate-fire rejection and controlled stationary-hit replication.
+- Same command with `-Scenario migration-crash`: **passed**, `Artifacts/Smoke/20261028-104654-656-migration-crash`. The owned original host was forcibly terminated; both survivors restored authority 2 with exactly one new host, 18 ticks of rollback and ten seconds of continued play. Reported migration duration includes that stability observation. Expected host kill is distinguished from survivor zero exits; all log gates passed.
+
+### Packaged visual evidence
+
+`./Tools/QA/Invoke-VisualCheck.ps1` generated sixteen D3D11 camera/UI captures in
+`Artifacts/Visual/20261028-103753-693/`; all sixteen were inspected. Title, settings
+top/controls, online, practice selection, pause and all three map spawn views show
+readable text, scrollbar contrast, centered crosshair and no observed HUD overflow.
+Map views cover 720p, 720p at UI scale 1.4 and 1080p; title additionally covers
+1920x810. This is real offscreen rendering, not concept images. The driver uses
+existing screen/map transitions, without desktop input or saved preference changes.
+Normal builds exclude it. Static images do not establish keyboard/mouse operation,
+full-map traversal, animation/moving readability or human game feel.
+
+Earlier capture runs are preserved: `20261028-081714-524` failed with black frames
+and timeout; `20261028-102622-032` was rejected after image inspection because the
+batch camera was not rendering, accumulating UI over old frames. Explicit render
+requests fixed that. `20261028-102830-235` rendered correctly but exposed target
+release warnings on resize; final cleanup clears camera references before release.
+The final log has no warning/exception/assertion lines. It does include Unity
+shutdown memory telemetry (about 0.95 MB, no allocation stack), which is not enough
+to attribute a leak to this batch and does not establish performance acceptance.
+Independent GPT-6.1 Sol read-only review found no actionable defect in menu/recovery,
+HUD, discovery or the compile-time visual driver.
+
+### Current normal Windows player
+
+`Artifacts/Unity/Windows-20261028-103823-536/WildstoneArena.exe` built through
+`./Artifacts/Resume/Build-GuestPreview.ps1`; log `GuestWindows-20261028-103823-536.log`.
+`Artifacts/Resume/guest-build-20261028-103823-536.json` records exact arguments and
+HEAD `8d88f1569f39a53208c4c184530457bd325509a2`;
+`guest-manifest-20261028-103823-536.json` records 1,149 source inputs unchanged during
+compilation and 200 output hashes. `guest-startup-20261028-103823-536.json` records
+fifteen seconds alive, zero runtime exceptions/assertions and neither diagnostic
+driver in the shipped assembly. This is **unpublished, local-playtest-only** with
+uncommitted inputs; prior builds and the separate private offline preview remain intact.
+
+Full acceptance still needs independent external networks/direct-relay paths,
+eight machines, latency/loss profiles, moving-target combat, long endurance/frame
+budgets and physical-input/human-feel checks. No PlayFab setup is needed.
+
+Final documentation check: 85 local links across ten current documents resolve.
+`git diff --check` reports only the two pre-existing Unity-generated empty `m_Name`
+trailing spaces in Bootstrap (lines 367 and 379); no new source whitespace issue.
+
+## 2026-10-28 first-person body, hands and slide (D025)
+
+The requested local body/handling continuation is implemented with original
+Wildstone geometry. Source `vibegame1` was inspected read-only: its slide simulation
+values already match this project. No source assets/dependencies or gameplay tuning
+were copied. Camera eye and aim remain authoritative; leg animation, wrist/finger
+articulation, sleeves, confirmed action feedback and slide FOV/roll are cosmetic.
+
+- Final command: `./Tools/Unity/Invoke-Unity.ps1 -Action Test -TestPlatform PlayMode -TestFilter 'Wildstone.Tests.FirstPersonBodyTests;Wildstone.Tests.FirstPersonWeaponMotionTests;Wildstone.Tests.FirstPersonSlideViewTests;Wildstone.Tests.PresentationRuntimeTests;Wildstone.Tests.NetworkPresentationBridgeTests;Wildstone.Tests.PracticeSessionTests' -Graphics -TimeoutMinutes 5`.
+- `Artifacts/Unity/PlayMode-20261028-200805-947.xml`: **35 passed, zero failed/skipped**. Coverage includes original six skin renderers and real D3D11 backface-culling visibility, look-down/slide framing, imported cuff mesh contact, grip/support alignment, confirmed-event recoil, real action duration on slow frames, lifecycle/short-Blink reset, reduced motion, exact camera eye/aim and frame partition behavior.
+- Earlier 193606 run failed one new camera test because it assumed 90 FOV while its camera fixture defaults to 60. It now asserts relative to the captured baseline. Earlier 200355 run failed its new cuff test because the imported mesh is not CPU-readable; editor read-only mesh data fixed the test without changing import settings. Final run above supersedes these failures.
+- `./Tools/Unity/Invoke-Unity.ps1 -Action BuildSmoke -TimeoutMinutes 10` passed; log `Artifacts/Unity/BuildSmoke-20261028-200829-311.log`, executable `Artifacts/Unity/Smoke-20261029-000836-240/WildstoneArena.exe`.
+- `./Tools/QA/Invoke-VisualCheck.ps1 -Motion` passed in `Artifacts/Visual/20261028-200856-832/`. All thirteen real D3D11 pose fixtures were inspected: forward/down, two gait phases, airborne, slide entry/sustain/down/base-FOV60/exit, fire, reload and sword. Connected legs/boots and distinct slide framing are visible; hand/weapon action poses differ. Low-poly original geometry remains. These are explicitly sampled presentation states, not actual input or human animation-feel proof.
+- Rejected captures remain preserved: `193457-428` aligned leg segments along the viewing ray; `195511-468` tried a waist cap that occluded the legs. Final code removes that geometry and places hips behind/under the lens. Intermediate `194808-055` and `200309-732` captures/builds are superseded. Their successful screenshot production is not visual acceptance.
+- Fresh `./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario combat -TimeoutSeconds 210` and `-Scenario reconnect` both pass on the final diagnostic build: `Artifacts/Smoke/20261028-200856-824-combat/` and `20261028-200856-824-reconnect/`. Actual separate Photon processes verify movement/fire deduplication/controlled stationary hits and retained-seat reconnect; runtime log and exit gates pass.
+- Independent GPT-6.1 Sol final read-only body/integration review found no actionable defect. Hand review exposed a reflected-import-axis assumption; the production basis now derives from authored grip points and the rendered cuff regression passes.
+
+Fresh normal player: `Artifacts/Unity/Windows-20261028-200856-804/WildstoneArena.exe`,
+built by `./Artifacts/Resume/Build-GuestPreview.ps1`. Manifest
+`Artifacts/Resume/guest-manifest-20261028-200856-804.json` records HEAD
+`8d88f1569f39a53208c4c184530457bd325509a2`, **1,157 unchanged inputs / 200 output hashes**.
+Startup record `guest-startup-20261028-200856-804.json` reports fifteen seconds alive,
+zero runtime exceptions/assertions and both diagnostic drivers excluded. This is
+**unpublished, local-playtest-only**, preserving uncommitted inputs. Human animation
+feel, physical input, adverse/external networks and performance acceptance remain open.

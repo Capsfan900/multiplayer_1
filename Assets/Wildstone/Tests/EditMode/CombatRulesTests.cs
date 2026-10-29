@@ -21,12 +21,68 @@ namespace Wildstone.Tests
         }
         static CombatAction Act(int player,int sequence,int tick,CombatActionKind kind) => new CombatAction {
             Participant=player,ConnectionGeneration=1,LifeGeneration=1,AuthorityGeneration=1,Sequence=sequence,Tick=tick,Kind=kind,Direction=Vector3.forward,PickupGeneration=1 };
+        [Test] public void CommittedPendingAttackSurvivesMigrationRebindAndResolvesOnce()
+        {
+            var source=Match(); var shooter=source.Find(1);
+            shooter.SpecialWeapon=WeaponKind.PushLens; shooter.SpecialAmmo=6; shooter.SelectedSpecial=true;
+            var committed=Act(1,1,1,CombatActionKind.Fire);
+            Assert.That(source.Step(1,new[]{committed},new EmptyCombatWorld()),Is.True);
+            var checkpoint=source.Capture();
+            checkpoint.Players[0].Connected=false; checkpoint.Players[0].DisconnectUntil=checkpoint.Tick+300;
+            var recovered=Match(); Assert.That(recovered.TryRestore(checkpoint),Is.True);
+            Assert.That(recovered.AdvanceAuthorityGeneration(2),Is.True);
+            Assert.That(recovered.SetConnection(1,2,true),Is.True);
+            var rebound=recovered.Find(1);
+            Assert.That(rebound.LifeGeneration,Is.EqualTo(1));
+            Assert.That(rebound.Pending.Action,Is.EqualTo(committed),"Committed action provenance must survive transport rebinding.");
+            var replica=Match(); Assert.That(replica.TryRestore(recovered.Capture()),Is.True,"Every post-rebind checkpoint must remain valid for replicas and later migrations.");
+            int resolve=rebound.Pending.ResolveTick;
+            Advance(recovered,resolve-1);
+            Assert.That(recovered.Step(resolve,new CombatAction[0],new EmptyCombatWorld()),Is.True);
+            var impulse=recovered.Events.Single(e=>e.Kind==CombatEventKind.Impulse);
+            Assert.That(impulse.Action,Is.EqualTo(committed)); Assert.That(impulse.Target,Is.EqualTo(2));
+            Assert.That(rebound.Pending,Is.Null);
+            Assert.That(recovered.Step(resolve+1,new CombatAction[0],new EmptyCombatWorld()),Is.True);
+            Assert.That(recovered.Events.Any(e=>e.Kind==CombatEventKind.Impulse),Is.False);
+            var stale=Act(1,2,resolve+2,CombatActionKind.Fire); stale.AuthorityGeneration=2;
+            int ammo=rebound.SpecialAmmo;
+            Assert.That(recovered.Step(resolve+2,new[]{stale},new EmptyCombatWorld()),Is.True);
+            Assert.That(recovered.Events.Single(e=>e.Kind==CombatEventKind.Rejected).Reason,Does.Contain("Stale"));
+            Assert.That(rebound.SpecialAmmo,Is.EqualTo(ammo)); Assert.That(rebound.LastActionSequence,Is.EqualTo(1));
+        }
+        [TestCase(0),TestCase(3)] public void PendingCheckpointRejectsNonpositiveOrFutureConnectionGeneration(int connection)
+        {
+            var source=Match(); var shooter=source.Find(1);
+            shooter.SpecialWeapon=WeaponKind.PushLens; shooter.SpecialAmmo=6; shooter.SelectedSpecial=true;
+            source.Step(1,new[]{Act(1,1,1,CombatActionKind.Fire)},new EmptyCombatWorld());
+            var saved=source.Capture(); saved.Players[0].ConnectionGeneration=2;
+            saved.Players[0].Pending.Action.ConnectionGeneration=connection;
+            Assert.That(Match().TryRestore(saved),Is.False);
+        }
+        [Test] public void StarterCadenceClipReloadAndRevisionStayConsistent()
+        {
+            Assert.That(WeaponCatalog.Revision,Is.EqualTo(2));
+            Assert.That(WeaponCatalog.Get(WeaponKind.LineDriver).Damage,Is.EqualTo(13));
+            Assert.That(WeaponCatalog.Get(WeaponKind.LineDriver).Ammo,Is.EqualTo(24));
+            var m=Match();
+            m.Step(1,new[]{Act(1,1,1,CombatActionKind.Fire)},new EmptyCombatWorld());
+            Assert.That(m.Find(1).FireReadyTick,Is.EqualTo(10));
+            Advance(m,8);
+            m.Step(9,new[]{Act(1,2,9,CombatActionKind.Fire)},new EmptyCombatWorld());
+            Assert.That(m.Find(1).StarterAmmo,Is.EqualTo(23));
+            m.Step(10,new[]{Act(1,3,10,CombatActionKind.Fire)},new EmptyCombatWorld());
+            Assert.That(m.Find(1).StarterAmmo,Is.EqualTo(22));
+            var saved=m.Capture(); saved.CatalogRevision=1;
+            Assert.That(Match().TryRestore(saved),Is.False);
+            saved=m.Capture(); saved.Players[0].StarterAmmo=25;
+            Assert.That(Match().TryRestore(saved),Is.False);
+        }
         [Test] public void DuplicateAttackSpendsOnceAndStaleLifeFails()
         {
             var m=Match(); var a=Act(1,1,1,CombatActionKind.Fire); m.Step(1,new[]{a,a},new EmptyCombatWorld());
-            Assert.That(m.Players[0].StarterAmmo,Is.EqualTo(11));
+            Assert.That(m.Players[0].StarterAmmo,Is.EqualTo(WeaponCatalog.StarterAmmo-1));
             a.Tick=2; a.Sequence=2; a.LifeGeneration=2; m.Step(2,new[]{a},new EmptyCombatWorld());
-            Assert.That(m.Players[0].StarterAmmo,Is.EqualTo(11));
+            Assert.That(m.Players[0].StarterAmmo,Is.EqualTo(WeaponCatalog.StarterAmmo-1));
         }
         [Test] public void ShieldAbsorbsOverflowAndStunNeverRefreshes()
         {
@@ -74,7 +130,7 @@ namespace Wildstone.Tests
         {
             var m=new ArenaMatch(Map()); m.AddPlayer(1,0,1,1,Vector3.zero);
             Assert.That(m.Step(1,new[]{Act(1,1,1,CombatActionKind.Fire)},new EmptyCombatWorld()),Is.False);
-            Assert.That(m.Begin(),Is.False); Assert.That(m.Players[0].StarterAmmo,Is.EqualTo(12));
+            Assert.That(m.Begin(),Is.False); Assert.That(m.Players[0].StarterAmmo,Is.EqualTo(WeaponCatalog.StarterAmmo));
             m.AddPlayer(2,1,1,1,Vector3.forward); m.Begin();
             Assert.That(m.Step(1,new[]{Act(1,1,1,CombatActionKind.Fire)},new EmptyCombatWorld(),false),Is.False);
             Assert.That(m.Tick,Is.Zero);
@@ -87,19 +143,19 @@ namespace Wildstone.Tests
         }
         [Test] public void AcceptedSameTickShotsTradeAndDeathClearsTemporaryInventory()
         {
-            var m=Match(); foreach(var p in m.Players) { p.Health=20; p.GrenadeAmmo=2; p.BlinkCharges=1; }
+            var m=Match(); foreach(var p in m.Players) { p.Health=WeaponCatalog.Get(WeaponKind.LineDriver).Damage; p.GrenadeAmmo=2; p.BlinkCharges=1; }
             m.Step(1,new[]{Act(2,1,1,CombatActionKind.Fire),Act(1,1,1,CombatActionKind.Fire)},new TargetWorld());
             Assert.That(m.Players.All(p=>!p.Alive && p.GrenadeAmmo==0 && p.BlinkCharges==0),Is.True);
             Assert.That(m.Events.Count(e=>e.Kind==CombatEventKind.Death),Is.EqualTo(2));
             m.Step(2,new[]{Act(1,2,2,CombatActionKind.Fire)},new TargetWorld());
             Assert.That(m.Events.Any(e=>e.Kind==CombatEventKind.Shot),Is.False);
-            Advance(m,181); Assert.That(m.Players.All(p=>p.Alive && p.Health==100 && p.StarterAmmo==12 && p.LifeGeneration==2),Is.True);
+            Advance(m,181); Assert.That(m.Players.All(p=>p.Alive && p.Health==100 && p.StarterAmmo==WeaponCatalog.StarterAmmo && p.LifeGeneration==2),Is.True);
         }
         [Test] public void SameTickShieldPrecedesImpactAndReuseConsumesNothing()
         {
             var m=Match(); m.Players[1].ShieldCharges=1;
             m.Step(1,new[]{Act(1,1,1,CombatActionKind.Fire),Act(2,1,1,CombatActionKind.Shield)},new TargetWorld());
-            Assert.That(m.Players[1].Health,Is.EqualTo(100)); Assert.That(m.Players[1].Shield,Is.EqualTo(34));
+            Assert.That(m.Players[1].Health,Is.EqualTo(100)); Assert.That(m.Players[1].Shield,Is.EqualTo(WeaponCatalog.Shield-WeaponCatalog.Get(WeaponKind.LineDriver).Damage));
             m.Players[1].ShieldCharges=1;
             m.Step(2,new[]{Act(2,2,2,CombatActionKind.Shield)},new EmptyCombatWorld());
             Assert.That(m.Players[1].ShieldCharges,Is.EqualTo(1)); Assert.That(m.Players[1].ShieldUntil,Is.EqualTo(361));
@@ -112,7 +168,7 @@ namespace Wildstone.Tests
             m.Step(1,new[]{Act(1,1,1,CombatActionKind.Reload)},new EmptyCombatWorld());
             m.Step(2,new[]{Act(1,2,2,CombatActionKind.Reload),Act(1,3,2,CombatActionKind.Fire)},new TargetWorld());
             Assert.That(m.Players[0].StarterAmmo,Is.Zero); Assert.That(m.Players[0].ReloadUntil,Is.EqualTo(73));
-            Advance(m,73); Assert.That(m.Players[0].StarterAmmo,Is.EqualTo(12));
+            Advance(m,73); Assert.That(m.Players[0].StarterAmmo,Is.EqualTo(WeaponCatalog.StarterAmmo));
         }
         [Test] public void BlinkRejectsWithoutCostAndSuccessfulReplayIsOneDiscontinuity()
         {
@@ -186,6 +242,53 @@ namespace Wildstone.Tests
             m.Step(1,new[]{Act(1,1,1,CombatActionKind.Fire)},new TargetWorld());
             Assert.That(m.Players[1].Health,Is.LessThan(100));
             Assert.That(kind==WeaponKind.LineDriver?m.Players[0].StarterAmmo:m.Players[0].SpecialAmmo,Is.EqualTo(WeaponCatalog.Get(kind).Ammo-1));
+        }
+        [TestCase(WeaponKind.PushLens)] [TestCase(WeaponKind.LaserSword)]
+        public void WindupShotOccursOnceAtReleaseWithOriginalAction(WeaponKind kind)
+        {
+            var m=Match(); Equip(m.Find(1),kind);
+            var action=Act(1,1,1,CombatActionKind.Fire);
+            m.Step(1,new[]{action},new EmptyCombatWorld());
+            Assert.That(m.Events.Any(e=>e.Kind==CombatEventKind.Shot),Is.False);
+            int release=m.Find(1).Pending.ResolveTick;
+            for(int tick=2;tick<release;tick++)
+            {
+                m.Step(tick,new CombatAction[0],new EmptyCombatWorld());
+                Assert.That(m.Events.Any(e=>e.Kind==CombatEventKind.Shot),Is.False);
+            }
+            m.Step(release,new CombatAction[0],new EmptyCombatWorld());
+            var shot=m.Events.Single(e=>e.Kind==CombatEventKind.Shot);
+            Assert.That(shot.Action,Is.EqualTo(action)); Assert.That(shot.Tick,Is.EqualTo(release));
+            Assert.That(shot.Weapon,Is.EqualTo(kind)); Assert.That(shot.Position,Is.EqualTo(m.Find(1).Eye));
+            Assert.That(shot.Vector,Is.EqualTo(action.Direction));
+            var restored=Match(); Assert.That(restored.TryRestore(m.Capture()),Is.True);
+            for(int tick=release+1;tick<=release+20;tick++)
+            {
+                restored.Step(tick,new CombatAction[0],new EmptyCombatWorld());
+                Assert.That(restored.Events.Any(e=>e.Kind==CombatEventKind.Shot),Is.False);
+            }
+        }
+        [TestCase(WeaponKind.PushLens,"stun")] [TestCase(WeaponKind.LaserSword,"stun")]
+        [TestCase(WeaponKind.PushLens,"blink")] [TestCase(WeaponKind.LaserSword,"blink")]
+        [TestCase(WeaponKind.PushLens,"death")] [TestCase(WeaponKind.LaserSword,"death")]
+        public void CancelledWindupNeverEmitsShot(WeaponKind kind,string cancellation)
+        {
+            var m=Match(); var player=m.Find(1); Equip(player,kind);
+            m.Step(1,new[]{Act(1,1,1,CombatActionKind.Fire)},new EmptyCombatWorld());
+            int release=player.Pending.ResolveTick;
+            if(cancellation=="stun") CombatRules.Stun(player,2,m.TickRate);
+            else if(cancellation=="blink")
+            {
+                player.BlinkCharges=1;
+                m.Step(2,new[]{Act(1,2,2,CombatActionKind.Blink)},new TargetWorld {BlinkAllowed=true});
+            }
+            else { player.Health=0; player.Alive=false; player.RespawnTick=release+100; CombatRules.ClearLife(player); }
+            for(int tick=m.Tick+1;tick<=release+20;tick++)
+            {
+                m.Step(tick,new CombatAction[0],new EmptyCombatWorld());
+                Assert.That(m.Events.Any(e=>e.Kind==CombatEventKind.Shot || e.Kind==CombatEventKind.Impulse),Is.False);
+            }
+            Assert.That(player.Pending,Is.Null);
         }
         [Test] public void PushHasWindupNoDamageAndCoverBlocks()
         {
@@ -265,12 +368,12 @@ namespace Wildstone.Tests
             var m=Match(); var a=Act(1,1,1,CombatActionKind.Fire); a.AuthorityGeneration=2;
             var b=a; b.AuthorityGeneration=1; b.ConnectionGeneration=2;
             m.Step(1,new[]{a,b},new TargetWorld());
-            Assert.That(m.Players[0].StarterAmmo,Is.EqualTo(12)); Assert.That(m.Players[0].LastActionSequence,Is.EqualTo(-1));
+            Assert.That(m.Players[0].StarterAmmo,Is.EqualTo(WeaponCatalog.StarterAmmo)); Assert.That(m.Players[0].LastActionSequence,Is.EqualTo(-1));
             Assert.That(m.Events.All(e=>e.Kind==CombatEventKind.Rejected),Is.True);
         }
         [Test] public void PickupBeforeSameTickDeathIsConsumedAndDeathClearsNewCharge()
         {
-            var m=Match(); m.Players[0].Health=20;
+            var m=Match(); m.Players[0].Health=WeaponCatalog.Get(WeaponKind.LineDriver).Damage;
             m.Step(1,new[]{Act(1,1,1,CombatActionKind.Pickup),Act(2,1,1,CombatActionKind.Fire)},new TargetWorld());
             Assert.That(m.Players[0].Alive,Is.False); Assert.That(m.Players[0].ShieldCharges,Is.Zero); Assert.That(m.Pickups[0].Generation,Is.EqualTo(2));
         }
@@ -344,7 +447,7 @@ namespace Wildstone.Tests
                 {
                     if(combat) for(int i=0;i<8;i++)
                     {
-                        var p=m.Players[i]; p.StarterAmmo=12; p.GrenadeAmmo=2;
+                        var p=m.Players[i]; p.StarterAmmo=WeaponCatalog.StarterAmmo; p.GrenadeAmmo=2;
                         if(i<4) { p.SpecialWeapon=WeaponKind.PulseLobber; p.SelectedSpecial=true; }
                         else { p.SpecialWeapon=WeaponKind.LaserSword; p.SelectedSpecial=true; }
                         p.SpecialAmmo=WeaponCatalog.Get(p.SpecialWeapon).Ammo;
@@ -360,12 +463,37 @@ namespace Wildstone.Tests
         {
             var m=Match(); var saved=m.Capture(); saved.Players[0].LastActionSequence=int.MaxValue-2;
             Assert.That(m.TryRestore(saved),Is.False);
-            Assert.That(m.Phase,Is.EqualTo(ArenaMatchPhase.Running)); Assert.That(m.Find(1).StarterAmmo,Is.EqualTo(12));
+            Assert.That(m.Phase,Is.EqualTo(ArenaMatchPhase.Running)); Assert.That(m.Find(1).StarterAmmo,Is.EqualTo(WeaponCatalog.StarterAmmo));
             Assert.That(m.Find(1).LastActionSequence,Is.EqualTo(-1)); Assert.That(m.Tick,Is.Zero);
             m=Match(); saved=m.Capture(); saved.Players[0].LifeGeneration=int.MaxValue-1;
             Assert.That(m.TryRestore(saved),Is.True); m.SetConnection(1,1,false);
+            Advance(m,300);
             Assert.That(m.SetConnection(1,2,true),Is.False); Assert.That(m.Phase,Is.EqualTo(ArenaMatchPhase.Aborted));
             Assert.That(m.Find(1).LifeGeneration,Is.EqualTo(int.MaxValue-1)); Assert.That(m.Find(1).ConnectionGeneration,Is.EqualTo(1));
+        }
+        [Test] public void ReconnectBeforeAvatarHoldExpiresKeepsHealthAmmoAndLife()
+        {
+            var m=Match(); var player=m.Find(1);
+            player.Health=37; player.StarterAmmo=3; player.SpecialWeapon=WeaponKind.PulseLobber;
+            player.SpecialAmmo=2; player.BlinkCharges=1; player.FireReadyTick=100; player.LastActionSequence=7;
+            var feet=new Vector3(3,0,2); player.Feet=feet;
+            Assert.That(m.SetConnection(1,1,false),Is.True); Advance(m,299);
+            Assert.That(m.SetConnection(1,2,true),Is.True);
+            Assert.That(player.Alive,Is.True); Assert.That(player.Health,Is.EqualTo(37)); Assert.That(player.StarterAmmo,Is.EqualTo(3));
+            Assert.That(player.SpecialWeapon,Is.EqualTo(WeaponKind.PulseLobber)); Assert.That(player.SpecialAmmo,Is.EqualTo(2));
+            Assert.That(player.BlinkCharges,Is.EqualTo(1)); Assert.That(player.LifeGeneration,Is.EqualTo(1)); Assert.That(player.Feet,Is.EqualTo(feet));
+            Assert.That(player.LastActionSequence,Is.EqualTo(7)); Assert.That(player.ConnectionGeneration,Is.EqualTo(2)); Assert.That(player.DisconnectUntil,Is.Zero);
+            Assert.That(m.SetConnection(1,1,false),Is.False,"Retired connection cannot disconnect the rebound avatar.");
+        }
+        [Test] public void ReconnectAfterHoldExpiresRespawnsWithStarterGear()
+        {
+            var m=Match(); var player=m.Find(1); player.Health=37; player.StarterAmmo=3;
+            player.SpecialWeapon=WeaponKind.PulseLobber; player.SpecialAmmo=2;
+            Assert.That(m.SetConnection(1,1,false),Is.True); Advance(m,300);
+            Assert.That(player.Alive,Is.False);
+            Assert.That(m.SetConnection(1,2,true),Is.True);
+            Assert.That(player.Alive,Is.True); Assert.That(player.Health,Is.EqualTo(100)); Assert.That(player.StarterAmmo,Is.EqualTo(WeaponCatalog.StarterAmmo));
+            Assert.That(player.LifeGeneration,Is.EqualTo(2)); Assert.That(player.SpecialWeapon,Is.EqualTo(WeaponKind.None)); Assert.That(player.SpecialAmmo,Is.Zero);
         }
         [Test] public void ClientTerminalSequencePairCannotAbortMatchOrPoisonWatermark()
         {
@@ -373,17 +501,17 @@ namespace Wildstone.Tests
             m.Step(1,new[]{Act(1,int.MaxValue-2,1,CombatActionKind.SelectStarter),Act(1,int.MaxValue-1,1,CombatActionKind.SelectStarter),
                 Act(2,1,1,CombatActionKind.Fire)},world);
             Assert.That(m.Phase,Is.EqualTo(ArenaMatchPhase.Running)); Assert.That(m.Find(1).LastActionSequence,Is.EqualTo(-1));
-            Assert.That(m.Find(2).StarterAmmo,Is.EqualTo(11)); Assert.That(m.Events.Count(e=>e.Kind==CombatEventKind.Rejected),Is.EqualTo(2));
+            Assert.That(m.Find(2).StarterAmmo,Is.EqualTo(WeaponCatalog.StarterAmmo-1)); Assert.That(m.Events.Count(e=>e.Kind==CombatEventKind.Rejected),Is.EqualTo(2));
             m.Step(2,new[]{Act(1,1,2,CombatActionKind.Fire)},world);
-            Assert.That(m.Find(1).StarterAmmo,Is.EqualTo(11)); Assert.That(m.Phase,Is.EqualTo(ArenaMatchPhase.Running));
+            Assert.That(m.Find(1).StarterAmmo,Is.EqualTo(WeaponCatalog.StarterAmmo-1)); Assert.That(m.Phase,Is.EqualTo(ArenaMatchPhase.Running));
         }
         [Test] public void ContinuedPracticeSequenceAfterRespawnRemainsValid()
         {
-            var m=Match(); m.Players[0].Health=20;
+            var m=Match(); m.Players[0].Health=WeaponCatalog.Get(WeaponKind.LineDriver).Damage;
             m.Step(1,new[]{Act(2,1,1,CombatActionKind.Fire)},new TargetWorld()); Advance(m,181);
             var a=Act(1,1000,182,CombatActionKind.Fire); a.LifeGeneration=2;
             m.Step(182,new[]{a},new EmptyCombatWorld());
-            Assert.That(m.Find(1).StarterAmmo,Is.EqualTo(11)); Assert.That(m.Find(1).LastActionSequence,Is.EqualTo(1000));
+            Assert.That(m.Find(1).StarterAmmo,Is.EqualTo(WeaponCatalog.StarterAmmo-1)); Assert.That(m.Find(1).LastActionSequence,Is.EqualTo(1000));
         }
         [Test] public void ReusedProjectileAndPendingStorageClearPreviousHitState()
         {

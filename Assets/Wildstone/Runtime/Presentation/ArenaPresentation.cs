@@ -7,7 +7,7 @@ using Wildstone.Movement;
 
 namespace Wildstone.Presentation
 {
-    [RequireComponent(typeof(PracticeSession))]
+    [DefaultExecutionOrder(100),RequireComponent(typeof(PracticeSession))]
     public sealed class ArenaPresentation : MonoBehaviour
     {
         PracticeSession session;
@@ -18,6 +18,8 @@ namespace Wildstone.Presentation
         ArenaEffects effects;
         ArenaAudio audio;
         WeaponView view;
+        FirstPersonBody body;
+        int localDiscontinuity;
         void Awake()
         {
             session=GetComponent<PracticeSession>();
@@ -45,17 +47,6 @@ namespace Wildstone.Presentation
             StopPresentation();
             history=new PresentationEventHistory();
             lastFeet.Clear();
-            for(int i=0;i<session.Match.Players.Count;i++)
-            {
-                var player=session.Match.Players[i];
-                lastFeet[player.Participant]=player.Feet;
-                if(player.Participant==PracticeSession.LocalParticipant) continue;
-                var go=new GameObject("Player visual "+player.Participant,typeof(PlayerVisual));
-                go.transform.SetParent(transform,false);
-                var visual=go.GetComponent<PlayerVisual>();
-                visual.Initialize(catalog,player.Team);
-                players.Add(player.Participant,visual);
-            }
             effects=new GameObject("Arena effects",typeof(ArenaEffects)).GetComponent<ArenaEffects>();
             effects.transform.SetParent(transform,false);
             effects.Initialize(catalog,session.Match);
@@ -64,12 +55,17 @@ namespace Wildstone.Presentation
             audio.Initialize();
             view=gameObject.AddComponent<WeaponView>();
             view.Initialize(session.Camera,catalog);
+            body=new GameObject("Local first-person body",typeof(FirstPersonBody)).GetComponent<FirstPersonBody>();
+            body.transform.SetParent(transform,false);
+            body.Initialize(catalog,session.LocalPlayer.Team);
+            localDiscontinuity=session.LocalPlayer.DiscontinuityTick;
             PresentState();
         }
         void OnSettingsChanged() { view?.SyncProjection(session.Camera); }
         void StopPresentation()
         {
             if(view!=null) { view.Teardown(session!=null?session.Camera:null); Destroy(view); view=null; }
+            if(body!=null) { Destroy(body.gameObject); body=null; }
             if(effects!=null) { Destroy(effects.gameObject); effects=null; }
             if(audio!=null) { Destroy(audio.gameObject); audio=null; }
             foreach(var player in players.Values) if(player!=null) Destroy(player.gameObject);
@@ -80,12 +76,17 @@ namespace Wildstone.Presentation
         {
             var match=session.Match;
             if(match==null || effects==null) return;
-            for(int i=0;i<match.Events.Count;i++)
+            for(int i=0;i<session.CombatEvents.Count;i++)
             {
-                var e=match.Events[i];
+                var e=session.CombatEvents[i];
                 if(!history.Accept(e)) continue;
+                if(session.LocalPlayer!=null && session.LocalPlayer.Alive && session.LocalPlayer.Connected)
+                    view?.Play(e,session.LocalParticipantId);
                 lastFeet.TryGetValue(e.Action.Participant,out var departure);
-                effects.Play(e,match,session.Settings.ReducedMotion,departure);
+                Vector3? muzzle=null;
+                if(e.Kind==CombatEventKind.Shot && e.Action.Participant==session.LocalParticipantId &&
+                   view!=null && view.TryGetMuzzle(out var muzzlePosition)) muzzle=muzzlePosition;
+                effects.Play(e,match,session.Settings.ReducedMotion,departure,session.CombatEvents,muzzle);
                 var target=match.Find(e.Target);
                 var position=(e.Kind==CombatEventKind.Stunned || e.Kind==CombatEventKind.ShieldBroken || e.Kind==CombatEventKind.ShieldActivated) && target!=null?target.Feet:e.Position;
                 audio.Play(e,position,session.Settings.EffectsVolume);
@@ -95,24 +96,50 @@ namespace Wildstone.Presentation
                 var player=match.Players[i];
                 lastFeet[player.Participant]=player.Feet;
             }
-            PresentState();
         }
         void LateUpdate()
         {
-            if(session.Match!=null && effects!=null) effects.Present(session.Match,session.Settings.ReducedMotion);
+            if(session.Match!=null && effects!=null)
+            {
+                PresentState();
+                if(session.Motor!=null && session.LocalPlayer!=null)
+                {
+                    var motor=session.Motor.CaptureState();
+                    if(localDiscontinuity!=session.LocalPlayer.DiscontinuityTick)
+                    {
+                        localDiscontinuity=session.LocalPlayer.DiscontinuityTick;
+                        session.View?.ResetPresentation();
+                    }
+                    float dt=session.Flow.GameplayInput?Time.unscaledDeltaTime:0;
+                    view?.SyncProjection(session.Camera);
+                    view?.Present(session.LocalPlayer,catalog,motor,session.Match.Tick,dt,session.Settings.ReducedMotion);
+                    body?.Present(session.LocalPlayer,motor,dt,session.Settings.ReducedMotion);
+                }
+                effects.Present(session.Match,session.Settings.ReducedMotion,session.ZoneCaptor,session.ZoneContested);
+            }
         }
         void PresentState()
         {
             var match=session.Match;
             if(match==null) return;
+            for(int i=0;i<match.Players.Count;i++)
+            {
+                var player=match.Players[i];
+                if(player.Participant==session.LocalParticipantId || players.ContainsKey(player.Participant)) continue;
+                var go=new GameObject("Player visual "+player.Participant,typeof(PlayerVisual));
+                go.transform.SetParent(transform,false); go.SetActive(false);
+                var visual=go.GetComponent<PlayerVisual>(); visual.Initialize(catalog,player.Team);
+                players.Add(player.Participant,visual);
+            }
             foreach(var pair in players)
             {
                 var player=match.Find(pair.Key);
                 if(player!=null && session.Motors.TryGetValue(pair.Key,out ArenaMotor motor))
                 {
                     MotorState state=motor.CaptureState();
-                    pair.Value.Present(player,state,catalog);
+                    pair.Value.Present(player,state,catalog,session.RenderPose(pair.Key));
                 }
+                else if(pair.Value!=null) pair.Value.gameObject.SetActive(false);
             }
             view?.Present(session.LocalPlayer,catalog);
         }

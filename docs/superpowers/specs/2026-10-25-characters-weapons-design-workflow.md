@@ -79,6 +79,40 @@ consumables; no new comparison is needed to re-approve their inclusion.
 
 ## 4. Behavior and rendering contracts
 
+### First-person body and handling (2026-10-28)
+
+The user requires visible legs, properly animated arms/hands and a pronounced slide
+like `vibegame1`. The local lower body stays level under camera pitch, follows local
+yaw and turns its asymmetric boots-forward slide pose toward travel. Walking uses
+distance-related gait; air tuck, hand landing dip and slide recovery remain distinct.
+Use Wildstone's existing original human and hand geometry. Source body/arm motion
+is a reference; no source single-player managers, clocks or third-party assets are
+imported. Exact pose amplitudes are builder tuning, validated against this camera.
+
+Hands maintain their weapon grip/support relationship during motion. Existing
+accepted combat events and authoritative action timers drive firing, reload and
+throw/melee presentation; visuals cannot spend ammo, create hits or extend timers.
+Locomotion and slide tuck articulate the hands and sleeves. Death, life changes,
+teleports and teardown clear stale visual impulses; menus freeze cosmetic clocks.
+
+Slide simulation already matches the audited source tuning. Strengthen body,
+weapon and cosmetic camera feedback without changing speed, friction, collision,
+stamina or network state. Camera eye position and center aim direction remain the
+authoritative ones; cosmetic roll/FOV must not alter shot direction. Reduced motion
+retains leg/hand state readability while suppressing decorative bob/roll/FOV/overshoot.
+
+Initial implementation uses six existing lower-body skins, with hips behind the
+standing lens and under it during the slide. A 6 Hz damped transition raises the
+legs; the view adds up to 6 degrees of FOV and 2.5 degrees of steering roll.
+Wrist/finger pivots and length-only sleeve adjustment retain original geometry.
+These are presentation defaults, not measured movement or performance targets.
+
+Acceptance: native tests for grip/support contact, local body visibility and pose
+reset, camera aim preservation and reduced motion; inspect packaged look-down,
+walking, airborne, slide-entry/sustain/exit, fire/reload and weapon changes. Static
+pose fixtures do not prove actual input, movement parity or human feel. Full moving
+acceptance remains open until its evidence is recorded in [QA](../../QA.md).
+
 Use the [combat/items/zone spec](2026-10-25-arena-combat-items-zone-design.md) as the
 single owner of weapon roles, counterplay, authority and status interactions. Use
 the [rendering spec](2026-10-25-unity-rendering-design.md) for materials, lighting,

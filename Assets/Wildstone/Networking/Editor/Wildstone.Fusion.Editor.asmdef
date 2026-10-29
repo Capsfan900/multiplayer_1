@@ -1,0 +1,6 @@
+{
+  "name": "Wildstone.Fusion.Editor",
+  "references": ["Wildstone.Runtime", "Wildstone.Fusion", "Fusion.Unity", "Fusion.Unity.Editor"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

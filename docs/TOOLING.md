@@ -138,9 +138,9 @@ GUID and populate the App ID again when recreating a checkout. The source packag
 contains no account ID. SDK defaults are not acceptance of the project's network
 rate/rewind budgets. The generated config now explicitly weaves `Wildstone.Fusion`
 and selects eight players, 120 Hz host/client ticks and 60 Hz sends. Lag compensation
-and migration composition remain unimplemented. The recoverable provider client uses
-Unity's built-in `com.unity.modules.unitywebrequest` 1.0.0; no extra PlayFab SDK is
-required for its four client endpoints. [QA](QA.md) records focused native integration
+is enabled; migration publishes complete checkpoints manually through the SDK.
+Local tests do not establish cloud recovery. D023 removes the PlayFab client and
+account configuration. Photon-only guest sessions use the existing SDK and App ID. [QA](QA.md) records focused native integration
 checks; compilation alone does not establish working networking.
 
 The cached source Unity MCP package is Coplay `com.coplaydev.unity-mcp` 10.1.2,
@@ -149,3 +149,132 @@ installed here: batch tooling and native editor builders currently supply the
 authoring commands. The upstream commit's MIT license was verified; if an interactive
 bridge is added, preserve that license and pin the package to the reviewed commit.
 Select only this project's Editor instance.
+## Network content preparation
+
+After networking scripts compile, run `./Tools/Unity/Invoke-Unity.ps1 -Action PrepareNetworking`
+in the active worktree. This calls `Wildstone.Networking.Editor.FusionContentBuild.Prepare`,
+preserves saved author scenes, creates the three registered Fusion prefabs and
+attaches online orchestration to Bootstrap. Do not run while another Unity process
+owns this checkout or agents are changing its Assets. Network preparation is not a
+provider connection test or internet-play acceptance.
+
+Preparation and the build preprocessor generate ignored `Resources/WildstoneBuild.txt`
+from a deterministic SHA-256 of runtime content/configuration. Host/join pins this
+fingerprint instead of relying on the unchanged application version. Local provider
+IDs/settings, the fingerprint itself, tests and Wildstone editor sources are excluded.
+Missing or malformed build identity fails closed for online connections.
+
+
+## Separate-process Photon checks
+
+Build the isolated diagnostic player with
+`./Tools/Unity/Invoke-Unity.ps1 -Action BuildSmoke -TimeoutMinutes 10`, then run
+one of the following checks:
+
+```powershell
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario basic
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario reconnect
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario combat
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario migration
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario migration-crash
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario capacity
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario capacity -SoakSeconds 300
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario late-join
+```
+
+The builder enables
+`WILDSTONE_SMOKE` only through that BuildPlayer invocation; normal players contain
+no automatic menu driver. Runs launch owned, hidden Windows player processes:
+two for `basic`, `reconnect` and `combat`; three for `migration`, `migration-crash` and `late-join`;
+eight for `capacity`, admitted sequentially to avoid team-swap races in the test
+driver. They use the existing Photon App ID and drive actual Host/Join, teams,
+ready, loading and gameplay. The runner stops only its own processes on failure.
+No new account, provider, deployment or paid subscription is required.
+
+`Artifacts/Smoke/latest-build.json` identifies the diagnostic executable. Per-run
+JSON and player logs are under `Artifacts/Smoke/<timestamp>-<scenario>/`.
+A pass requires every required process report and clean exit codes. Room codes are temporary;
+do not log guest identifiers or credentials. These checks exercise real cloud
+connections from this PC and do not establish independent-network or hardware
+performance acceptance. Runtime exceptions/assertions in any player log fail the
+run, even if status counters pass. [QA](QA.md) records which scenarios actually pass.
+
+`late-join` first requires ten seconds of two-player gameplay in both original
+processes. Only then does the orchestrator launch the third client into the running
+room. All three must observe coherent admission, existing seats and authority,
+three connected avatars on three teams and ten more seconds of advancing gameplay.
+
+`capacity -SoakSeconds` accepts 10–600 seconds (default 10), extending only the
+bounded diagnostic timeout. All eight peers must retain coherent players, avatars,
+seats and four teams of two throughout the hold, with advancing SDK ticks and no
+recovery or authority change. The hold starts in Running; natural Finished time is
+reported separately and never counted as running gameplay. The Windows runner
+samples its owned processes and writes start/end working set, private bytes,
+timestamps and observed hold duration to `result.capacityMemory`. Missing, zero
+or incomplete memory evidence fails; Unity/Mono process counters are not used.
+This is a short functional soak, not acceptance of frame budgets or endurance.
+
+`combat` first verifies actual SDK movement and duplicate-fire deduplication. It
+then records a controlled host-authoritative teleport fixture, waits for both peers
+to observe stationary targets and populate hitscan history, and sends one real
+client fire command. Both peers must agree on the shot/hit identities, target life,
+catalog damage, ammunition spent and unchanged unrelated health. Movement-distance
+metrics stop before fixture placement. This checks stationary hit replication,
+not natural traversal or moving-target behavior under adverse network profiles.
+
+`migration` leaves the original host through the normal menu cleanup path. For
+`migration-crash`, the original host first records `crashReady=true`, its pre-loss
+match tick and a successful cloud snapshot publication tick. It keeps running and
+does not call Leave or mark itself successful/finished. The orchestrator then kills
+only that owned host process. Its expected kill exit code and missing final success
+report are excluded from the survivor exit/status gates; `result.json` must record
+`hostCrashInjected=true` and the host process as `expectedCrash=true`. Both survivors
+must finish successfully and exit zero, with the ordinary authority, rollback,
+single-successor and resumed-gameplay checks intact. All three player logs still
+participate in the exception/assertion gate, including the terminated host's log.
+An unexpected host exit before the kill handshake remains a failure.
+
+An active remote client's transport `Timeout` can arrive before Photon supplies
+its migration token. With a usable recovery baseline, keep the SDK cloud connection
+and callbacks alive for election while freezing that disconnected runner's gameplay.
+Do not preemptively shut it down. Only this timeout path waits: server kicks and
+other disconnect reasons still release transport promptly and expose ordinary guest
+reconnect. The first timeout starts the recovery deadline; token arrival, repeated
+timeouts and replacement-runner startup reuse it without granting another window.
+Explicit leave/cancel or expiry closes the waiting connection. The post-fix
+`migration-crash` service check and reconnect/graceful regressions now pass;
+[QA](QA.md) records their evidence. Other callback orderings, adverse network
+profiles and independent-network acceptance remain open.
+
+The elected host's synchronous `HostMigrationResume` callback validates and restores
+the complete checkpoint. Its completion can occur after the `StartGame` task returns;
+startup therefore awaits the callback's separate completion task within the recovery
+deadline before accepting success. A callback exception, timeout or cancellation
+aborts recovery. The [foundation contract](superpowers/specs/2026-10-25-multiplayer-foundation-design.md#host-migration-contract)
+owns the recovery limits.
+
+## Offscreen packaged visual checks
+
+After `BuildSmoke`, run `./Tools/QA/Invoke-VisualCheck.ps1`. It launches one owned
+hidden D3D11 player and records sixteen PNGs plus JSON/logs under
+`Artifacts/Visual/<timestamp>/`. The compile-time diagnostic driver uses the
+existing screen/map flow, a RenderTexture and Unity's built-in ImageConversion
+module. It submits actual camera render requests and composites the UI panel onto
+the same target, including 720p, maximum UI scale, 1080p and an ultrawide title.
+Normal builds exclude both diagnostic drivers. Settings are applied in memory
+without saving; this does not send keyboard or mouse input to the desktop.
+
+The script checks completion, capture files, process exit and runtime logs. Inspect
+every image before accepting layout/contrast: file creation alone cannot detect
+blank or accumulated frames. These static captures do not validate physical input,
+moving readability, traversal or human game feel.
+
+For first-person body/handling inspection, `./Tools/QA/Invoke-VisualCheck.ps1 -Motion`
+records thirteen explicitly labeled visual pose fixtures: look-down, two gait phases,
+air, slide entry/sustain/down/low-FOV/exit, fire, reload and sword. These sample the
+actual presentation classes against a packaged map with deterministic fixture state;
+they do not drive gameplay input or prove traversal/combat. Every image still needs
+inspection; use native behavior tests and actual sessions for those separate gates.
+The Unity wrapper accepts `-Graphics` for an explicit D3D11 test that needs real
+rendering, such as `Wildstone.Tests.FirstPersonBodyTests.EachLegSegmentRendersWithBackfaceCulling`.
+Ordinary focused tests retain the headless default.
