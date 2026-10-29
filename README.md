@@ -1,9 +1,10 @@
 # multiplayer_1
 
-Private GitHub repository: [Capsfan900/multiplayer_1](https://github.com/Capsfan900/multiplayer_1).
-Download offline Windows Practice previews from [Releases](https://github.com/Capsfan900/multiplayer_1/releases).
-Extract the entire player ZIP and run `WildstoneArena.exe`. GitHub sign-in and repository
-access are required; the link does not grant access. These are development previews,
+Public GitHub repository: [Capsfan900/multiplayer_1](https://github.com/Capsfan900/multiplayer_1).
+Download Windows development previews from [Releases](https://github.com/Capsfan900/multiplayer_1/releases).
+Current snapshot: [2026-10-28 / 316a00f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-316a00f).
+Extract the entire player ZIP and run `WildstoneArena.exe`. Downloads are public.
+These are development previews,
 not accepted online multiplayer releases. See [build workflow](docs/TOOLING.md#github-builds-and-private-releases).
 
 **Active MVP development, resumed on 2026-10-27 in the isolated `mvp-2` worktree.** Current evidence and
