@@ -6,6 +6,36 @@ separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
 
+### 2026-10-28 current-state public preview release
+
+The user requested a fresh build/release of the current state and explicitly
+confirmed keeping the now-public repository public. Snapshot source commit:
+`316a00f36524a823bd92e77c5741d43d87ad7c19`. It captures the worktree at build start;
+concurrent edits made afterward are untouched and excluded from this release.
+No gameplay changes or content regeneration were performed for delivery.
+
+- Built from `git archive` in `C:\Users\tyler\orca\builds\wildstone-316a00f`,
+  using its `Tools/Unity/Invoke-Unity.ps1 -Action BuildWindows -TimeoutMinutes 30`.
+  Unity 6000.5.10f1 returned zero and `WILDSTONE BUILD OK`; log:
+  `Artifacts/Unity/BuildWindows-20261028-202235-794.log` under that build root.
+- The existing public Photon app settings were copied separately into the isolated
+  build so Host/Join remains configured. No credential-bearing local service config
+  was copied or committed. This configuration is not part of the source archive.
+- The normal player stayed alive for a 15-second hidden headless startup, with no
+  exception/assertion match in `Artifacts/Unity/release-startup.log`, then only the
+  owned process was stopped. This does not verify rendered visuals or network play.
+- Packaged ZIP: 200 entries, required EXE/DLL/player data verified, Unity backup/debug
+  folders excluded. SHA-256:
+  `dcd1c21839e73446c15467370758eb92ec7b3d03cab70dd69cce011efe1a2ae7`.
+  GitHub's asset digest matches. ZIP, checksum and `release-manifest.json` uploaded.
+- Public prerelease: [preview-20261028-316a00f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-316a00f).
+  Normal gameplay code is the captured work in progress, including D026 changes
+  present at capture. Full tests, visual/input checks and external-network acceptance
+  were not rerun for this release. Historical tests below are not new release tests.
+
+Local delivery record: `Artifacts/Release/current-release.json`. This was a local
+build/upload, not a GitHub Actions run. No runner setup was attempted.
+
 ### GitHub delivery
 
 Personal private repository `Capsfan900/multiplayer_1` was created on 2026-10-27.

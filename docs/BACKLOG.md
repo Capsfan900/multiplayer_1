@@ -7,6 +7,10 @@ remain open. Follow the
 Design documents and concept approvals do not complete implementation stages.
 Acceptance detail belongs in the [canonical specs](README.md), not this checklist.
 
+Delivery checkpoint: current-state snapshot `316a00f` is published as public preview
+`preview-20261028-316a00f` with user approval. Build/startup/package evidence is in
+[QA](QA.md). Ongoing development and remaining acceptance stages stay open.
+
 Current work: playtest D025 first-person legs, arm/hand animation and pronounced
 slide feel, then finish external-network acceptance and packaged input checks.
 D025 implementation passes 35 focused native checks, thirteen inspected pose

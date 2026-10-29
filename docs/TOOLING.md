@@ -2,7 +2,15 @@
 
 ## GitHub builds and private releases
 
-The personal repository is `Capsfan900/multiplayer_1` (private). Run **Actions >
+The personal repository is `Capsfan900/multiplayer_1` (now public, confirmed by the
+user on 2026-10-28). Current-state public releases may be built locally from an
+isolated committed source archive with the existing public Photon app settings
+copied separately so Host/Join remains configured; never copy credential-bearing
+service configuration. Record the source SHA, configuration inclusion and validation
+limits in the release manifest/notes. See [QA](QA.md) for the current release.
+
+The original workflow below remains unchanged and is not evidence of an Actions run.
+Run **Actions >
 Windows preview release > Run workflow** to build the selected committed branch.
 The workflow uses a separate clean checkout, the existing `BuildWindows` wrapper
 and saved scenes/lightmaps; it does not regenerate approved content. It checks the
@@ -40,7 +48,8 @@ and local service configuration stay ignored and are not copied into release bui
 These builds support offline Practice; internet acceptance remains open.
 
 Share a specific prerelease URL from [Releases](https://github.com/Capsfan900/multiplayer_1/releases).
-Private releases require GitHub repository read access; there is no anonymous link.
+Releases of the now-public repository can be downloaded anonymously. Historical
+private-release access notes describe the repository's earlier visibility.
 The `/releases/latest` route excludes these prereleases. Release-run evidence lives
 in [QA](QA.md); publication is distinct from runtime acceptance.
 
@@ -278,3 +287,11 @@ inspection; use native behavior tests and actual sessions for those separate gat
 The Unity wrapper accepts `-Graphics` for an explicit D3D11 test that needs real
 rendering, such as `Wildstone.Tests.FirstPersonBodyTests.EachLegSegmentRendersWithBackfaceCulling`.
 Ordinary focused tests retain the headless default.
+
+Weapon expression captures: `./Tools/QA/Invoke-VisualCheck.ps1 -Weapons` records
+26 packaged render fixtures: ten weapon shots against two map facings, plasma and
+grenade blasts, disc ricochet, stun impact, Lens charge and overlapping laser beams.
+These use production presentation and explicitly empty-world projectile rules;
+they are labeled fixtures and do not replace input/network/human-feel acceptance.
+`-Motion` and `-Weapons` are mutually exclusive. `-Action PreparePresentation`
+imports/builds the model catalog without regenerating map geometry or baked scenes.

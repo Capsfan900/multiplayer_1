@@ -11,6 +11,12 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
 
 ## Current evidence
 
+- Current-state delivery: source snapshot `316a00f` was built and published as public
+  [preview-20261028-316a00f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-316a00f)
+  at the user's request and explicit public-visibility confirmation. Build, headless
+  startup and ZIP/digest checks pass; [QA](QA.md) records exact evidence. Concurrent
+  edits made after capture remain outside that release. No new online/visual acceptance.
+
 - Active follow-up D026: creative weapon/laser/VFX pass. The body/slide build below
   predates this weapon continuation; validation/build replacement is in progress.
 
