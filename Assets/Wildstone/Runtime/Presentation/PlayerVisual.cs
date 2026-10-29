@@ -4,6 +4,7 @@ using Wildstone.Movement;
 
 namespace Wildstone.Presentation
 {
+    [DefaultExecutionOrder(200)]
     public sealed class PlayerVisual : MonoBehaviour
     {
         Animator animator;
@@ -14,6 +15,10 @@ namespace Wildstone.Presentation
         Vector3 aim=Vector3.forward;
         bool wasAlive=true;
         float deathUntil;
+        CombatState presented;
+        int life=-1, connection=-1, discontinuity=-1;
+        WeaponKind handlingWeapon;
+        float recoil, recoilDuration=.125f, recoilPitch=8, recoilTwist, reload, motionStrength=1;
         public void Initialize(PresentationCatalog catalog,int team)
         {
             if(team<0 || team>=catalog.Humans.Length || catalog.Humans[team]==null) throw new System.ArgumentException("Missing team human model.");
@@ -55,10 +60,38 @@ namespace Wildstone.Presentation
             weapon=Instantiate(prefab,hand);
             GripAttachment.Align(weapon.transform,hand);
         }
+        public void PresentHandling(CombatState player,int tick,float dt,bool reducedMotion,int tickRate=WeaponCatalog.DefaultTickRate)
+        {
+            if(life!=player.LifeGeneration || connection!=player.ConnectionGeneration || discontinuity!=player.DiscontinuityTick ||
+                handlingWeapon!=currentWeapon || !player.Alive || !player.Connected)
+                recoil=0;
+            presented=player;
+            life=player.LifeGeneration; connection=player.ConnectionGeneration; discontinuity=player.DiscontinuityTick;
+            handlingWeapon=currentWeapon;
+            motionStrength=reducedMotion?.2f:1;
+            recoil=Mathf.MoveTowards(recoil,0,Mathf.Max(0,dt)/recoilDuration);
+            reload=player.Alive && player.Connected && currentWeapon==WeaponKind.LineDriver && player.ReloadUntil>tick && tickRate>0?
+                Mathf.Sin(Mathf.PI*Mathf.Clamp01((player.ReloadUntil-tick)/(WeaponCatalog.ReloadSeconds*tickRate))):0;
+        }
+        public void Play(CombatEvent value)
+        {
+            if(presented==null || !gameObject.activeInHierarchy || !presented.Alive || !presented.Connected ||
+                value.Kind!=CombatEventKind.Shot || value.Action.Participant!=presented.Participant || value.Action.LifeGeneration!=life) return;
+            // Committed same-life shots can retain a historical connection after host recovery.
+            var kind=value.Weapon==WeaponKind.None?currentWeapon:value.Weapon;
+            if(kind!=currentWeapon || kind==WeaponKind.Grenade) return;
+            recoil=1;
+            recoilDuration=kind==WeaponKind.LaserSniper?.38f:kind==WeaponKind.LaserShotgun?.30f:kind==WeaponKind.LaserPistol?.16f:kind==WeaponKind.PulseLobber?.28f:kind==WeaponKind.PushLens?.25f:kind==WeaponKind.ReboundDisc?.20f:.125f;
+            recoilPitch=kind==WeaponKind.LaserSniper?17:kind==WeaponKind.LaserShotgun?16:kind==WeaponKind.LaserPistol?9:kind==WeaponKind.PulseLobber?14:kind==WeaponKind.StunGun?4:8;
+            recoilTwist=kind==WeaponKind.LaserShotgun?5:kind==WeaponKind.LaserPistol?3:kind==WeaponKind.ReboundDisc?-10:0;
+        }
+        void OnDisable() { recoil=reload=0; }
         void LateUpdate()
         {
             if(hand!=null && animationName!="Death" && aim.sqrMagnitude>.001f)
-                hand.rotation=Quaternion.LookRotation(aim,Vector3.up);
+                // Rotate the wrist after Animator; its attached weapon retains the authored grip.
+                hand.rotation=Quaternion.LookRotation(aim,Vector3.up)*Quaternion.Euler(
+                    motionStrength*(-recoil*recoilPitch+reload*18),0,motionStrength*(recoil*recoilTwist-reload*22));
         }
         public static string SelectAnimation(CombatState player,in MotorState motor)
         {

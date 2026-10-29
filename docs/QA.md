@@ -6,6 +6,76 @@ separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
 
+### 2026-10-29 resumed acceptance and connection follow-up
+
+The user reports that playtesting worked and felt good overall, with some initial
+connection issues. Exact participating builds, network topology and initial error
+are not established. Process inspection found the older public `316a00f` executable
+running locally; mixed builds are rejected, but that is not a diagnosed cause of
+the report. The latest local player log separately records a rejected recovery
+checkpoint and repeated Fusion allocator errors during host-migration disposal.
+The invalid checkpoint's cause remains unknown; rollback limits were not relaxed.
+
+Work remains in `mvp-2`. Verification runs use `D:/WildstoneBuilds/resume-20261029`
+from base `5a8348a` plus the recorded local delta. Source manifest:
+`Artifacts/Resume/resume-20261029-source-manifest.json`. It records 1,176 tracked/
+new build inputs, their workspace/build hashes and 233 Git-archive line-ending-only
+differences; no other source differences were found. No original project, account
+provider or public release was modified. No firewall allow rules were added:
+read-only inspection found four Public inbound **Block** query-user rules for the
+two new diagnostic player paths. Earlier test-build allow rules remain unchanged.
+
+- **Aborted results:** regression failed before the fix in
+  `Artifacts/Unity/EditMode-20261029-000736-508.xml` (1/1 failed: expected Results,
+  got Online). An aborted authoritative round now keeps an independent validated
+  score/player summary after transport and live presentation retirement; Back
+  clears it, and connection failures retain retry/back. First focused green:
+  `EditMode-20261029-000949-200.xml`, **16 passed**.
+- **Recovery callback boundary:** current and `316a00f` source both threw checkpoint
+  validation errors out of Fusion's synchronous resume callback. SDK IL inspection
+  showed that this bypasses following migration-disposal/initialization work.
+  `EditMode-20261029-001159-411.xml` failed the new exception-containment test
+  (9 tests, 1 failure). The callback now faults the owning completion task and
+  returns; the owner still aborts invalid recovery and shuts down the replacement.
+  No claim is made that every reported SDK allocator failure is resolved.
+- **Remote weapon handling:** four initial pose regressions failed on the missing
+  behavior in `PlayMode-20261029-001041-874.xml`. Third-person shots/reloads now
+  drive bounded wrist/weapon motion, with grip preservation, lifecycle resets,
+  reduced motion and shared event dedup. Six final tests include the actual
+  presentation bridge and valid historical committed shots across recovery.
+- **Final focused native checks:** `EditMode-20261029-001415-546.xml`, **49 passed**
+  across session boundaries, recovery state/rules, aborted summaries and online UI;
+  `PlayMode-20261029-001508-847.xml`, **32 passed** across remote/first-person
+  handling, network presentation, practice session and recovery lifecycle/hooks.
+  No failures or skips. These are focused runs, not a fresh full-suite claim.
+- **Three-laser live Photon fixture:** first successful run
+  `Artifacts/Smoke/20261029-000736-522-laser-combat` exercises real client pickup,
+  equip and fire RPCs for pistol/shotgun/sniper. Both peers agree on 32/72/80 damage,
+  one shot each, 1/8/1 hit events, one special-ammo spend and matching event/life
+  identities. Host placement and health resets construct stationary targets.
+  Final rebuilt-player rerun `20261029-001951-390-laser-combat` also passes all three
+  verdicts and cleanup/log gates after the integrated lifecycle/presentation fixes.
+- **Final-build recovery smoke:** `20261029-001729-065-migration-crash` and
+  `20261029-001729-084-reconnect` pass separate-process Photon recovery, with
+  clean required exits/log checks. Host-kill is intentional in the crash scenario.
+  Diagnostic build log: `BuildSmoke-20261029-001624-978.log`.
+- **Normal player:** `Artifacts/Unity/BuildWindows-20261029-001729-059.log` reports
+  successful Windows compilation under the D: verification root. A hidden 15-second
+  startup stayed alive without logged exceptions/assertions; owned player stopped.
+  Normal `Wildstone.Fusion.dll` contains neither diagnostic driver type name.
+  Output hashes and startup record: source workspace
+  `Artifacts/Resume/resume-20261029-normal-build.json`. The first metadata check used
+  the wrong assembly filename and failed after the successful startup; the corrected
+  check inspected the actual assembly. This is a local unpublished continuation;
+  public `e9e091f` remains unchanged.
+
+Evidence paths in this section are under the D: verification root unless explicitly
+listed as source manifests. Independent review found no blocking code regression.
+Moving opponent/readability captures, full packaged physical-input flow, listening,
+weapon balance, moving-target/adverse-network behavior, performance percentiles,
+eight-machine and long endurance/reconnect matrices remain open. Same-PC Photon
+tests and the user's qualitative report do not close those gates.
+
 ### 2026-10-28 laser arsenal and first-person polish public release
 
 The user requested the current version be built and released. Source snapshot
@@ -270,11 +340,12 @@ surfaces. An unattended still or scripted target is not human feel approval.
 
 ## Real network and performance acceptance
 
-The legitimate Fusion SDK and app are configured. Finish verified identity setup
-as described in [USER-SETUP](USER-SETUP.md) and compose the initial real SDK adapters
-into the actual lobby/player/match flow. Gate admission on provider identity and
-content compatibility, compose one whole-game checkpoint, and use actual Fusion
-prediction and lag compensation. The present physics adapter is offline only.
+The legitimate Fusion SDK and app are configured. D023 Photon guest admission,
+actual lobby/player/match adapters, whole-game recovery checkpoints and SDK
+historical hitscan are implemented and have the local evidence recorded below.
+No PlayFab or additional identity provisioning is pending. Continue measured
+prediction/lag-compensation and recovery acceptance using the actual SDK; do not
+repeat the superseded offline-only adapter milestone.
 
 Run host plus clients first, then independent-home networks and direct/relay
 paths. Exercise stale/malformed/duplicate actions, ownership/life changes, losses
@@ -292,10 +363,11 @@ or esports proven without the specified measurements and host-trust limits.
 The HUD's per-frame formatted display text remains a recorded optimization candidate.
 Measure it in the complete native frame profile; the core zero-byte checks exclude it.
 
-Only after these gates pass: copy the actual Windows output to a versioned build
-folder, verify copied file hashes, record source commit and dirty inputs, include
-the exact QA report, and ZIP that verified copy. Preserve previous builds. Public
-release is outside the current authorization.
+Release-quality acceptance still requires these gates. Separately authorized
+development previews may be packaged with exact source/build identity, verified
+file hashes and explicit remaining limits; public previews above were requested
+by the user. Preserve previous builds and never describe publication as completion
+of runtime or internet acceptance.
 
 # Networking continuation, 2026-10-27
 

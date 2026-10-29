@@ -113,6 +113,21 @@ walking, airborne, slide-entry/sustain/exit, fire/reload and weapon changes. Sta
 pose fixtures do not prove actual input, movement parity or human feel. Full moving
 acceptance remains open until its evidence is recorded in [QA](../../QA.md).
 
+### Remote weapon handling (2026-10-29)
+
+Third-person wrist/held-weapon recoil consumes accepted Shot events once, through
+the existing presentation event history. It runs after Animator and current player
+state presentation, retains the authored grip, and uses distinct pistol/shotgun/
+sniper impulse amplitudes. Starter reload pose follows authoritative `ReloadUntil`
+and match tick rate, including late observation; visuals never alter those timers.
+Death, weapon/life/connection changes, disconnect and movement discontinuities clear
+old impulses. Cosmetic decay freezes with gameplay input suspended; reduced motion
+retains a smaller cue. A valid committed same-life event may retain a historical
+connection generation across recovery and must not be rejected solely for that.
+The remote event queue is capped at 256 and clears on teardown. Focused native
+pose/grip/reset/bridge-dedup regressions live in `RemoteWeaponHandlingTests`; moving
+opponent-view and human readability acceptance remain separate.
+
 Use the [combat/items/zone spec](2026-10-25-arena-combat-items-zone-design.md) as the
 single owner of weapon roles, counterplay, authority and status interactions. Use
 the [rendering spec](2026-10-25-unity-rendering-design.md) for materials, lighting,

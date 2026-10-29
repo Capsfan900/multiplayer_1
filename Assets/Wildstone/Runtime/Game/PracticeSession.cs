@@ -134,6 +134,17 @@ namespace Wildstone.Game
             networkEvents=events ?? Array.Empty<CombatEvent>(); networkCaptor=captor; networkContested=contested;
             Stepped?.Invoke();
         }
+        public void ShowNetworkResults(MatchSnapshot snapshot,int localParticipant)
+        {
+            if(snapshot==null || snapshot.Practice || (snapshot.Phase!=ArenaMatchPhase.Aborted && snapshot.Phase!=ArenaMatchPhase.Finished))
+                throw new ArgumentException("A completed online round is required.",nameof(snapshot));
+            var summary=new ArenaMatch(Catalog.Find(snapshot.MapId),snapshot.TickRate);
+            if(!summary.TryRestore(snapshot) || summary.Find(localParticipant)==null)
+                throw new ArgumentException("Invalid online round summary.",nameof(snapshot));
+            StopMatch();
+            Match=summary; LocalParticipantId=localParticipant; ExternalSimulation=true; MapId=snapshot.MapId;
+            Show(MenuScreen.Results);
+        }
         public void DetachNetworkMatch() { if(ExternalSimulation) { StopMatch(); Show(MenuScreen.Online); } }
         IEnumerator LoadWorker()
         {

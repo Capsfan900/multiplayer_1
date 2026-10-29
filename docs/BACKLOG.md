@@ -1,6 +1,6 @@
 # Staged backlog
 
-Updated: 2026-10-28. **Execution resumed in `mvp-2`, with a Photon-only Windows playtest.**
+Updated: 2026-10-29. **Execution resumed in `mvp-2`, with a published Photon-only Windows preview.**
 Local implementation spans the stages below; full visual and internet acceptance
 remain open. Follow the
 [implementation plan](superpowers/plans/2026-10-25-wildstone-mvp.md) and [handoff](HANDOFF.md).
@@ -44,16 +44,24 @@ open. See [QA](QA.md).
 | 7 | Editable models, native maps/lightmaps and polished menus/HUD are packaged; sixteen static menu/all-map captures inspected. Physical input, moving readability, feel and profiles remain pending. |
 | 8 | Real external-network, eight-machine, endurance and performance acceptance not run. |
 
-| Order | Next actionable stage | Evidence needed to advance |
+The implementation stages above are substantially authored. The following is the
+active acceptance backlog, replacing the old bootstrap implementation order.
+
+| Order | Next actionable work | Evidence needed to advance |
 | --- | --- | --- |
-| 1 | Audit source reuse; plan and establish the separate Unity project; validate Fusion compatibility | Reuse inventory, pinned compatible versions and a compiling host/client target |
-| 2 | Adapt the source motor to fixed ticks, restorable state and prediction | Movement parity and replay evidence under the foundation network profiles |
-| 3 | Add temporary guest identity, private sessions, teams, reconnect and host migration | SDK peer binding, held-seat credential protection and recovery/failure cases with no duplicate seats |
-| 4 | Build minimal combat fixtures: one hitscan, one projectile and required impulse/deflection interactions | Authoritative verdicts, deduplication, respawn and lag-compensation evidence |
-| 5 | Add the moving capture zone and minimal arena routes | Host-owned scoring, moving-footprint coverage, uneven-team and recovery checks |
-| 6 | Expand accepted roster and the two initial special consumables | Combat contract tests for each weapon/status, Blink and shield; readable counterplay |
-| 7 | Produce three distinct maps, models, VFX and minimalist menus in the accepted art direction | Source reuse first; production assets, playable full flow, moving readability captures and measured graphics cost |
-| 8 | Complete eight-player internet and endurance validation | External direct/relay sessions, host rotation, recovery and measured acceptance results |
+| 1 | Reproduce user-reported initial connection issues | Exact symptom/build/topology; recovery callback containment and aborted-results fixes now pass focused/native and applicable live recovery checks |
+| 2 | Extend live combat acceptance to moving targets, cover and projectiles | Three-laser stationary production pickup/equip/fire RPC verdicts now pass; remaining cases must preserve authoritative ammo/damage/event identities |
+| 3 | Accept moving gameplay/remote weapon readability | Remote shot/reload presentation and lifecycle/dedup checks now pass; moving first-/third-person captures and human aim/slide/audio acceptance remain |
+| 4 | Exercise full standalone loop and map traversal | All maps/weapons/items, UI/cancel/retry, death/respawn, zone completion, pickup reachability and route fairness |
+| 5 | Measure movement/combat under adverse network conditions | Host plus two clients, moving targets/cover/projectiles, prediction corrections and authority/recovery under canonical profiles |
+| 6 | Add measured performance and endurance evidence | Frame/tick/bandwidth/allocation measurements, separate-machine eight-player matrix, 30-minute profiles, two-hour soak and 100 reconnect cycles |
+| 7 | Complete independent-network acceptance | At least two external networks, direct/relay paths, rotate hosts, graceful/crash recovery; capture exact builds and logs |
+
+User feedback on 2026-10-29: the game works and feels "pretty good", with a few
+connection issues at the beginning. Build, symptoms and network topology have not
+yet been identified; this is a human report, not completion of the external matrix.
+The prior firewall inspection found application exceptions for old diagnostic
+players. System firewall changes are separate from gameplay work and remain unapplied.
 
 Focused multi-client tests begin as soon as the SDK and service configuration are
 available; internet/load validation is not a reason to defer networking failures.

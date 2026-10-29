@@ -143,7 +143,7 @@ namespace Wildstone.Networking
                 match.CopyPresentationEvents(presentationEvents,ref eventCursor);
                 presentation.PresentNetworkTick(presentationEvents,match.Header.Captor,match.Header.Contested);
                 if(model.Phase==ArenaMatchPhase.Finished && presentation.Flow.Screen!=MenuScreen.Results) presentation.Show(MenuScreen.Results);
-                else if(model.Phase==ArenaMatchPhase.Aborted) throw new InvalidOperationException("Match aborted.");
+                else if(model.Phase==ArenaMatchPhase.Aborted) { CloseOnline(); return; }
                 SendCombat(local,model);
             }
             catch(Exception exception)
@@ -154,6 +154,15 @@ namespace Wildstone.Networking
         }
         void CloseOnline()
         {
+            if(presentation.ExternalSimulation && presentation.Match?.Phase==ArenaMatchPhase.Aborted)
+            {
+                var summary=presentation.Match.Capture();
+                int participant=presentation.LocalParticipantId;
+                ResetSession();
+                menu.Leave();
+                presentation.ShowNetworkResults(summary,participant);
+                return;
+            }
             var bridge=GetComponent<OnlineMenuBridge>();
             bridge.Status="The online match could not continue. Return to the lobby and retry.";
             menu.LeaveWithFailure(bridge.Status); ResetSession(); bridge.Refresh();

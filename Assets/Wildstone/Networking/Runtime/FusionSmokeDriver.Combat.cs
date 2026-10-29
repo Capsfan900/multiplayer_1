@@ -215,6 +215,130 @@ namespace Wildstone.Networking
             }
             return count;
         }
+        [Serializable] sealed class LaserMetrics
+        {
+            public string weapon,shotId="",hitIds="";
+            public bool pickupPlaced,pickupSent,picked,equipSent,equipped,fixturePlaced,ready,fireSent,observed,verified;
+            public int pickupId,pickupGeneration,pickupSequence,equipSequence,fireSequence,shooter,life,target,targetLife,ammo,shotCount,hitCount;
+            public float baselineHealth,health,damage,eventDamage;
+        }
+        int laserIndex;
+        double laserBegan=-1,laserStable=-1,laserAck=-1;
+        static readonly WeaponKind[] LaserWeapons={WeaponKind.LaserPistol,WeaponKind.LaserShotgun,WeaponKind.LaserSniper};
+        bool DriveLaserCombat(ArenaMatch model,NetworkRunner runner,Status peer,double now)
+        {
+            if(status.lasers==null)
+            {
+                status.lasers=new LaserMetrics[LaserWeapons.Length];
+                for(int i=0;i<LaserWeapons.Length;i++) status.lasers[i]=new LaserMetrics {weapon=LaserWeapons[i].ToString()};
+                foreach(var candidate in FindObjectsByType<FusionMatch>()) if(candidate.Runner==runner && candidate.Initialized) combatMatch=candidate;
+                foreach(var avatar in FindObjectsByType<FusionPlayer>())
+                    if(avatar.Runner==runner && avatar.Initialized && avatar.Participant==presentation.LocalParticipantId && avatar.Object.InputAuthority==runner.LocalPlayer) combatAvatar=avatar;
+                if(combatMatch==null || combatAvatar==null) throw new InvalidOperationException("Laser fixture is missing admitted network objects.");
+            }
+            if(peer?.lasers==null || peer.lasers.Length!=LaserWeapons.Length) return false;
+            if(laserIndex==LaserWeapons.Length) return true;
+            var m=status.lasers[laserIndex]; var remote=peer.lasers[laserIndex];
+            if(m.verified && remote.verified)
+            { laserIndex++; laserBegan=laserStable=laserAck=-1; WriteOutput(); return laserIndex==LaserWeapons.Length; }
+            if(laserBegan<0) laserBegan=now;
+            if(now-laserBegan>25) throw new TimeoutException("Laser fixture timed out: "+m.weapon+"@"+status.stage);
+            var weapon=LaserWeapons[laserIndex]; var spec=WeaponCatalog.Get(weapon);
+            var shooter=status.role=="client"?presentation.LocalPlayer:RemotePlayer(model);
+            var target=status.role=="host"?presentation.LocalPlayer:RemotePlayer(model);
+            if(shooter==null || target==null || !shooter.Alive || !target.Alive) throw new InvalidOperationException("Laser fixture lost a living participant.");
+            if(m.life!=0 && (m.shooter!=shooter.Participant || m.life!=shooter.LifeGeneration || m.target!=target.Participant || m.targetLife!=target.LifeGeneration))
+                throw new InvalidOperationException("Laser fixture changed participant or life identity.");
+            m.shooter=shooter.Participant; m.life=shooter.LifeGeneration; m.target=target.Participant; m.targetLife=target.LifeGeneration;
+            PickupState pickup=null;
+            foreach(var item in model.Pickups) if(WeaponCatalog.FromPickup(item.Item)==weapon) { pickup=item; break; }
+            if(pickup==null) throw new InvalidOperationException("Map is missing laser pickup: "+weapon);
+            m.pickupId=pickup.Id;
+            if(status.role=="host" && !m.pickupPlaced)
+            {
+                // Diagnostic-only reset between weapons; inventory is acquired only by the real pickup RPC.
+                combatMatch.Model.Find(target.Participant).Health=WeaponCatalog.Health;
+                combatMatch.Model.Find(target.Participant).Shield=0;
+                LaserAvatar(runner,shooter.Participant).Teleport(pickup.Position+Vector3.right,0);
+                m.pickupGeneration=pickup.Generation; m.pickupPlaced=true; WriteOutput();
+            }
+            var host=status.role=="host"?m:remote;
+            var client=status.role=="client"?m:remote;
+            status.stage="laser_pickup_"+weapon;
+            if(!host.pickupPlaced) return false;
+            if(status.role=="client" && !m.pickupSent)
+            {
+                if((shooter.Feet-pickup.Position).sqrMagnitude>4 || pickup.Generation!=host.pickupGeneration) return false;
+                m.pickupGeneration=pickup.Generation; m.pickupSequence=shooter.LastActionSequence+1; m.pickupSent=true;
+                SendLaserAction(model,shooter,m.pickupSequence,CombatActionKind.Pickup,Vector3.forward,pickup.Id,pickup.Generation);
+            }
+            m.picked=m.picked || client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==spec.Ammo && pickup.Generation==host.pickupGeneration+1 && pickup.AvailableTick>model.Tick;
+            if(!m.picked || !remote.picked) return false;
+            // Explicit selection exercises the production equip RPC even though pickup auto-selects.
+            if(status.role=="client" && !m.equipSent)
+            {
+                m.equipSequence=shooter.LastActionSequence+1; m.equipSent=true;
+                SendLaserAction(model,shooter,m.equipSequence,CombatActionKind.SelectSpecial,Vector3.forward);
+            }
+            m.equipped=m.equipped || client.equipSent && shooter.LastActionSequence>=client.equipSequence && shooter.SelectedSpecial && shooter.SpecialWeapon==weapon;
+            if(!m.equipped || !remote.equipped) return false;
+            var targetPoint=new Vector3(-30,.02f,-12); var shooterPoint=new Vector3(-30,.02f,-10);
+            if(status.role=="host" && !m.fixturePlaced)
+            {
+                if(Physics.Raycast(shooterPoint+Vector3.up*.9f,Vector3.back,2,MotorTuning.WorldMask,QueryTriggerInteraction.Ignore))
+                    throw new InvalidOperationException("Laser fixture corridor is occluded.");
+                LaserAvatar(runner,target.Participant).Teleport(targetPoint,0);
+                LaserAvatar(runner,shooter.Participant).Teleport(shooterPoint,180);
+                m.fixturePlaced=true; WriteOutput();
+            }
+            status.stage="laser_history_"+weapon;
+            if(!host.fixturePlaced || (shooter.Feet-shooterPoint).sqrMagnitude>.04f || (target.Feet-targetPoint).sqrMagnitude>.04f) { laserStable=-1; return false; }
+            if(laserStable<0) laserStable=now;
+            if(!m.ready)
+            {
+                if(now-laserStable<1 || target.Health!=WeaponCatalog.Health) return false;
+                m.baselineHealth=target.Health; m.ready=true; WriteOutput();
+            }
+            if(!remote.ready) return false;
+            if(status.role=="client" && !m.fireSent)
+            {
+                if(model.Tick<shooter.FireReadyTick) return false;
+                m.fireSequence=shooter.LastActionSequence+1; m.fireSent=true;
+                SendLaserAction(model,shooter,m.fireSequence,CombatActionKind.Fire,(target.Feet+Vector3.up*.9f-shooter.Eye).normalized);
+            }
+            if(!client.fireSent) return false;
+            m.fireSequence=client.fireSequence; m.ammo=shooter.SpecialAmmo; m.health=target.Health; m.damage=m.baselineHealth-m.health;
+            m.shotCount=CountSmokeShots(shooter.Participant,shooter.LifeGeneration,m.fireSequence,out m.shotId);
+            m.hitCount=0; m.hitIds=""; m.eventDamage=0;
+            for(int i=0;i<combatMatch.EventRing.Length;i++)
+            {
+                var e=combatMatch.EventRing[i];
+                if(e.Sequence<1 || e.Kind!=CombatEventKind.Hit || e.Action.Participant!=shooter.Participant || e.Action.LifeGeneration!=shooter.LifeGeneration || e.Action.Sequence!=m.fireSequence) continue;
+                if(e.Weapon!=weapon || e.Target!=target.Participant || e.TargetLife!=target.LifeGeneration) throw new InvalidOperationException("Laser hit has wrong weapon or target identity.");
+                m.hitCount++; m.eventDamage+=e.Amount; m.hitIds+=e.ToCombat().Id+";";
+            }
+            float expected=spec.Damage*WeaponCatalog.HitscanPellets(weapon);
+            if(m.ammo<spec.Ammo-1 || m.shotCount>1 || m.hitCount>WeaponCatalog.HitscanPellets(weapon) || m.damage>expected+.001f || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
+                throw new InvalidOperationException("Laser shot duplicated ammo, damage or events.");
+            m.observed=m.ammo==spec.Ammo-1 && m.shotCount==1 && m.hitCount==WeaponCatalog.HitscanPellets(weapon) && Mathf.Abs(m.damage-expected)<.001f && Mathf.Abs(m.eventDamage-expected)<.001f;
+            status.stage="laser_verdict_"+weapon;
+            if(!m.observed || !remote.observed) return false;
+            if(m.shotId!=remote.shotId || m.hitIds!=remote.hitIds || m.life!=remote.life || m.targetLife!=remote.targetLife) throw new InvalidOperationException("Peers disagree on laser event identity.");
+            if(laserAck<0) laserAck=now;
+            m.verified=now-laserAck>=1;
+            return false;
+        }
+        FusionPlayer LaserAvatar(NetworkRunner runner,int participant)
+        {
+            foreach(var avatar in FindObjectsByType<FusionPlayer>()) if(avatar.Runner==runner && avatar.Initialized && avatar.Participant==participant) return avatar;
+            throw new InvalidOperationException("Laser fixture avatar is missing.");
+        }
+        void SendLaserAction(ArenaMatch model,CombatState shooter,int sequence,CombatActionKind kind,Vector3 direction,int pickup=-1,int generation=0)
+        {
+            combatAvatar.RPC_Combat(FusionCombatAction.FromCombat(new CombatAction {Participant=shooter.Participant,ConnectionGeneration=shooter.ConnectionGeneration,
+                LifeGeneration=shooter.LifeGeneration,AuthorityGeneration=model.AuthorityGeneration,Sequence=sequence,Kind=kind,Direction=direction,PickupId=pickup,PickupGeneration=generation}));
+            WriteOutput();
+        }
         void StopCombatInput()
         {
             if(combatSession!=null) combatSession.InputRequested-=SmokeCombatInput;

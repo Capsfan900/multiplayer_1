@@ -606,6 +606,14 @@ menu/controller/runner path in separate Windows processes. Keep automation absen
 from normal builds, bound deadlines, redact identifiers/credentials, and require
 observable replicated state plus successful cleanup. Same-PC cloud sessions are
 local functional evidence, never a substitute for the independent-network matrix.
+
+Recovery resume validation failures must not escape the synchronous Fusion
+`HostMigrationResume` callback. Fault the session's completion task and return so
+the SDK can finish migration finalization; the owning migration operation then
+observes that failure and shuts down its replacement runner. Invalid, stale or
+future checkpoints still abort under the original validation/rollback limits.
+`FusionSessionBoundaryTests` covers successful completion and failure containment;
+SDK allocator cleanup under every transport failure still needs runtime evidence.
 Late admission must preserve existing seats and authority while the new client
 loads and gains its own avatar. Controlled hitscan fixtures may place stationary
 targets through the existing host-authoritative teleport API, then use real client

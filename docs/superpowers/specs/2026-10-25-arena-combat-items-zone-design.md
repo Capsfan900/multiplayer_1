@@ -2,6 +2,13 @@
 
 Date: 2026-10-25. Status: confirmed content scope with proposed gameplay rules;
 no numeric balance or runtime behavior is approved or proved by this document.
+
+Local SDK verification extension (2026-10-29): diagnostic `laser-combat` runs pistol,
+shotgun and sniper through production pickup/equip/fire RPCs in separate host/client
+players. It checks one ammo spend, authoritative damage, pellet/event counts and
+matching replicated event identities. Host teleports and health resets explicitly
+construct a stationary fixture; this does not establish moving-target, cover,
+adverse-latency or human balance acceptance. Exact runs belong in [QA](../../QA.md).
 The [foundation design](2026-10-25-multiplayer-foundation-design.md) governs Unity
 URP, Fusion Host Mode, prediction, recovery and implementation order.
 

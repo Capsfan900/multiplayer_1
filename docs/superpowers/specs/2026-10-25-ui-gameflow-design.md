@@ -55,6 +55,13 @@ moving readability, keyboard/mouse interaction or human feel acceptance.
 | Recovery | Honest reconnect/migration state and countdown; input/scoring behavior belongs to foundation; failed recovery offers retry/back |
 | Results | Win/draw/abort distinction, team totals, rematch/back; no invented persistent ranking or trusted progression |
 
+An authoritative aborted round is a terminal result, not a generic connection
+failure. Capture its validated independent summary before retiring network objects;
+close the session, clear motors/view/input/event references and display Results.
+Keep the summary marked online so it cannot tick locally or offer offline replay.
+Back discards it. A connection failure without a terminal match still uses the
+existing online retry/back path. Native lifecycle regression: `AbortedOnlineResultsTests`.
+
 Loading Cancel, Escape and failure Back must leave an active network session even
 before gameplay attaches. Clear the exposed session immediately on leave so a late
 load cannot acknowledge or spawn. An online loading failure must not offer an offline

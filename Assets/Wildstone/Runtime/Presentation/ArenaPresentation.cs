@@ -21,6 +21,7 @@ namespace Wildstone.Presentation
         FirstPersonBody body;
         int localDiscontinuity;
         readonly List<CombatEvent> localEffects=new List<CombatEvent>(256);
+        readonly List<CombatEvent> remoteShots=new List<CombatEvent>(256);
         void Awake()
         {
             session=GetComponent<PracticeSession>();
@@ -48,6 +49,7 @@ namespace Wildstone.Presentation
             StopPresentation();
             history=new PresentationEventHistory();
             localEffects.Clear();
+            remoteShots.Clear();
             lastFeet.Clear();
             effects=new GameObject("Arena effects",typeof(ArenaEffects)).GetComponent<ArenaEffects>();
             effects.transform.SetParent(transform,false);
@@ -67,6 +69,7 @@ namespace Wildstone.Presentation
         void StopPresentation()
         {
             localEffects.Clear();
+            remoteShots.Clear();
             if(view!=null) { view.Teardown(session!=null?session.Camera:null); Destroy(view); view=null; }
             if(body!=null) { Destroy(body.gameObject); body=null; }
             if(effects!=null) { Destroy(effects.gameObject); effects=null; }
@@ -83,6 +86,8 @@ namespace Wildstone.Presentation
             {
                 var e=session.CombatEvents[i];
                 if(!history.Accept(e)) continue;
+                if(e.Kind==CombatEventKind.Shot && e.Action.Participant!=session.LocalParticipantId && remoteShots.Count<256)
+                    remoteShots.Add(e);
                 if(e.Kind!=CombatEventKind.Shot && session.LocalPlayer!=null && session.LocalPlayer.Alive && session.LocalPlayer.Connected)
                     view?.Play(e,session.LocalParticipantId);
                 lastFeet.TryGetValue(e.Action.Participant,out var departure);
@@ -109,6 +114,9 @@ namespace Wildstone.Presentation
             if(session.Match!=null && effects!=null)
             {
                 PresentState();
+                for(int i=0;i<remoteShots.Count;i++)
+                    if(players.TryGetValue(remoteShots[i].Action.Participant,out var remote)) remote.Play(remoteShots[i]);
+                remoteShots.Clear();
                 if(session.LocalPlayer!=null && session.LocalPlayer.Alive && session.LocalPlayer.Connected)
                     for(int i=0;i<localEffects.Count;i++) if(localEffects[i].Kind==CombatEventKind.Shot) view?.Play(localEffects[i],session.LocalParticipantId);
                 if(session.Motor!=null && session.LocalPlayer!=null)
@@ -152,6 +160,8 @@ namespace Wildstone.Presentation
                 {
                     MotorState state=motor.CaptureState();
                     pair.Value.Present(player,state,catalog,session.RenderPose(pair.Key));
+                    pair.Value.PresentHandling(player,match.Tick,session.Flow.GameplayInput?Time.unscaledDeltaTime:0,
+                        session.Settings.ReducedMotion,match.TickRate);
                 }
                 else if(pair.Value!=null) pair.Value.gameObject.SetActive(false);
             }

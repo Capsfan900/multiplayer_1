@@ -1,6 +1,6 @@
 # Handoff
 
-Updated: 2026-10-28. **Photon-only Windows playtest available; full multiplayer MVP remains open.**
+Updated: 2026-10-29. **Photon-only Windows preview published; full multiplayer MVP remains open.**
 Active worktree: `C:\Users\tyler\orca\workspaces\multiplayer_1\mvp-2`, branch `mvp-2`.
 The original project at `C:\Users\tyler\Main Storage\multiplayer_1` remains untouched.
 
@@ -16,7 +16,15 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
 
 ## Current evidence
 
-- Current-state delivery: source snapshot `316a00f` was built and published as public
+- 2026-10-29 continuation: native **49 EditMode/32 PlayMode** focused checks pass
+  after fixing aborted online results, containing rejected recovery callbacks and
+  adding remote firing/reload handling. Live controlled three-laser pickup/equip/
+  damage/event verification, reconnect and abrupt-host-crash recovery pass locally.
+  User reports good play overall with initial connection trouble; exact cause is
+  still unconfirmed. [QA](QA.md) records red/green evidence and remaining limits.
+  These fixes are local and are not in the public `e9e091f` preview.
+
+- Earlier delivery: source snapshot `316a00f` was built and published as public
   [preview-20261028-316a00f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-316a00f)
   at the user's request and explicit public-visibility confirmation. Build, headless
   startup and ZIP/digest checks pass; [QA](QA.md) records exact evidence. Concurrent
@@ -24,8 +32,8 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
 
 - D026 implemented: laser pistol/shotgun/sniper, held rapid starter fire, distinct
   models/handling/audio and bounded colored blast effects. Native155 EditMode/51
-  PlayMode plus35 final focused regressions pass. Current local build includes this
-  continuation; the separately published snapshot predates final edits. See QA.
+  PlayMode plus35 final focused regressions pass. Latest public snapshot `e9e091f`
+  includes the completed continuation; the earlier `316a00f` preview predates final edits.
 
 - Implemented continuation: visible first-person legs, articulated hands/arms and stronger
   slide presentation requested by the user (D025). Source audit confirms slide
@@ -34,7 +42,7 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
   captures were inspected, and fresh Photon combat/reconnect regressions pass.
   Human animation/slide feel remains open. [QA](QA.md) records exact evidence.
 
-- GitHub delivery is authorized: personal private repository `Capsfan900/multiplayer_1`
+- GitHub delivery is authorized: now-public repository `Capsfan900/multiplayer_1`
   and a manual Windows Practice prerelease workflow. [TOOLING](TOOLING.md#github-builds-and-private-releases)
   owns operation and access constraints; [QA](QA.md) records publication evidence.
   A fresh clean-source Windows build was packaged and published locally as private
@@ -58,7 +66,9 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
   pass; human animation loop contracts and attachment checks pass.
 - Four Python map regressions pass. Fourteen model/source hash pairs and all 73
   saved map meshes were verified without regenerating the approved source assets.
-- Latest local Windows build: `Artifacts/Unity/Windows-20261028-203918-018/WildstoneArena.exe`.
+- Latest local Windows build: `D:/WildstoneBuilds/resume-20261029/Artifacts/Unity/Windows/WildstoneArena.exe`.
+  Successful current build includes the 2026-10-29 fixes; see QA for verification.
+  Historical laser preview: `Artifacts/Unity/Windows-20261028-203918-018/WildstoneArena.exe`.
   Photon-only Host/Join and offline Practice are packaged; no account login.
   Build succeeded and 15-second headless startup showed no logged exceptions.
   Source stayed unchanged during compilation (1,173 inputs; 200 output hashes).
@@ -98,6 +108,16 @@ temporary-prefab dirty-scene problem did not reproduce in full Prepare; no specu
 isolation layer was added. CPU bake teardown now handles an initially empty batch scene set.
 
 ## Next actionable work
+
+The user resumed the full backlog on 2026-10-29 and reports that playtesting worked
+well overall, with initial connection issues. Exact build, symptoms and topology
+are pending; do not turn that report into a measured external-network pass.
+Current local work has added live three-laser RPC verification, fixed the identified
+aborted-round results transition and recovery callback escape, and implemented
+remote weapon handling. Moving/full-loop checks, connection symptom reproduction
+and measured performance follow. [BACKLOG](BACKLOG.md) owns the prioritized queue;
+the implementation plan has been reconciled against recorded evidence so completed
+SDK, identity, content and menu work is not repeated.
 
 1. Continue packaged physical-input and moving-readability checks in [QA](QA.md)
    when desktop control is available. Static menu/settings/all-map captures are

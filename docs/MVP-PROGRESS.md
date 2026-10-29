@@ -5,6 +5,27 @@ Goal active; user explicitly resumed and delegated all work possible while away.
 
 ## Current position
 
+2026-10-29 resume: user requested all backlog work and a state/goals brief, then
+reported successful playtesting with initial connection issues. Symptoms/build/
+topology remain unspecified. Reconciled stale implementation checkboxes against
+recorded code/tests; remaining work is the acceptance queue in [BACKLOG](BACKLOG.md).
+Ruling: extend the existing compile-time diagnostic driver for three-laser live
+RPC verification and fix the observed aborted-results UI gap before speculative
+connection changes. Existing `mvp-2` isolation is retained; new verification runs
+use `D:/WildstoneBuilds/resume-20261029` because C: remains space-constrained.
+Production behavior changes require focused regressions; diagnostic results must
+state controlled placement and same-PC limitations. No new identity provider,
+paid service, firewall change or unrelated-project modification is implied.
+
+This continuation implements aborted-round terminal summaries, captures recovery
+validation failures before they escape the SDK callback, and adds remote shot/
+reload handling. Observed failing regressions precede fixes; final focused native
+runs pass 49 EditMode and 32 PlayMode tests. Three-laser production RPC checks,
+reconnect and abrupt host-crash recovery pass through real Photon on this PC.
+A fresh normal Windows player builds on D:. Independent review found no blocking
+regression. Public `e9e091f` is unchanged; exact runs and remaining acceptance are
+in [QA](QA.md), not inferred from successful build or publication.
+
 2026-10-28 latest delivery: user requested a build/release of the completed laser and
 first-person polish pass. Committed source snapshot `e9e091f` built from an isolated
 archive on D: after C: exhausted disk space. It passed 15-second headless startup,

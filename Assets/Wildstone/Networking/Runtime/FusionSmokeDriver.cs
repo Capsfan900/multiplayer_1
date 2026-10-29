@@ -20,6 +20,7 @@ namespace Wildstone.Networking
         [Serializable] sealed class Status
         {
             public CombatMetrics combat;
+            public LaserMetrics[] lasers;
             public string role,scenario,stage="boot",room="",error="",phase="Closed",screen="Title";
             public bool success,finished,externalSimulation;
             public bool initialVerified,reconnectRequested,reconnectDisconnected,reconnectComplete,retainedAvatar;
@@ -90,7 +91,7 @@ namespace Wildstone.Networking
             began=Time.realtimeSinceStartupAsDouble;
             bool capacity=status.scenario=="capacity";
             if(capacity?CapacityRoleIndex(status.role)<0:status.role!="host" && status.role!="client" && status.role!="client2") throw new ArgumentException();
-            if(status.scenario!="basic" && status.scenario!="reconnect" && !IsMigrationScenario && status.scenario!="combat" && status.scenario!="late-join" && !capacity) throw new NotSupportedException("This smoke scenario is not implemented.");
+            if(status.scenario!="basic" && status.scenario!="reconnect" && !IsMigrationScenario && status.scenario!="combat" && status.scenario!="laser-combat" && status.scenario!="late-join" && !capacity) throw new NotSupportedException("This smoke scenario is not implemented.");
             if(status.role=="client2" && !IsMigrationScenario && status.scenario!="late-join" && !capacity) throw new ArgumentException();
             if((IsMigrationScenario || capacity || status.scenario=="late-join") && Path.GetFileName(output)!=status.role+".json") throw new ArgumentException("This scenario requires fixed sibling status filenames.");
             if(capacity)
@@ -98,7 +99,7 @@ namespace Wildstone.Networking
                 status.roleIndex=CapacityRoleIndex(status.role);
                 status.capacitySoakSeconds=ParseCapacitySoakSeconds(args.TryGetValue("--wildstone-smoke-soak-seconds",out var soak)?soak:null);
             }
-            if((status.scenario=="reconnect" || status.scenario=="combat") && peerOutput==null) throw new ArgumentException("This scenario requires the peer status file.");
+            if((status.scenario=="reconnect" || status.scenario=="combat" || status.scenario=="laser-combat") && peerOutput==null) throw new ArgumentException("This scenario requires the peer status file.");
             if(status.role!="host")
             {
                 joinRoom=args["--wildstone-smoke-room"].Trim().ToUpperInvariant();
@@ -259,7 +260,7 @@ namespace Wildstone.Networking
                         WriteOutput();
                     }
                 }
-                bool combatReady=status.scenario!="combat" || (playing && DriveCombat(session,model,runner,peerStatus,now));
+                bool combatReady=status.scenario=="laser-combat" ? playing && DriveLaserCombat(model,runner,peerStatus,now) : status.scenario!="combat" || (playing && DriveCombat(session,model,runner,peerStatus,now));
                 bool observeStability=(status.scenario=="basic" || !status.initialVerified || status.reconnectComplete) && combatReady;
                 if(playing && !status.success && observeStability)
                 {

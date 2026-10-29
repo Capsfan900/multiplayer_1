@@ -280,7 +280,7 @@ namespace Wildstone.Networking
                 var result=await replacement.StartGame(new StartGameArgs
                 {
                     GameMode=token.GameMode,HostMigrationToken=token,
-                    HostMigrationResume=resuming=>
+                    HostMigrationResume=resuming=>CompleteRecoveryResume(()=>
                     {
                         try
                         {
@@ -296,9 +296,9 @@ namespace Wildstone.Networking
                         }
                         catch(Exception exception)
                         {
-                            RecordRecoveryFailure(stage,exception); resumeCompletion.TrySetException(exception); throw;
+                            RecordRecoveryFailure(stage,exception); throw;
                         }
-                    },
+                    },resumeCompletion),
                     SessionName=savedRoom,IsVisible=false,IsOpen=true,EnableClientSessionCreation=false,PlayerCount=SeatTable.Capacity,
                     Config=NetworkProjectConfig.Global,CustomPhotonAppSettings=savedSettings.GetCopy(),AuthValues=savedAuthentication,
                     SceneManager=sceneManager,ObjectProvider=objectProvider,
@@ -331,6 +331,16 @@ namespace Wildstone.Networking
                 { await ShutdownOwned(replacement); rules.Leave(); recovering=false; }
                 if(ReferenceEquals(operation,source)) operation=null;
                 source.Dispose(); migrating=null; Changed?.Invoke();
+            }
+        }
+
+        internal static void CompleteRecoveryResume(Action restore,TaskCompletionSource<bool> completion)
+        {
+            try { restore(); }
+            catch(Exception exception)
+            {
+                // Let Fusion finish disposing its migration snapshot before MigrateCore owns shutdown.
+                completion.TrySetException(exception);
             }
         }
 

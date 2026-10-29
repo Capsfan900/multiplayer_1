@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Fusion;
 using Fusion.Photon.Realtime;
 using Photon.Realtime;
@@ -67,6 +68,27 @@ namespace Wildstone.Tests
                 StringAssert.Contains("complete bounded recovery checkpoint",local);
                 StringAssert.Contains("FusionRecoveryState",local);
             }
+        }
+        [Test] public void InvalidResumeFailsCompletionWithoutEscapingSdkCallback()
+        {
+            var completion=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var invalid=new ArgumentException("Invalid recovery checkpoint.");
+            bool sdkFinalized=false;
+            Assert.DoesNotThrow(()=>
+            {
+                FusionSession.CompleteRecoveryResume(()=>throw invalid,completion);
+                sdkFinalized=true;
+            });
+            Assert.That(sdkFinalized,Is.True,"SDK migration finalization must run before session-owned shutdown.");
+            Assert.That(completion.Task.IsFaulted,Is.True,"Invalid state must still abort migration.");
+            Assert.That(completion.Task.Exception.InnerException,Is.SameAs(invalid));
+        }
+        [Test] public void ValidResumePreservesCallbackCompletion()
+        {
+            var completion=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            FusionSession.CompleteRecoveryResume(()=>completion.TrySetResult(true),completion);
+            Assert.That(completion.Task.Status,Is.EqualTo(TaskStatus.RanToCompletion));
+            Assert.That(completion.Task.Result,Is.True);
         }
         [Test] public void ContentFingerprintIncludesEveryVersionWithoutDelimiterAmbiguity()
         {
