@@ -5,10 +5,11 @@ Goal active; user explicitly resumed and delegated all work possible while away.
 
 ## Current position
 
-2026-10-28 delivery: user requested the current-state build and confirmed public
-publication. Committed source snapshot `316a00f` built in a separate archive checkout,
-passed 15-second headless startup and ZIP/checksum gates, and was released as public
-`preview-20261028-316a00f`. Later concurrent edits are excluded and untouched. No
+2026-10-28 latest delivery: user requested a build/release of the completed laser and
+first-person polish pass. Committed source snapshot `e9e091f` built from an isolated
+archive on D: after C: exhausted disk space. It passed 15-second headless startup,
+every ZIP file hash check and anonymous download verification, and is published as
+`preview-20261028-e9e091f`. Earlier preview `316a00f` remains available. No
 full-suite, visual/input or external-network acceptance was added; see [QA](QA.md).
 
 GitHub delivery (2026-10-27): private `Capsfan900/multiplayer_1` created and a manual

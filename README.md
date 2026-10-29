@@ -2,7 +2,7 @@
 
 Public GitHub repository: [Capsfan900/multiplayer_1](https://github.com/Capsfan900/multiplayer_1).
 Download Windows development previews from [Releases](https://github.com/Capsfan900/multiplayer_1/releases).
-Current snapshot: [2026-10-28 / 316a00f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-316a00f).
+Current snapshot: [Laser arsenal and first-person polish / e9e091f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-e9e091f).
 Extract the entire player ZIP and run `WildstoneArena.exe`. Downloads are public.
 These are development previews,
 not accepted online multiplayer releases. See [build workflow](docs/TOOLING.md#github-builds-and-private-releases).
@@ -20,9 +20,8 @@ movement, host-owned simulation, Photon-only private host/join, lobby/recovery,
 offline Practice/UI and editable models/maps. PlayFab is removed (D023).
 Focused native checks and separate-process Photon gameplay, reconnect, late joining,
 controlled hits, eight-player capacity and graceful/crash host migration pass. Full
-external-network, visual and performance acceptance remain open. Run
-`Artifacts/Unity/Windows-20261028-000246-678/WildstoneArena.exe` for the latest local
-playtest. This build contains uncommitted inputs and is not published. The separate
+external-network, visual and performance acceptance remain open. Download the current
+Windows preview above for the recorded, published source snapshot. The separate
 source projects and original authoring checkout remain unchanged.
 
 Selected direction: Photon Fusion Host Mode, with one participating player hosting;

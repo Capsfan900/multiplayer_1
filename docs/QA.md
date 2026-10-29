@@ -6,6 +6,42 @@ separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
 
+### 2026-10-28 laser arsenal and first-person polish public release
+
+The user requested the current version be built and released. Source snapshot
+`e9e091fe9a4f1b75800082cc141d20bacaf9bdfc` includes the completed D025/D026 pass.
+Source was pushed to `mvp-2`; no main-branch merge or original-project modification
+was performed. The earlier preview remains available.
+
+- Initial isolated build at `C:/Users/tyler/orca/builds/wildstone-e9e091f` failed
+  during package import with `ENOSPC`. Automatic approval review blocked deletion
+  of that attempt's incomplete cache; it was left in place. Build moved to D:.
+- Successful isolated source archive: `D:/WildstoneBuilds/wildstone-e9e091f`.
+  Command: its `Tools/Unity/Invoke-Unity.ps1 -Action BuildWindows -TimeoutMinutes 30`.
+  Unity 6000.5.10f1 returned zero with `WILDSTONE BUILD OK`; log:
+  `Artifacts/Unity/BuildWindows-20261028-215203-120.log` under that build root.
+  The source archive SHA-256 matched, and imported tracked Assets/Packages/
+  ProjectSettings files remained byte-identical to the archive during compilation.
+- Existing public Photon app settings were copied separately; credential-bearing
+  local configuration was neither committed nor packaged. Diagnostic/debug folders
+  are excluded from the player archive. No content regeneration was performed.
+- Fresh normal player remained alive for a 15-second hidden headless startup with
+  no exception/assertion match in `Artifacts/Unity/release-startup.log`; only the
+  owned smoke process was stopped. Existing game windows were untouched.
+- Player ZIP contains 198 files. Every archived file SHA-256 matches the build
+  output; required player EXE/DLL/data were checked. ZIP checksum:
+  `a16010e5e8661a1e9ae2d8f3089c764d9b003c4b79923772a1dea3dac703b4a5`.
+  GitHub's uploaded asset digest and an anonymous downloaded copy both match.
+- Public [preview-20261028-e9e091f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-e9e091f)
+  contains the Windows ZIP, checksum and release manifest. Anonymous release page
+  returned HTTP 200. Share this exact URL; `/releases/latest` excludes prereleases.
+- Local records: `Artifacts/Release/current-release.json`, `public-access-check.json`
+  and `Package-CurrentPreview.ps1`. Local build/upload, not GitHub Actions.
+  Full tests, rendered/input playtesting and external-network acceptance were not
+  rerun for this package. Historical gameplay evidence below is separate. Sniper
+  zoom, human feel/audio acceptance, external-network and eight-machine performance/
+  endurance gates remain open; this is a development preview.
+
 ### 2026-10-28 current-state public preview release
 
 The user requested a fresh build/release of the current state and explicitly

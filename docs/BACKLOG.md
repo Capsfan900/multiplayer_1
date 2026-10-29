@@ -7,8 +7,8 @@ remain open. Follow the
 Design documents and concept approvals do not complete implementation stages.
 Acceptance detail belongs in the [canonical specs](README.md), not this checklist.
 
-Delivery checkpoint: current-state snapshot `316a00f` is published as public preview
-`preview-20261028-316a00f` with user approval. Build/startup/package evidence is in
+Delivery checkpoint: current-state snapshot `e9e091f` is published as public preview
+`preview-20261028-e9e091f` at the user's request. Anonymous download and checksum verification passed. Build/startup/package evidence is in
 [QA](QA.md). Ongoing development and remaining acceptance stages stay open.
 
 Current work: playtest D026 expanded laser arsenal/balance and D025 first-person legs, arm/hand animation and pronounced

@@ -4,6 +4,11 @@ Updated: 2026-10-28. **Photon-only Windows playtest available; full multiplayer 
 Active worktree: `C:\Users\tyler\orca\workspaces\multiplayer_1\mvp-2`, branch `mvp-2`.
 The original project at `C:\Users\tyler\Main Storage\multiplayer_1` remains untouched.
 
+Latest public download: [laser arsenal and first-person polish preview e9e091f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-e9e091f).
+Built from committed snapshot `e9e091f` in `D:/WildstoneBuilds/wildstone-e9e091f`.
+Fresh Windows build, 15-second headless startup, archive integrity and anonymous
+download checks pass. [QA](QA.md) records the failed C: attempt and acceptance limits.
+
 The user resumed all tasks and requested GPT-6.1 Sol delegates. We recovered the
 existing authored checkpoint rather than reimplementing it: 194 files were copied
 and SHA-256 checked before/copy/after. Evidence: `Artifacts/Resume/recovered-checkpoint.json`.
@@ -57,8 +62,9 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
   Photon-only Host/Join and offline Practice are packaged; no account login.
   Build succeeded and 15-second headless startup showed no logged exceptions.
   Source stayed unchanged during compilation (1,173 inputs; 200 output hashes).
-  This preserves uncommitted inputs and is local-playtest-only, not published or
-  accepted as a full online MVP. [QA](QA.md) records commands/manifests.
+  This historical local build preserved uncommitted inputs. The current source is
+  now committed and rebuilt in the public preview above; full online MVP acceptance
+  remains open. [QA](QA.md) records commands/manifests.
 - Unattended polish fixes menu focus, HUD lifetime/layout, settings scrollbar contrast
   and visible recovery status. Runner-local discovery preserves late avatar changes
   without rebuilding unchanged presentation registries. Focused native checks pass
@@ -118,7 +124,8 @@ isolation layer was added. CPU bake teardown now handles an initially empty batc
    endurance and measured latency/performance gates from the foundation spec.
    Only after acceptance should a release-quality package be produced.
 
-No paid services, accounts, deployments or public releases were created. Do not
+No paid services or new accounts were created. Public previews were published at
+the user's request; publication does not complete multiplayer acceptance. Do not
 re-audit the source projects or regenerate approved art merely because this is a new
 worktree. Preserve existing asset GUIDs and editable Blender sources. The accepted
 roster, Blink/shield-only consumables, Host Mode and art direction remain in their
