@@ -49,7 +49,7 @@ active acceptance backlog, replacing the old bootstrap implementation order.
 
 | Order | Next actionable work | Evidence needed to advance |
 | --- | --- | --- |
-| 1 | Reproduce user-reported initial connection issues | Exact symptom/build/topology; recovery callback containment and aborted-results fixes now pass focused/native and applicable live recovery checks |
+| 1 | Reproduce user-reported join/team-selection issue | Other player confirmed in Texas on another ISP; exact symptom/build still needed. Recovery callback containment and aborted-results fixes now pass focused/native and applicable live recovery checks |
 | 2 | Extend live combat acceptance to moving targets, cover and projectiles | Three-laser stationary production pickup/equip/fire RPC verdicts now pass; remaining cases must preserve authoritative ammo/damage/event identities |
 | 3 | Accept moving gameplay/remote weapon readability | Remote shot/reload presentation and lifecycle/dedup checks now pass; moving first-/third-person captures and human aim/slide/audio acceptance remain |
 | 4 | Exercise full standalone loop and map traversal | All maps/weapons/items, UI/cancel/retry, death/respawn, zone completion, pickup reachability and route fairness |
@@ -58,8 +58,9 @@ active acceptance backlog, replacing the old bootstrap implementation order.
 | 7 | Complete independent-network acceptance | At least two external networks, direct/relay paths, rotate hosts, graceful/crash recovery; capture exact builds and logs |
 
 User feedback on 2026-10-29: the game works and feels "pretty good", with a few
-connection issues at the beginning. Build, symptoms and network topology have not
-yet been identified; this is a human report, not completion of the external matrix.
+connection issues at the beginning. Follow-up identifies join/team selection and
+another player in Texas on a different ISP. Builds and exact visible symptom remain
+unconfirmed; this is human external-play evidence, not completion of the external matrix.
 The prior firewall inspection found application exceptions for old diagnostic
 players. System firewall changes are separate from gameplay work and remain unapplied.
 

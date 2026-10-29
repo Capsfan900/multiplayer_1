@@ -6,8 +6,9 @@ Goal active; user explicitly resumed and delegated all work possible while away.
 ## Current position
 
 2026-10-29 resume: user requested all backlog work and a state/goals brief, then
-reported successful playtesting with initial connection issues. Symptoms/build/
-topology remain unspecified. Reconciled stale implementation checkboxes against
+reported successful playtesting with initial connection issues. Follow-up confirms
+another player in Texas on a different ISP and the issue after joining/clicking a
+team; exact visible symptoms/builds remain unspecified. Reconciled stale implementation checkboxes against
 recorded code/tests; remaining work is the acceptance queue in [BACKLOG](BACKLOG.md).
 Ruling: extend the existing compile-time diagnostic driver for three-laser live
 RPC verification and fix the observed aborted-results UI gap before speculative

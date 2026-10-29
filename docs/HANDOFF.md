@@ -110,8 +110,9 @@ isolation layer was added. CPU bake teardown now handles an initially empty batc
 ## Next actionable work
 
 The user resumed the full backlog on 2026-10-29 and reports that playtesting worked
-well overall, with initial connection issues. Exact build, symptoms and topology
-are pending; do not turn that report into a measured external-network pass.
+well overall, with an issue after joining and selecting a team. The other player
+was in Texas on a different ISP, confirming user-reported external play. Exact
+build and visible symptoms are pending; this is not a measured external-network pass.
 Current local work has added live three-laser RPC verification, fixed the identified
 aborted-round results transition and recovery callback escape, and implemented
 remote weapon handling. Moving/full-loop checks, connection symptom reproduction

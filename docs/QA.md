@@ -9,8 +9,16 @@ separate evidence levels. The full MVP is not complete.
 ### 2026-10-29 resumed acceptance and connection follow-up
 
 The user reports that playtesting worked and felt good overall, with some initial
-connection issues. Exact participating builds, network topology and initial error
-are not established. Process inspection found the older public `316a00f` executable
+connection issues. Follow-up confirms the other player was in Texas on a different
+ISP, and the issue occurred after joining and clicking a team. This is user-reported
+independent-network play, not an instrumented network/performance acceptance run.
+Exact participating builds and the visible symptom/error remain unconfirmed.
+Follow-up focused check: `EditMode-20261029-074112-638.xml`, **61 passed, zero
+failures/skips**, covering `SessionRulesTests`, `FusionLobbyAdmissionTests` and
+`OnlineMenuTests` in the same D: verification workspace. Existing live smoke uses
+the production team-selection bridge/RPC before ready/start. This does not reproduce
+the reported click symptom or prove it fixed; further changes await that symptom.
+Process inspection found the older public `316a00f` executable
 running locally; mixed builds are rejected, but that is not a diagnosed cause of
 the report. The latest local player log separately records a rejected recovery
 checkpoint and repeated Fusion allocator errors during host-migration disposal.
