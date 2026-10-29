@@ -184,6 +184,8 @@ one of the following checks:
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario basic
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario reconnect
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario combat
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario laser-combat
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario team-switch
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario migration
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario migration-crash
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario capacity
@@ -194,7 +196,7 @@ one of the following checks:
 The builder enables
 `WILDSTONE_SMOKE` only through that BuildPlayer invocation; normal players contain
 no automatic menu driver. Runs launch owned, hidden Windows player processes:
-two for `basic`, `reconnect` and `combat`; three for `migration`, `migration-crash` and `late-join`;
+two for `basic`, `reconnect`, `combat`, `laser-combat` and `team-switch`; three for `migration`, `migration-crash` and `late-join`;
 eight for `capacity`, admitted sequentially to avoid team-swap races in the test
 driver. They use the existing Photon App ID and drive actual Host/Join, teams,
 ready, loading and gameplay. The runner stops only its own processes on failure.
@@ -212,6 +214,19 @@ run, even if status counters pass. [QA](QA.md) records which scenarios actually 
 processes. Only then does the orchestrator launch the third client into the running
 room. All three must observe coherent admission, existing seats and authority,
 three connected avatars on three teams and ten more seconds of advancing gameplay.
+
+`team-switch` changes the guest through all four teams, including the host's,
+returning to its originally assigned team. Each change follows observed readiness
+and must clear readiness on host and client before the next request. Runner,
+PlayerRef and connection generation must remain stable; only a SHA256 guest
+identity fingerprint is recorded, never the raw ID. The host waits for all four
+acknowledged moves before ready/start and ten seconds of gameplay. This invokes
+the production UI bridge/RPC, not physical pointer input or injected network delay.
+
+`laser-combat` performs production pickup/equip/fire RPCs for pistol, shotgun and
+sniper. Host-placed stationary fixtures and health resets are explicit; both peers
+must agree on ammunition, damage and shot/pellet event identities. This is not
+moving-target or adverse-network acceptance.
 
 `capacity -SoakSeconds` accepts 10–600 seconds (default 10), extending only the
 bounded diagnostic timeout. All eight peers must retain coherent players, avatars,

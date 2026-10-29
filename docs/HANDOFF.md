@@ -112,7 +112,10 @@ isolation layer was added. CPU bake teardown now handles an initially empty batc
 The user resumed the full backlog on 2026-10-29 and reports that playtesting worked
 well overall, with an issue after joining and selecting a team. The other player
 was in Texas on a different ISP, confirming user-reported external play. Exact
-build and visible symptoms are pending; this is not a measured external-network pass.
+build and error wording are pending; the user identifies disconnect/menu return
+after the team click. This is not a measured external-network pass. A new actual
+team-switch diagnostic covers a gap in the older tests, which could keep players
+on their automatically assigned teams without invoking the team-change RPC.
 Current local work has added live three-laser RPC verification, fixed the identified
 aborted-round results transition and recovery callback escape, and implemented
 remote weapon handling. Moving/full-loop checks, connection symptom reproduction

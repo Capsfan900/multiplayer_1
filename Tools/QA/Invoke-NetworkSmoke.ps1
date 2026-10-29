@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('basic','reconnect','migration','migration-crash','combat','laser-combat','capacity','late-join')][string]$Scenario = 'basic',
+    [ValidateSet('basic','reconnect','migration','migration-crash','combat','laser-combat','capacity','late-join','team-switch')][string]$Scenario = 'basic',
     [string]$Executable,
     [ValidateRange(30,900)][int]$TimeoutSeconds = 150,
     [ValidateRange(10,600)][int]$SoakSeconds = 10
@@ -141,6 +141,20 @@ try {
     if($runtimeFailures.Count){throw ("Player logs contain $($runtimeFailures.Count) runtime exception/assertion records.")}
     if($Scenario -eq 'migration-crash' -and -not $crashInjected){throw 'The required host crash was not injected.'}
     if($Scenario -eq 'late-join' -and $roles.Count -ne 3){throw 'The required late client was not launched.'}
+    if($Scenario -eq 'team-switch') {
+        foreach($state in $requiredStates) {
+            if(-not $state.teamSwitchComplete -or $state.teamSwitchStep -ne 4 -or
+                $state.teamSwitchClearAck -ne 4 -or $state.teamSwitchReadyAck -ne 5 -or
+                -not $state.teamSwitchGuestFingerprint -or $state.teamSwitchConnectionGeneration -le 0 -or $state.stableSeconds -lt 10) {
+                throw 'Team switch smoke did not verify all four actual moves, readiness clearing, identity and gameplay.'
+            }
+        }
+        $a=$requiredStates[0]; $b=$requiredStates[1]
+        if($a.teamSwitchGuestFingerprint -ne $b.teamSwitchGuestFingerprint -or $a.teamSwitchGuestPlayer -ne $b.teamSwitchGuestPlayer -or
+            $a.teamSwitchConnectionGeneration -ne $b.teamSwitchConnectionGeneration -or $a.teamSwitchInitialTeam -ne $b.teamSwitchInitialTeam) {
+            throw 'Team switch peers disagree on the retained guest connection.'
+        }
+    }
     if($Scenario -eq 'laser-combat') {
         $weapons=@('LaserPistol','LaserShotgun','LaserSniper')
         foreach($state in $requiredStates) {

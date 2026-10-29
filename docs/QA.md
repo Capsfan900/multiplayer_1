@@ -12,12 +12,27 @@ The user reports that playtesting worked and felt good overall, with some initia
 connection issues. Follow-up confirms the other player was in Texas on a different
 ISP, and the issue occurred after joining and clicking a team. This is user-reported
 independent-network play, not an instrumented network/performance acceptance run.
-Exact participating builds and the visible symptom/error remain unconfirmed.
+The user subsequently identified the symptom as a disconnect or return to a menu
+after clicking a team. Exact builds and error wording remain unconfirmed.
 Follow-up focused check: `EditMode-20261029-074112-638.xml`, **61 passed, zero
 failures/skips**, covering `SessionRulesTests`, `FusionLobbyAdmissionTests` and
 `OnlineMenuTests` in the same D: verification workspace. Existing live smoke uses
 the production team-selection bridge/RPC before ready/start. This does not reproduce
-the reported click symptom or prove it fixed; further changes await that symptom.
+the reported click symptom or prove it fixed; the exact external failure remains
+unreproduced.
+New investigation found ordinary smoke targets the teams automatically assigned
+at admission, so it may never issue a real team-change RPC. Diagnostic `team-switch`
+now deliberately moves the guest four times, checks readiness clearing on both
+peers and retained runner/player/connection identity, then starts gameplay.
+The command initially rejected this unsupported scenario before implementation.
+`BuildSmoke-20261029-100914-057.log` succeeds and
+`Artifacts/Smoke/20261029-101012-977-team-switch/result.json` passes on both peers:
+four real moves, four readiness-clear acknowledgements, five ready acknowledgements,
+unchanged guest connection and ten seconds of advancing gameplay. Required player
+exits/log checks pass. These paths are under the D: verification root. Only a SHA256
+identity fingerprint is serialized; the earlier unredacted diagnostic build was
+not run. No production gameplay behavior changed, and this test uses the production
+UI bridge/RPC rather than physical pointer clicks or external-network latency.
 Process inspection found the older public `316a00f` executable
 running locally; mixed builds are rejected, but that is not a diagnosed cause of
 the report. The latest local player log separately records a rejected recovery

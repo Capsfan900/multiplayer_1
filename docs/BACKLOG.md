@@ -49,7 +49,7 @@ active acceptance backlog, replacing the old bootstrap implementation order.
 
 | Order | Next actionable work | Evidence needed to advance |
 | --- | --- | --- |
-| 1 | Reproduce user-reported join/team-selection issue | Other player confirmed in Texas on another ISP; exact symptom/build still needed. Recovery callback containment and aborted-results fixes now pass focused/native and applicable live recovery checks |
+| 1 | Reproduce user-reported disconnect/menu return after joining and selecting a team | Other player confirmed in Texas on another ISP; exact builds/error wording still needed. Actual four-team switching diagnostic added; same-PC success is not a reproduction of the external symptom |
 | 2 | Extend live combat acceptance to moving targets, cover and projectiles | Three-laser stationary production pickup/equip/fire RPC verdicts now pass; remaining cases must preserve authoritative ammo/damage/event identities |
 | 3 | Accept moving gameplay/remote weapon readability | Remote shot/reload presentation and lifecycle/dedup checks now pass; moving first-/third-person captures and human aim/slide/audio acceptance remain |
 | 4 | Exercise full standalone loop and map traversal | All maps/weapons/items, UI/cancel/retry, death/respawn, zone completion, pickup reachability and route fairness |

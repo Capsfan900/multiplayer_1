@@ -27,6 +27,14 @@ A fresh normal Windows player builds on D:. Independent review found no blocking
 regression. Public `e9e091f` is unchanged; exact runs and remaining acceptance are
 in [QA](QA.md), not inferred from successful build or publication.
 
+Team-selection follow-up: user reports disconnect/menu return after joining and
+clicking a team across different ISPs (other player Texas). The old basic smoke
+could keep auto-assigned teams, leaving actual switching unexercised. Added bounded
+`team-switch` diagnostics and verified four real guest team changes, readiness
+clearing, retained connection identity and ten seconds of gameplay on both peers.
+The same-PC run passes; the user's external failure is not reproduced or claimed
+fixed. No production behavior or public build changed in this diagnostic follow-up.
+
 2026-10-28 latest delivery: user requested a build/release of the completed laser and
 first-person polish pass. Committed source snapshot `e9e091f` built from an isolated
 archive on D: after C: exhausted disk space. It passed 15-second headless startup,

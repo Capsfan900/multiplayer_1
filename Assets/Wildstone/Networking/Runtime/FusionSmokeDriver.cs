@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Fusion;
@@ -41,6 +42,10 @@ namespace Wildstone.Networking
             public float reconnectSeconds,health,recoveredHealth;
             public Vector3 localPosition,remotePosition;
             public bool lobbyReady;
+            public int teamSwitchStep,teamSwitchClearAck,teamSwitchReadyAck,teamSwitchInitialTeam,teamSwitchGuestPlayer;
+            public long teamSwitchConnectionGeneration;
+            public string teamSwitchGuestFingerprint="";
+            public bool teamSwitchComplete;
             public int roleIndex,connectedPlayerCount,connectedTeamCount;
             public int capacityVerifiedPlayers,capacityVerifiedAvatars,capacityVerifiedConnected,capacityVerifiedTeams,capacityVerifiedMatchTick;
             public int[] capacityTeamSizes,capacityVerifiedTeamSizes;
@@ -65,6 +70,10 @@ namespace Wildstone.Networking
         ContentVersion originalContent;
         string originalMatchId;
         int minimumPostRecoveryTick=int.MaxValue;
+        NetworkRunner teamSwitchRunner;
+        string teamSwitchGuestIdentity;
+        bool teamSwitchInitialized,teamSwitchActionSent;
+        double teamSwitchProgressAt;
         bool IsMigrationScenario => status.scenario=="migration" || status.scenario=="migration-crash";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -91,7 +100,7 @@ namespace Wildstone.Networking
             began=Time.realtimeSinceStartupAsDouble;
             bool capacity=status.scenario=="capacity";
             if(capacity?CapacityRoleIndex(status.role)<0:status.role!="host" && status.role!="client" && status.role!="client2") throw new ArgumentException();
-            if(status.scenario!="basic" && status.scenario!="reconnect" && !IsMigrationScenario && status.scenario!="combat" && status.scenario!="laser-combat" && status.scenario!="late-join" && !capacity) throw new NotSupportedException("This smoke scenario is not implemented.");
+            if(status.scenario!="basic" && status.scenario!="reconnect" && !IsMigrationScenario && status.scenario!="combat" && status.scenario!="laser-combat" && status.scenario!="late-join" && status.scenario!="team-switch" && !capacity) throw new NotSupportedException("This smoke scenario is not implemented.");
             if(status.role=="client2" && !IsMigrationScenario && status.scenario!="late-join" && !capacity) throw new ArgumentException();
             if((IsMigrationScenario || capacity || status.scenario=="late-join") && Path.GetFileName(output)!=status.role+".json") throw new ArgumentException("This scenario requires fixed sibling status filenames.");
             if(capacity)
@@ -99,7 +108,7 @@ namespace Wildstone.Networking
                 status.roleIndex=CapacityRoleIndex(status.role);
                 status.capacitySoakSeconds=ParseCapacitySoakSeconds(args.TryGetValue("--wildstone-smoke-soak-seconds",out var soak)?soak:null);
             }
-            if((status.scenario=="reconnect" || status.scenario=="combat" || status.scenario=="laser-combat") && peerOutput==null) throw new ArgumentException("This scenario requires the peer status file.");
+            if((status.scenario=="reconnect" || status.scenario=="combat" || status.scenario=="laser-combat" || status.scenario=="team-switch") && peerOutput==null) throw new ArgumentException("This scenario requires the peer status file.");
             if(status.role!="host")
             {
                 joinRoom=args["--wildstone-smoke-room"].Trim().ToUpperInvariant();
@@ -166,7 +175,11 @@ namespace Wildstone.Networking
                 var runner=session.Runner;
                 if(runner!=null && runner.IsRunning) status.runnerTick=runner.Tick.Raw;
                 var lobby=session.Lobby;
-                if(lobby!=null && runner!=null && runner.IsRunning && lobby.Phase==SessionPhase.Lobby)
+                if(status.scenario=="team-switch" && teamSwitchInitialized && !ReferenceEquals(runner,teamSwitchRunner))
+                    throw new InvalidOperationException("Team switching replaced the runner.");
+                if(status.scenario=="team-switch" && lobby!=null && runner!=null && runner.IsRunning && lobby.Phase==SessionPhase.Lobby)
+                    DriveTeamSwitch(lobby,runner,peerStatus,now);
+                if(status.scenario!="team-switch" && lobby!=null && runner!=null && runner.IsRunning && lobby.Phase==SessionPhase.Lobby)
                 {
                     status.stage="lobby"; int team=status.scenario=="capacity"?status.roleIndex%4:status.role=="host"?0:status.role=="client2"?2:1; bool localOnTeam=false;
                     int readyCount=0,teamMask=0;
@@ -292,6 +305,67 @@ namespace Wildstone.Networking
                 PublishDue(now);
             }
             catch(Exception exception) { Debug.LogException(exception); Finish(false,exception.GetType().Name+"@"+status.stage); }
+        }
+        void DriveTeamSwitch(FusionLobby lobby,NetworkRunner runner,Status peer,double now)
+        {
+            status.stage="team_switch_lobby";
+            FusionLobbySeat guest=default,host=default;
+            int connected=0;
+            foreach(var seat in lobby.Seats)
+            {
+                if(!seat.Occupied || !seat.Connected) continue;
+                connected++;
+                if(seat.Player==lobby.HostPlayer) host=seat; else guest=seat;
+            }
+            if(connected!=2) { if(teamSwitchInitialized) throw new InvalidOperationException("Team switching lost a peer."); return; }
+            if(!teamSwitchInitialized)
+            {
+                teamSwitchInitialized=true; teamSwitchRunner=runner; teamSwitchProgressAt=now;
+                status.teamSwitchInitialTeam=guest.Team; status.teamSwitchGuestPlayer=guest.Player.RawEncoded;
+                status.teamSwitchConnectionGeneration=guest.ConnectionGeneration;
+                teamSwitchGuestIdentity=runner.GetPlayerUserId(guest.Player);
+                if(string.IsNullOrEmpty(teamSwitchGuestIdentity)) throw new InvalidOperationException("Missing guest identity.");
+                using(var sha=SHA256.Create())
+                    status.teamSwitchGuestFingerprint=Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(teamSwitchGuestIdentity)));
+            }
+            if(guest.Player.RawEncoded!=status.teamSwitchGuestPlayer || guest.ConnectionGeneration!=status.teamSwitchConnectionGeneration ||
+                runner.GetPlayerUserId(guest.Player)!=teamSwitchGuestIdentity)
+                throw new InvalidOperationException("Team switching changed the guest connection identity.");
+            if(now-teamSwitchProgressAt>15) throw new InvalidOperationException("Team switch handshake timed out.");
+            if(peer==null) return;
+            if(peer.teamSwitchInitialTeam!=status.teamSwitchInitialTeam || peer.teamSwitchGuestPlayer!=status.teamSwitchGuestPlayer ||
+                peer.teamSwitchConnectionGeneration!=status.teamSwitchConnectionGeneration || peer.teamSwitchGuestFingerprint!=status.teamSwitchGuestFingerprint) return;
+            if(status.role=="host")
+            {
+                int step=peer.teamSwitchStep;
+                if(step<0 || step>4) throw new InvalidOperationException("Invalid team switch step.");
+                int target=(status.teamSwitchInitialTeam+step)%4;
+                if(guest.Team!=target) return;
+                if(step>status.teamSwitchClearAck && !guest.Ready)
+                { status.teamSwitchStep=step; status.teamSwitchClearAck=step; teamSwitchProgressAt=now; }
+                if(guest.Ready && (step==0 || status.teamSwitchClearAck==step) && status.teamSwitchReadyAck==step)
+                { status.teamSwitchReadyAck=step+1; teamSwitchProgressAt=now; }
+                if(step==4 && status.teamSwitchReadyAck==5 && peer.teamSwitchComplete)
+                {
+                    status.teamSwitchComplete=true;
+                    if(!host.Ready && !readyRequested) { readyRequested=true; bridge.ToggleReady(); }
+                    if(host.Ready && guest.Ready && host.Team!=guest.Team && !startRequested)
+                    { startRequested=true; bridge.StartGame(); }
+                }
+                return;
+            }
+            int current=status.teamSwitchStep;
+            int expected=(status.teamSwitchInitialTeam+current)%4;
+            if(guest.Team!=expected) return;
+            if(current>0 && !guest.Ready && peer.teamSwitchClearAck==current)
+            { status.teamSwitchClearAck=current; teamSwitchProgressAt=now; }
+            if(!guest.Ready && (current==0 || status.teamSwitchClearAck==current) && !teamSwitchActionSent)
+            { teamSwitchActionSent=true; bridge.ToggleReady(); }
+            if(!guest.Ready || peer.teamSwitchReadyAck!=current+1) return;
+            status.teamSwitchReadyAck=current+1;
+            if(current==4) { status.teamSwitchComplete=true; teamSwitchProgressAt=now; return; }
+            status.teamSwitchStep=current+1; teamSwitchActionSent=false; teamSwitchProgressAt=now;
+            bridge.SelectTeam((status.teamSwitchInitialTeam+status.teamSwitchStep)%4);
         }
         void ObserveMigration(FusionSession session,NetworkRunner runner,ArenaMatch model,bool playing,double now)
         {
