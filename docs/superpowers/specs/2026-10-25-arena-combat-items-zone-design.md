@@ -22,6 +22,13 @@ damage. A second shot hits explicit world cover with its protected target still
 inside the explosion radius; target damage must remain zero. Initial placement,
 health resets and temporary cover are fixtures. This does not implement or accept
 deflection, other projectile categories or natural moving-target counterplay.
+Additional local diagnostics exercise actual grenade gravity/bounce/fuse and
+within-radius blast cover, disc ricochets/return-path damage deduplication and
+removal before expiry, and three legitimate stun shots spanning suppression,
+immunity and renewed stun. Peers must agree on actions, events, ammo and timers.
+Synthetic colliders and pre-shot placement isolate these cases. Suppression-flag
+observations do not prove motor/input response, nor do these checks implement
+deflection or accept natural counterplay; [QA](../../QA.md) owns observed results.
 The [foundation design](2026-10-25-multiplayer-foundation-design.md) governs Unity
 URP, Fusion Host Mode, prediction, recovery and implementation order.
 

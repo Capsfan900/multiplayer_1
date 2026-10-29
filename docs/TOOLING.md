@@ -187,6 +187,8 @@ one of the following checks:
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario laser-combat
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario laser-moving-cover
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario projectile-combat
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario grenade-combat
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario special-projectiles
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario laser-moving-cover -NetworkProfile regional80
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario projectile-combat -NetworkProfile adverse150
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario team-switch
@@ -200,7 +202,7 @@ one of the following checks:
 The builder enables
 `WILDSTONE_SMOKE` only through that BuildPlayer invocation; normal players contain
 no automatic menu driver. Runs launch owned, hidden Windows player processes:
-two for `basic`, `reconnect`, `combat`, `laser-combat`, `laser-moving-cover`, `projectile-combat` and `team-switch`; three for `migration`, `migration-crash` and `late-join`;
+two for `basic`, `reconnect`, `combat`, `laser-combat`, `laser-moving-cover`, `projectile-combat`, `grenade-combat`, `special-projectiles` and `team-switch`; three for `migration`, `migration-crash` and `late-join`;
 eight for `capacity`, admitted sequentially to avoid team-swap races in the test
 driver. They use the existing Photon App ID and drive actual Host/Join, teams,
 ready, loading and gameplay. The runner stops only its own processes on failure.
@@ -248,10 +250,27 @@ must remain strictly inside the blast radius and a ray from the actual detonatio
 center must hit that cover; zero damage outside the radius cannot pass. Teleports
 and health resets occur only during explicit setup between shots.
 
+`grenade-combat` uses two actual grenade throws following the production pickup
+RPC. Both peers observe gravity, a backstop bounce, travel and removal, and require
+exact fuse-expiry explosion ticks and single ammo spends. An elevated diagnostic
+floor/backstop inside the map bounds isolates the trajectory; a lateral wall on
+the second throw must protect a target strictly inside blast range. These colliders
+and pre-throw avatar/health placement are explicit fixtures, not map-route proof.
+
+`special-projectiles` uses real pickup/equip/fire for Rebound Disc and Stun Gun,
+including duplicate identical fire requests that must spend once. The disc passes
+the target, reflects off two diagnostic walls and passes back without a second hit;
+sampled direction changes or reflected event positions prove its route. Removal
+must precede lifetime/range expiry. Three stun shots check initial suppression and
+expiry, damage without refreshing the active immunity interval, and stun after
+immunity ends. Both peers compare events/ammo/timers; the host must observe active
+suppression. This flag check is not motor/input-response or human-feel acceptance.
+
 `-NetworkProfile` defaults to `baseline` (SDK simulation disabled). `regional80`
 configures added 80 ms RTT, +/-10 ms one-way jitter and 1% per-direction loss;
 `adverse150` configures added 150 ms RTT, +/-20 ms jitter and 2% loss. Injected
-profiles are restricted to `laser-moving-cover` and `projectile-combat` and require
+profiles are restricted to `laser-moving-cover`, `projectile-combat`, `grenade-combat`
+and `special-projectiles` and require
 Fusion Debug DLLs: Release DLLs disable the simulator. Both peers receive copied
 session configs before startup; the shared config asset is never saved or edited.
 The pinned SDK internally clones simulation settings on runner initialization;

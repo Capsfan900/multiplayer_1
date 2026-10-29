@@ -6,6 +6,90 @@ separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
 
+### 2026-10-29 grenade, disc and stun continuation
+
+Base `b33ba79` plus diagnostic changes, verified in
+`D:/WildstoneBuilds/resume-20261029`. New `grenade-combat` and
+`special-projectiles` scenarios use real Photon RPCs and production combat rules
+with explicit synthetic geometry and initial player placement. They are compiled
+only into the diagnostic player. Production balance and public builds are unchanged.
+
+Grenade build `Artifacts/Unity/BuildSmoke-20261029-164838-553.log` passes.
+Both runs below pass gameplay, peer identity, profile/RTT, player-exit and log gates:
+
+| Run under `Artifacts/Smoke/` | Profile | Mean SDK RTT host/client | Result |
+| --- | --- | --- | --- |
+| `20261029-164929-424-grenade-combat-baseline` | No injection | 13.25 / 14.55 ms (117/117 samples) | Both throws pass |
+| `20261029-165045-509-grenade-combat-adverse150` | Added 150 ms RTT, +/-20 ms one-way jitter, 2% receive loss at each peer | 161.93 / 161.98 ms (183/182 samples) | Both throws pass |
+
+Each peer observes gravity, a backstop bounce and explosion exactly at the
+192-tick fuse (1.6 seconds at the runner's 120 Hz). The uncovered target takes
+31.5281 damage at 4.2879 m from the actual explosion center; the second target at
+the same distance takes zero behind verified cover. Both are inside the 5.5 m
+blast radius. Grenade ammo falls from two to one to zero; each throw has exactly
+one Shot/Explosion with matching action/event identities. Clients record 29 flight
+samples per throw. Only pre-throw placement/health reset and diagnostic geometry
+are injected; projectile motion and damage are not injected.
+
+Failed special-projectile attempts are retained:
+
+- `20261029-164929-424-special-projectiles-baseline`: startup serialized an absent
+  peer array as `[]`; indexing before checking length raised `IndexOutOfRangeException`.
+  The diagnostic now waits for an empty array and rejects malformed nonempty data.
+- Rebuild `BuildSmoke-20261029-165101-377.log` passes. Runs
+  `20261029-165200-176-special-projectiles-baseline` and
+  `20261029-165200-201-special-projectiles-adverse150` reach the third stun shot but
+  fail verification: the diagnostic cached the previous stun timers when a new
+  event arrived ahead of its avatar snapshot. Disc and first two stun verdicts
+  pass within these failed runs. Timer sampling now waits for matching state;
+  exact duration, damage, ammo and immunity checks remain required.
+- Rebuild `BuildSmoke-20261029-165531-256.log` passes. Run
+  `20261029-165642-021-special-projectiles-adverse150` passes, including all stun
+  timers (mean SDK RTT 162.59/162.32 ms). Its baseline sibling verifies all weapon
+  verdicts but fails the overall deadline while completing stability/peer cleanup.
+  Source review identifies a completion path that could return false on an
+  unavailable peer status file and restart stability even after bilateral weapon
+  verification. Completed grenade and special scenarios now retain completion;
+  the outer live-match, tick-progress, peer-success and clean-exit gates still apply.
+
+- Rebuild `BuildSmoke-20261029-165931-986.log` passes. Special baseline
+  `20261029-170011-572-special-projectiles-baseline` passes in 36.4 seconds.
+  Grenade baseline `20261029-170011-577-grenade-combat-baseline` fails before
+  gameplay: client receives `Requested` disconnect after player admission starts,
+  then cancellation and a closed-session error. Host logs do not identify the
+  rejection cause. Repeat `20261029-170137-927-grenade-combat-baseline` passes.
+  This failure is retained as unresolved startup evidence, not attributed to the
+  user's earlier team-selection report or counted as grenade acceptance.
+- `20261029-170137-927-special-projectiles-adverse150` fails its second stun
+  shot's flight-sampling gate: the client sees only one projectile snapshot despite
+  matching damage/events/timers. Stun-only fixture distance increases from 6 m to
+  12 m within the disc's verified clear corridor. Two distinct flight samples,
+  exact damage, legitimate cooldowns and immunity behavior remain required.
+
+Final build `Artifacts/Unity/BuildSmoke-20261029-170332-094.log` passes. Both
+`20261029-170427-699-special-projectiles-baseline` and
+`20261029-170427-699-special-projectiles-adverse150` pass all wrapper gates and exit
+cleanly. Mean SDK RTT is 10.98/13.46 ms (79/79 samples) and 166.29/161.39 ms
+(84/83 samples), respectively. Client stun-flight samples are 5/5/5 baseline and
+4/5/5 adverse. Disc spends one round, deals 35 damage once across the return path,
+records two ricochets and disappears before range/lifetime expiry. Three stun shots
+spend one round each and deal 15 damage each; stun events are 1/0/1, with exact
+54-tick suppression and 210-tick subsequent immunity at 120 Hz. Host observes active
+suppression; both peers observe expiry and agree on event IDs and timers.
+Final grenade adverse rerun `20261029-170534-432-grenade-combat-adverse150`
+also passes on this build (164.45/159.56 ms mean SDK RTT, 79/77 samples), retaining
+the same exact fuse, positive falloff and zero covered-damage verdicts. The latest
+grenade baseline above passes with 10.14/13.82 ms mean RTT (76/76 samples).
+
+These controlled, short, two-process tests
+do not establish natural moving counterplay, motor/input suppression, deflection,
+rewind accuracy, external-network reliability or performance. SDK RTT includes
+processing time and configured loss probability is not a measured loss rate.
+No normal-player rebuild or full test-suite rerun was needed for compile-time
+diagnostic changes. Input hashes, build identities, all failed/passing run paths
+and a subsequent blank-EOF-line cleanup are recorded in
+`Artifacts/Resume/grenade-specials-20261029.json`.
+
 ### 2026-10-29 projectile and injected-network continuation
 
 Base `b401a93` plus the diagnostic delta, verified in

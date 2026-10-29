@@ -5,6 +5,23 @@ Goal active; user explicitly resumed and delegated all work possible while away.
 
 ## Current position
 
+2026-10-29 grenade and disc/stun continuation adds native Photon acceptance to
+the existing diagnostic player. Grenade proof requires actual gravity/bounce and an
+explosion exactly at fuse expiry, with positive and within-radius covered cases.
+Disc proof requires two ricochets, repeated target crossing without duplicate
+damage, and disappearance before range/lifetime expiry. Stun uses legitimate
+cooldowns to check initial suppression, damage without immunity refresh, then
+stun after immunity ends. Synthetic geometry and pre-shot placement remain
+explicit; no production behavior or balance changes were made. Two Sol agents
+authored separate partials, another reviewed, and root verified builds/live results.
+Baseline and adverse150 verdicts pass for all three weapons. The final stun fixture
+uses 12 m flight so both peers can sample travel under loss. Diagnostic fixes cover
+empty startup arrays, event/state arrival ordering and retaining completed verdicts.
+A separate client startup disconnect is recorded with an unknown cause; it does
+not establish reproduction of the user's team-selection symptom. [QA](QA.md) records
+every failed attempt and successful rerun. Deflection, measured rewind, natural
+counterplay, motor/input suppression and external/performance gates remain open.
+
 Next resume: extend controlled live coverage to Pulse Lobber flight, terminal
 blast/cover and replicated identities. Ruling: retain existing production pickup/
 fire/host simulation with explicit initial fixtures; require the covered target

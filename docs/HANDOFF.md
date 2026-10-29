@@ -16,6 +16,15 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
 
 ## Current evidence
 
+- Grenade, Rebound Disc and Stun Gun now pass controlled real-Photon baseline and
+  adverse150 acceptance. Checks cover gravity/bounce/fuse and blast cover; two disc
+  ricochets without repeated damage; and stun expiry/immunity/renewed stun with
+  matching peer timers. Duplicate special-fire RPCs spend once. Sol implementation
+  and review plus native builds/runs are recorded in [QA](QA.md). These diagnostics
+  leave normal gameplay/public builds unchanged. One pre-game requested disconnect
+  remains unexplained; add safe admission-rejection reason logging before inferring
+  a fix or linking it to the user's external team-selection report.
+
 - Projectile/fault-profile continuation: Pulse Lobber flight, damage and cover
   pass baseline and added 150 ms RTT/jitter/2% loss; all three moving lasers pass
   added 80 ms/1% and 150 ms/2% profiles. Both peers record positive SDK RTT and

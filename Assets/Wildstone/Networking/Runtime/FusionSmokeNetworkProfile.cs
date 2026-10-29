@@ -25,8 +25,8 @@ namespace Wildstone.Networking
             Configuration = null;
             if (!args.TryGetValue("--wildstone-smoke-network-profile", out var profile)) return;
             if (profile != "baseline" && (!args.TryGetValue("--wildstone-smoke-scenario", out var scenario) ||
-                (scenario != "laser-moving-cover" && scenario != "projectile-combat")))
-                throw new ArgumentException("Injected network profiles are supported only for laser-moving-cover and projectile-combat.");
+                (scenario != "laser-moving-cover" && scenario != "projectile-combat" && scenario != "grenade-combat" && scenario != "special-projectiles")))
+                throw new ArgumentException("Injected network profiles are supported only for the moving-laser and projectile combat scenarios.");
             var report = new Report { profile = profile, sdkBuildType = NetworkRunner.BuildType.ToString() };
             switch (profile)
             {

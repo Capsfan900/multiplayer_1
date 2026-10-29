@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('basic','reconnect','migration','migration-crash','combat','laser-combat','laser-moving-cover','projectile-combat','capacity','late-join','team-switch')][string]$Scenario = 'basic',
+    [ValidateSet('basic','reconnect','migration','migration-crash','combat','laser-combat','laser-moving-cover','projectile-combat','grenade-combat','special-projectiles','capacity','late-join','team-switch')][string]$Scenario = 'basic',
     [ValidateSet('baseline','regional80','adverse150')][string]$NetworkProfile = 'baseline',
     [string]$Executable,
     [ValidateRange(30,900)][int]$TimeoutSeconds = 150,
@@ -7,8 +7,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if($NetworkProfile -ne 'baseline' -and $Scenario -notin @('laser-moving-cover','projectile-combat')) {
-    throw 'Injected network profiles are supported only for laser-moving-cover and projectile-combat.'
+if($NetworkProfile -ne 'baseline' -and $Scenario -notin @('laser-moving-cover','projectile-combat','grenade-combat','special-projectiles')) {
+    throw 'Injected network profiles are supported only for the moving-laser and projectile combat scenarios.'
 }
 $effectiveTimeoutSeconds = if($Scenario -eq 'capacity'){[Math]::Max($TimeoutSeconds,$SoakSeconds+150)}else{$TimeoutSeconds}
 $project = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -221,6 +221,60 @@ try {
                 }
                 if($i -eq 1 -and (-not $v.coverBlocks -or $v.blastDistance -ge 3.5 -or $v.expectedDamage -le 20 -or $v.damage -ne 0 -or $v.hits -ne 0)) {
                     throw 'Projectile cover case did not demonstrate a blocked target strictly inside blast range.'
+                }
+            }
+        }
+    }
+    if($Scenario -eq 'grenade-combat') {
+        foreach($state in $requiredStates) {
+            $other=$requiredStates | Where-Object role -ne $state.role
+            $g=$state.grenade
+            if(-not $g.picked -or @($g.throws).Count -ne 2){throw 'Grenade smoke requires pickup and both throws.'}
+            for($i=0;$i -lt 2;$i++) {
+                $v=$g.throws[$i]; $r=$other.grenade.throws[$i]
+                if(-not $v.verified -or -not $v.observed -or -not $v.despawned -or -not $v.gravityObserved -or -not $v.bounceObserved -or
+                    $v.samples -lt 2 -or $v.lastTick -le $v.firstTick -or $v.lastTravel-$v.firstTravel -le 1 -or
+                    $v.expireTick -le $v.actionTick -or $v.explosionTick -ne $v.expireTick -or $v.expireTick -ne $r.expireTick -or
+                    $v.ammo -ne (1-$i) -or $v.shotCount -ne 1 -or $v.explosions -ne 1 -or
+                    -not $v.identity -or -not $v.shotId -or -not $v.explosionId -or $v.identity -ne $r.identity -or
+                    $v.shotId -ne $r.shotId -or $v.explosionId -ne $r.explosionId -or $v.hitId -ne $r.hitId -or
+                    [Math]::Abs($v.damage-$r.damage) -gt .01 -or $v.blastDistance -ge 5 -or $v.expectedDamage -le 15) {
+                    throw 'Grenade smoke is missing matching flight, bounce, fuse, ammo or in-range blast evidence.'
+                }
+                if($i -eq 0 -and ($v.hits -ne 1 -or -not $v.hitId -or [Math]::Abs($v.damage-$v.expectedDamage) -gt .01 -or [Math]::Abs($v.eventDamage-$v.expectedDamage) -gt .01)) {
+                    throw 'Grenade positive control is missing falloff damage.'
+                }
+                if($i -eq 1 -and (-not $v.coverBlocks -or $v.hits -ne 0 -or $v.damage -ne 0)){throw 'Grenade cover did not protect its in-range target.'}
+            }
+        }
+    }
+    if($Scenario -eq 'special-projectiles') {
+        foreach($state in $requiredStates) {
+            $other=$requiredStates | Where-Object role -ne $state.role
+            if(@($state.specialProjectiles).Count -ne 2){throw 'Both Disc and Stun verdicts are required.'}
+            for($i=0;$i -lt 2;$i++) {
+                $v=$state.specialProjectiles[$i]; $r=$other.specialProjectiles[$i]
+                $expectedWeapon=if($i -eq 0){'ReboundDisc'}else{'StunGun'}
+                $expectedShots=if($i -eq 0){1}else{3}; $ammo=if($i -eq 0){10}else{8}; $damage=if($i -eq 0){35}else{15}
+                if($v.weapon -ne $expectedWeapon -or -not $v.picked -or -not $v.equipped -or -not $v.verified -or @($v.shots).Count -ne $expectedShots){throw 'Special projectile pickup/equip/verdict incomplete.'}
+                for($j=0;$j -lt $expectedShots;$j++) {
+                    $a=$v.shots[$j]; $b=$r.shots[$j]
+                    if(-not $a.verified -or -not $a.observed -or -not $a.absent -or $a.samples -lt 2 -or
+                        $a.lastTick -le $a.firstTick -or $a.lastTravel-$a.firstTravel -le .2 -or $a.shots -ne 1 -or $a.hits -ne 1 -or
+                        $a.ammo -ne ($ammo-$j-1) -or [Math]::Abs($a.eventDamage-$damage) -gt .01 -or [Math]::Abs($a.damage-$damage*($j+1)) -gt .01 -or
+                        -not $a.identity -or -not $a.events -or $a.identity -ne $b.identity -or $a.events -ne $b.events -or
+                        $a.stunUntil -ne $b.stunUntil -or $a.immunityUntil -ne $b.immunityUntil){throw 'Special projectile peers lack matching flight, single spend/hit and event verdicts.'}
+                    if($i -eq 0 -and ($a.ricochets -ne 2 -or $a.ricochetMask -ne 6 -or $a.maxBounces -ne 2 -or
+                        $a.firstDespawnTick -le $a.lastTick -or $a.firstDespawnTick -ge $a.expireTick)){throw 'Disc must ricochet twice and disappear before lifetime expiry.'}
+                    if($i -eq 1) {
+                        if(-not $a.stunExpired){throw 'Stun suppression did not expire.'}
+                        if($j -eq 1) {
+                            if($a.stuns -ne 0 -or $a.stunUntil -ne $v.shots[0].stunUntil -or $a.immunityUntil -ne $v.shots[0].immunityUntil){throw 'Immune hit refreshed stun timers.'}
+                        } else {
+                            $hostShot=if($state.role -eq 'host'){$a}else{$b}
+                            if($a.stuns -ne 1 -or -not $hostShot.suppressionObserved){throw 'Authoritative active stun was not observed.'}
+                        }
+                    }
                 }
             }
         }
