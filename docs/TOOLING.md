@@ -185,6 +185,7 @@ one of the following checks:
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario reconnect
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario combat
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario laser-combat
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario laser-moving-cover
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario team-switch
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario migration
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario migration-crash
@@ -196,7 +197,7 @@ one of the following checks:
 The builder enables
 `WILDSTONE_SMOKE` only through that BuildPlayer invocation; normal players contain
 no automatic menu driver. Runs launch owned, hidden Windows player processes:
-two for `basic`, `reconnect`, `combat`, `laser-combat` and `team-switch`; three for `migration`, `migration-crash` and `late-join`;
+two for `basic`, `reconnect`, `combat`, `laser-combat`, `laser-moving-cover` and `team-switch`; three for `migration`, `migration-crash` and `late-join`;
 eight for `capacity`, admitted sequentially to avoid team-swap races in the test
 driver. They use the existing Photon App ID and drive actual Host/Join, teams,
 ready, loading and gameplay. The runner stops only its own processes on failure.
@@ -227,6 +228,14 @@ the production UI bridge/RPC, not physical pointer input or injected network del
 sniper. Host-placed stationary fixtures and health resets are explicit; both peers
 must agree on ammunition, damage and shot/pellet event identities. This is not
 moving-target or adverse-network acceptance.
+
+`laser-moving-cover` uses the same three production pickup/equip paths, then
+moves the host target using normal network input while the client fires. Both
+peers observe motion; each checks expected ammo, damage and event identities.
+A second shot through an explicit temporary world collider must consume one round
+and produce one matching shot event without target damage. Setup teleports, health
+resets and cover placement are diagnostic fixtures. No fault profile is injected,
+and the test does not measure SDK rewind age or establish projectile acceptance.
 
 `capacity -SoakSeconds` accepts 10–600 seconds (default 10), extending only the
 bounded diagnostic timeout. All eight peers must retain coherent players, avatars,
@@ -308,5 +317,16 @@ Weapon expression captures: `./Tools/QA/Invoke-VisualCheck.ps1 -Weapons` records
 grenade blasts, disc ricochet, stun impact, Lens charge and overlapping laser beams.
 These use production presentation and explicitly empty-world projectile rules;
 they are labeled fixtures and do not replace input/network/human-feel acceptance.
-`-Motion` and `-Weapons` are mutually exclusive. `-Action PreparePresentation`
+Continuous first-person samples: `./Tools/QA/Invoke-VisualCheck.ps1 -Sequence`
+records 32 PNGs across run, slide/return, fire/recoil settle and reload/return.
+It retains presentation history while advancing fixed 1/60-second synthetic frames
+with the matching combat tick rate. Each sample records state, camera/hands poses,
+simulation time and separate wall time; wrapper gates require visible pose changes
+and return to rest. It is not natural gameplay, remote readability or framerate proof.
+The fixture uses the starter weapon; the other weapon modes remain distinct.
+
+All modes validate the offscreen camera/UI target and PNG dimensions, so a clamped
+hidden window does not stall capture or silently define the image's aspect ratio.
+`width`/`height` describe the PNG; `screenWidth`/`screenHeight` describe the OS window.
+`-Motion`, `-Weapons` and `-Sequence` are mutually exclusive. `-Action PreparePresentation`
 imports/builds the model catalog without regenerating map geometry or baked scenes.

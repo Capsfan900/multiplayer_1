@@ -9,6 +9,12 @@ players. It checks one ammo spend, authoritative damage, pellet/event counts and
 matching replicated event identities. Host teleports and health resets explicitly
 construct a stationary fixture; this does not establish moving-target, cover,
 adverse-latency or human balance acceptance. Exact runs belong in [QA](../../QA.md).
+The separate `laser-moving-cover` scenario retains explicit initial placement,
+then moves the host target through production input while the client fires each
+laser. Both peers must observe displacement and velocity before fire, agree on
+ammo/damage/event identities, and observe a second shot blocked by a diagnostic
+world collider with no target damage. This is controlled moving-target/cover
+evidence, not measured rewind age, injected latency, projectiles or balance proof.
 The [foundation design](2026-10-25-multiplayer-foundation-design.md) governs Unity
 URP, Fusion Host Mode, prediction, recovery and implementation order.
 

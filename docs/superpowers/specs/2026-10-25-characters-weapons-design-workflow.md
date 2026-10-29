@@ -169,6 +169,13 @@ framing and numeric statistics remain production work. Use the documented
 [Blender-to-Unity asset pipeline](../../ASSET-PIPELINE.md), auditing reusable source
 assets before replacing them. Concept illustrations are references, not final meshes.
 
+Local diagnostic extension (2026-10-29): a continuous first-person starter-weapon
+sequence retains body/view/hand state across run, slide, recoil and reload, with
+sampled PNGs and transform/return checks. Fixed simulated time is separate from
+wall time. This supplements posed captures; it does not accept natural traversal,
+other weapon transitions, third-person readability, human feel or rendering cost.
+[QA](../../QA.md) records the inspected sequence and remaining gates.
+
 ### Expanded laser arsenal (2026-10-28)
 
 The user explicitly requested recognizable pistol, shotgun and sniper forms alongside

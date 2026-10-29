@@ -25,12 +25,21 @@ namespace Wildstone.Networking
             public Action Enter;
             public Func<bool> Ready;
             public Action BeforeCapture;
+            public float SettleSeconds=1.5f;
         }
         [Serializable] sealed class Capture
         {
             public string file,screen,map,mode;
-            public int width,height;
+            public int width,height,screenWidth,screenHeight;
+            public float cameraAspect;
             public float uiScale;
+            public int simulatedFrame,simulationTick;
+            public float simulatedSeconds,simulationDelta,cameraFov;
+            public double wallSeconds;
+            public bool sliding,reloading;
+            public string stage;
+            public Vector3 velocity,cameraPosition,handsPosition;
+            public Quaternion handsRotation;
         }
         [Serializable] sealed class Result
         {
@@ -47,7 +56,10 @@ namespace Wildstone.Networking
         string directory,pending;
         int index;
         double began,entered,readyAt=-1;
-        bool initialized,started,finished,motionCheck,weaponCheck,capturePrepared;
+        bool initialized,started,finished,motionCheck,weaponCheck,sequenceCheck,capturePrepared;
+        int sequenceFrame=-1;
+        const float SequenceDelta=1f/60;
+        string sequenceStage;
         double preparedAt;
         FirstPersonBody fixtureBody;
         WeaponView fixtureWeapon;
@@ -75,6 +87,9 @@ namespace Wildstone.Networking
                 var driver=owner.AddComponent<FusionVisualCheckDriver>(); driver.directory=output; driver.began=Time.realtimeSinceStartupAsDouble;
                 driver.motionCheck=Array.IndexOf(args,"--wildstone-motion-check")>=0;
                 driver.weaponCheck=Array.IndexOf(args,"--wildstone-weapon-check")>=0;
+                driver.sequenceCheck=Array.IndexOf(args,"--wildstone-sequence-check")>=0;
+                if((driver.motionCheck?1:0)+(driver.weaponCheck?1:0)+(driver.sequenceCheck?1:0)>1) throw new ArgumentException("Choose one diagnostic mode.");
+                if(driver.sequenceCheck) driver.result.mode="continuous-presentation-samples-not-gameplay-or-framerate-proof";
                 if(driver.motionCheck) driver.result.mode="visual-pose-fixtures-not-gameplay-proof";
                 if(driver.weaponCheck) driver.result.mode="weapon-effect-fixtures-not-gameplay-proof";
             }
@@ -101,18 +116,23 @@ namespace Wildstone.Networking
                 if(index>=steps.Count) { Finish(true,""); return; }
                 var step=steps[index];
                 if(!started) { step.Enter(); entered=now; readyAt=-1; started=true; capturePrepared=false; }
-                if(now-entered>35) throw new TimeoutException("Visual step did not complete: "+step.Name);
+                if(now-entered>35) throw new TimeoutException("Visual step did not complete: "+step.Name+
+                    $"; screen={session.Flow.Screen}; loading={session.Flow.ForegroundLoading}; map={session.MapId}; match={session.Match!=null}"+
+                    $"; size={Screen.width}x{Screen.height}; fixture={fixtureView!=null}; sessionEnabled={session.enabled}"+
+                    $"; target={(target!=null?target.width+"x"+target.height:"none")}; aspect={session.Camera.aspect:F4}; capturePrepared={capturePrepared}; readyAt={readyAt:F3}; preparedAt={preparedAt:F3}; now={now:F3}; pending={pending??"none"}; simulatedFrame={sequenceFrame}");
                 if(pending!=null)
                 {
                     if(!File.Exists(pending) || new FileInfo(pending).Length<100) return;
-                    result.captures.Add(new Capture {file=pending,screen=session.Flow.Screen.ToString(),map=session.MapId,
-                        width=Screen.width,height=Screen.height,uiScale=session.Settings.UiScale,mode=result.mode});
+                    var capture=new Capture {file=pending,screen=session.Flow.Screen.ToString(),map=session.MapId,
+                        width=target.width,height=target.height,screenWidth=Screen.width,screenHeight=Screen.height,cameraAspect=session.Camera.aspect,uiScale=session.Settings.UiScale,mode=result.mode};
+                    if(sequenceCheck) RecordSequence(capture,now);
+                    result.captures.Add(capture);
                     File.WriteAllText(Path.Combine(directory,"result.json"),JsonUtility.ToJson(result,true));
                     pending=null; index++; started=false; return;
                 }
                 if(!step.Ready()) { readyAt=-1; return; }
                 if(readyAt<0) readyAt=now;
-                if(now-readyAt<1.5) return;
+                if(now-readyAt<step.SettleSeconds) return;
                 if(step.BeforeCapture!=null)
                 {
                     if(!capturePrepared) { step.BeforeCapture(); capturePrepared=true; preparedAt=now; return; }
@@ -133,6 +153,7 @@ namespace Wildstone.Networking
         }
         void ConfigureSteps()
         {
+            if(sequenceCheck) { ConfigureSequenceSteps(); return; }
             if(weaponCheck) { ConfigureWeaponSteps(); return; }
             if(motionCheck) { ConfigureMotionSteps(); return; }
             Add("title-720",()=>{ApplySize(1280,720,1);session.Show(MenuScreen.Title);},()=>At(MenuScreen.Title,1280,720));
@@ -149,6 +170,59 @@ namespace Wildstone.Networking
             }
             Add("pause-1080",()=>session.Show(MenuScreen.Pause),()=>At(MenuScreen.Pause,1920,1080));
             Add("title-ultrawide",()=>{session.Leave();ApplySize(1920,810,1);},()=>At(MenuScreen.Title,1920,810));
+        }
+        void ConfigureSequenceSteps()
+        {
+            // These are fixed simulation samples, deliberately held while PNG readback completes.
+            // Adjacent samples at transition boundaries preserve intervening presentation history.
+            foreach(int frame in new[]{0,12,24,30,31,32,42,54,60,61,62,72,84,90,91,92,96,102,108,114,120,121,122,132,144,156,168,180,192,198,204,216})
+            {
+                int sample=frame;
+                Add("sequence-"+sample.ToString("D3"),()=>
+                {
+                    if(fixtureView==null) { ApplySize(1280,720,1); session.Load("atrium"); }
+                },()=>
+                {
+                    if(!Playing("atrium",1280,720)) return false;
+                    if(fixtureView==null) { CreateFixture(); Pose(35,0,0,false,true,90); }
+                    return true;
+                });
+                var step=steps[steps.Count-1]; step.SettleSeconds=0;
+                step.BeforeCapture=()=>AdvanceSequence(sample);
+            }
+        }
+        void AdvanceSequence(int sample)
+        {
+            for(int frame=sequenceFrame+1;frame<=sample;frame++)
+            {
+                sequenceStage=frame<30?"run":frame<60?"slide":frame<90?"slide-return":frame<120?"fire-and-settle":frame<120+Mathf.CeilToInt(WeaponCatalog.ReloadSeconds/SequenceDelta)?"reload":"reload-return";
+                fixtureState.Sliding=frame>=30 && frame<60;
+                fixtureState.CapsuleHeight=fixtureState.Sliding?.9f:1.8f;
+                fixtureState.Velocity=frame<60?Vector3.forward*(fixtureState.Sliding?16:8):Vector3.zero;
+                fixtureState.LastMove=frame<60?Vector2.up:Vector2.zero;
+                int tick=100+Mathf.RoundToInt(frame*SequenceDelta*WeaponCatalog.DefaultTickRate);
+                if(frame==90) fixtureWeapon.Play(new CombatEvent(CombatEventKind.Shot,
+                    new CombatAction {Participant=fixturePlayer.Participant},tick),fixturePlayer.Participant);
+                if(frame==120) fixturePlayer.ReloadUntil=tick+Mathf.RoundToInt(WeaponCatalog.ReloadSeconds*WeaponCatalog.DefaultTickRate);
+                fixtureView.RenderFrame(fixtureState,SequenceDelta);
+                fixtureBody.Present(fixturePlayer,fixtureState,SequenceDelta,false);
+                fixtureWeapon.Present(fixturePlayer,fixtureCatalog,fixtureState,tick,SequenceDelta,false);
+            }
+            sequenceFrame=sample;
+            fixtureWeapon.SyncProjection(session.Camera);
+        }
+        void RecordSequence(Capture capture,double now)
+        {
+            var overlay=session.Camera.transform.Find("Viewmodel");
+            if(overlay==null || overlay.childCount==0) throw new InvalidOperationException("Missing sequence hands.");
+            var hands=overlay.GetChild(0);
+            capture.simulatedFrame=sequenceFrame; capture.simulationTick=100+Mathf.RoundToInt(sequenceFrame*SequenceDelta*WeaponCatalog.DefaultTickRate);
+            capture.simulationDelta=SequenceDelta; capture.simulatedSeconds=(sequenceFrame+1)*SequenceDelta;
+            capture.wallSeconds=now-began; capture.stage=sequenceStage;
+            capture.sliding=fixtureState.Sliding; capture.reloading=fixturePlayer.ReloadUntil>capture.simulationTick;
+            capture.velocity=fixtureState.Velocity; capture.cameraFov=session.Camera.fieldOfView;
+            capture.cameraPosition=session.Camera.transform.position;
+            capture.handsPosition=hands.localPosition; capture.handsRotation=hands.localRotation;
         }
         void ConfigureMotionSteps()
         {
@@ -332,7 +406,11 @@ namespace Wildstone.Networking
                 RenderPipeline.SubmitRenderRequest(session.Camera,renderRequest);
         }
         void Add(string name,Action enter,Func<bool> ready) => steps.Add(new Step {Name=name,Enter=enter,Ready=ready});
-        bool At(MenuScreen screen,int width,int height) => session.Flow.Screen==screen && Screen.width==width && Screen.height==height;
+        bool At(MenuScreen screen,int width,int height) => session.Flow.Screen==screen &&
+            target!=null && target.IsCreated() && target.width==width && target.height==height &&
+            session.Camera!=null && session.Camera.targetTexture==target && renderRequest.destination==target &&
+            document!=null && document.panelSettings!=null && document.panelSettings.targetTexture==target &&
+            Mathf.Abs(session.Camera.aspect-width/(float)height)<.0001f;
         bool Playing(string map,int width,int height)
         {
             if(session.Failure!=null) throw new InvalidOperationException(session.Failure);
@@ -344,6 +422,8 @@ namespace Wildstone.Networking
         {
             var settings=session.Settings.Copy(); settings.Width=width; settings.Height=height; settings.Fullscreen=false;
             settings.UiScale=scale; settings.FpsCap=60; settings.VSync=false; session.ApplySettings(settings,false);
+            // The diagnostic draws offscreen: an OS-clamped hidden window must not define projection.
+            session.Camera.aspect=width/(float)height;
             if(target!=null && target.width==width && target.height==height) return;
             ReleaseTarget();
             target=new RenderTexture(width,height,24,RenderTextureFormat.ARGB32,RenderTextureReadWrite.sRGB);

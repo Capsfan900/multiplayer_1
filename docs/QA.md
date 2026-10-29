@@ -6,6 +6,50 @@ separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
 
+### 2026-10-29 moving laser and continuous presentation follow-up
+
+Source base `be0a352` plus the diagnostic delta, verified in
+`D:/WildstoneBuilds/resume-20261029`. Production gameplay and the public preview
+are unchanged. `BuildSmoke-20261029-103115-545.log` passes.
+
+- `Artifacts/Smoke/20261029-103148-656-laser-moving-cover/result.json` passes:
+  the client picks up, equips and fires pistol, shotgun and sniper at a host target
+  moving through production network input. Target speed at each fire is 2.2 m/s;
+  displacement exceeds 0.27 m. Both peers agree on 32/72/80 damage, respectively,
+  exact 1/8/1 hit events and one round spent. A follow-up shot through explicit
+  diagnostic world cover spends one more round with zero target hits/damage.
+  Both players finish and exit cleanly; log exception gates pass. This remains
+  same-PC Photon evidence with initial placement/health resets, no injected faults
+  or measured SDK rewind age. Projectile and adverse-network acceptance remain open.
+- The new continuous first-person sequence initially times out before capture in
+  `Artifacts/Visual/20261029-103202-687`. Existing `-Motion` reproduces the shared
+  setup failure in `20261029-103355-054`. Context-only rebuild
+  `BuildSmoke-20261029-103440-423.log` and sequence `20261029-103527-943` identify
+  a clamped 1024x720 player window while readiness demanded 1280x720. The map is
+  loaded and Playing; no fixture has yet been created. These are failed checks,
+  not animation acceptance.
+- Corrected diagnostic readiness checks the created offscreen texture, camera
+  binding/aspect, render request and UI target. PNG headers independently verify
+  actual image dimensions; window dimensions are recorded separately. Rebuild
+  `BuildSmoke-20261029-103721-284.log` passes. Sequence
+  `Artifacts/Visual/20261029-103814-106/run.json` passes all 32 captures and gates:
+  slide-to-rest hand displacement 0.1012 m, recoil 0.0403 m, reload 0.0600 m,
+  with zero recorded residual hand displacement after recoil/reload settle.
+  The 3.6167 simulated seconds use fixed 1/60 updates and matching 120 Hz action
+  ticks; capture wall time is separate and is not a framerate measurement.
+  Two contact sheets were inspected: slide legs appear, recoil/reload poses
+  change and return, with no missing geometry or stale accumulated frame in this
+  first-person starter-weapon sample. This is retained synthetic presentation
+  state, not natural traversal, remote readability, human feel or all-weapon motion.
+- Existing pose mode `20261029-103832-879` passes all 13 captures. Default mode
+  `20261029-103854-736` passes 16 captures, including actual 1280x720, 1920x1080
+  and 1920x810 output despite clamped windows. Its contact sheet was inspected for
+  menu/HUD framing and projection regressions. These modes were rerun because
+  offscreen readiness is shared; no full test suite or production rebuild was
+  needed for this compile-time-only change. Independent Sol source review found
+  no blocking issues. Source parity and build/run paths are recorded in
+  `Artifacts/Resume/moving-visual-20261029.json`.
+
 ### 2026-10-29 resumed acceptance and connection follow-up
 
 The user reports that playtesting worked and felt good overall, with some initial

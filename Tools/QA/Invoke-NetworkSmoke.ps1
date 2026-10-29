@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('basic','reconnect','migration','migration-crash','combat','laser-combat','capacity','late-join','team-switch')][string]$Scenario = 'basic',
+    [ValidateSet('basic','reconnect','migration','migration-crash','combat','laser-combat','laser-moving-cover','capacity','late-join','team-switch')][string]$Scenario = 'basic',
     [string]$Executable,
     [ValidateRange(30,900)][int]$TimeoutSeconds = 150,
     [ValidateRange(10,600)][int]$SoakSeconds = 10
@@ -155,7 +155,7 @@ try {
             throw 'Team switch peers disagree on the retained guest connection.'
         }
     }
-    if($Scenario -eq 'laser-combat') {
+    if($Scenario -in @('laser-combat','laser-moving-cover')) {
         $weapons=@('LaserPistol','LaserShotgun','LaserSniper')
         foreach($state in $requiredStates) {
             if(@($state.lasers).Count -ne 3){throw 'Laser smoke requires all three weapon verdicts.'}
@@ -163,6 +163,14 @@ try {
                 $verdict=$state.lasers[$i]
                 $other=if($state.role -eq 'host'){$requiredStates | Where-Object role -eq 'client'}else{$requiredStates | Where-Object role -eq 'host'}
                 $expectedHits=if($i -eq 1){8}else{1}
+                if($Scenario -eq 'laser-moving-cover' -and (-not $verdict.movingVerified -or -not $verdict.movingObserved -or $verdict.movingFireDistance -le .2 -or $verdict.movingFireSpeed -le .2 -or
+                    -not $verdict.coverPlaced -or -not $verdict.coverReady -or -not $verdict.coverObserved -or
+                    $verdict.coverShots -ne 1 -or $verdict.coverHits -ne 0 -or $verdict.coverHealth -ne $verdict.coverBaselineHealth -or
+                    $verdict.coverAmmo -ne $verdict.ammo-1 -or -not $verdict.coverShotId -or
+                    $verdict.coverShotId -ne $other.lasers[$i].coverShotId -or $verdict.coverSequence -ne $other.lasers[$i].coverSequence)) {
+                    throw 'Moving laser smoke requires matching actual-motion and blocked-cover verdicts.'
+                }
+
                 if($verdict.weapon -ne $weapons[$i] -or -not $verdict.picked -or -not $verdict.equipped -or -not $verdict.verified -or
                     $verdict.shotCount -ne 1 -or $verdict.hitCount -ne $expectedHits -or -not $verdict.shotId -or -not $verdict.hitIds -or
                     $verdict.shotId -ne $other.lasers[$i].shotId -or $verdict.hitIds -ne $other.lasers[$i].hitIds){

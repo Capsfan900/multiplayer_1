@@ -221,14 +221,24 @@ namespace Wildstone.Networking
             public bool pickupPlaced,pickupSent,picked,equipSent,equipped,fixturePlaced,ready,fireSent,observed,verified;
             public int pickupId,pickupGeneration,pickupSequence,equipSequence,fireSequence,shooter,life,target,targetLife,ammo,shotCount,hitCount;
             public float baselineHealth,health,damage,eventDamage;
+            public bool movingObserved,movingVerified,coverPlaced,coverReady,coverFireSent,coverObserved;
+            public int movementSamples,coverSequence,coverAmmo,coverShots,coverHits;
+            public float movingDistance,movingSpeed,movingFireDistance,movingFireSpeed,coverBaselineHealth,coverHealth;
+            public string coverShotId="";
         }
         int laserIndex;
+        bool MovingLaserScenario=>status.scenario=="laser-moving-cover";
+        bool laserMoveActive;
+        float laserMoveDirection=1;
+        GameObject laserCover;
+        double laserCoverStable=-1;
         double laserBegan=-1,laserStable=-1,laserAck=-1;
         static readonly WeaponKind[] LaserWeapons={WeaponKind.LaserPistol,WeaponKind.LaserShotgun,WeaponKind.LaserSniper};
         bool DriveLaserCombat(ArenaMatch model,NetworkRunner runner,Status peer,double now)
         {
             if(status.lasers==null)
             {
+                if(MovingLaserScenario) { combatSession=menu.Session; combatSession.InputRequested+=SmokeLaserMovingInput; }
                 status.lasers=new LaserMetrics[LaserWeapons.Length];
                 for(int i=0;i<LaserWeapons.Length;i++) status.lasers[i]=new LaserMetrics {weapon=LaserWeapons[i].ToString()};
                 foreach(var candidate in FindObjectsByType<FusionMatch>()) if(candidate.Runner==runner && candidate.Initialized) combatMatch=candidate;
@@ -240,7 +250,8 @@ namespace Wildstone.Networking
             if(laserIndex==LaserWeapons.Length) return true;
             var m=status.lasers[laserIndex]; var remote=peer.lasers[laserIndex];
             if(m.verified && remote.verified)
-            { laserIndex++; laserBegan=laserStable=laserAck=-1; WriteOutput(); return laserIndex==LaserWeapons.Length; }
+            { laserMoveActive=false; if(laserCover!=null) Destroy(laserCover); laserCover=null;
+                laserIndex++; laserBegan=laserStable=laserAck=laserCoverStable=-1; WriteOutput(); return laserIndex==LaserWeapons.Length; }
             if(laserBegan<0) laserBegan=now;
             if(now-laserBegan>25) throw new TimeoutException("Laser fixture timed out: "+m.weapon+"@"+status.stage);
             var weapon=LaserWeapons[laserIndex]; var spec=WeaponCatalog.Get(weapon);
@@ -292,7 +303,7 @@ namespace Wildstone.Networking
                 m.fixturePlaced=true; WriteOutput();
             }
             status.stage="laser_history_"+weapon;
-            if(!host.fixturePlaced || (shooter.Feet-shooterPoint).sqrMagnitude>.04f || (target.Feet-targetPoint).sqrMagnitude>.04f) { laserStable=-1; return false; }
+            if(!host.fixturePlaced || !m.ready && ((shooter.Feet-shooterPoint).sqrMagnitude>.04f || (target.Feet-targetPoint).sqrMagnitude>.04f)) { laserStable=-1; return false; }
             if(laserStable<0) laserStable=now;
             if(!m.ready)
             {
@@ -300,13 +311,30 @@ namespace Wildstone.Networking
                 m.baselineHealth=target.Health; m.ready=true; WriteOutput();
             }
             if(!remote.ready) return false;
+            if(MovingLaserScenario)
+            {
+                laserMoveActive=true;
+                var state=LaserAvatar(runner,target.Participant).State;
+                m.movingDistance=HorizontalDistance(target.Feet,targetPoint);
+                m.movingSpeed=new Vector2(state.Velocity.x,state.Velocity.z).magnitude;
+                m.movingObserved|=m.movingDistance>.2f && m.movingSpeed>.2f;
+                if(!m.movingObserved || !remote.movingObserved || host.movementSamples<5) return false;
+                if(m.movingVerified) return DriveLaserCover(model,runner,peer,m,remote,shooter,target,spec,now);
+            }
             if(status.role=="client" && !m.fireSent)
             {
                 if(model.Tick<shooter.FireReadyTick) return false;
+                if(MovingLaserScenario)
+                {
+                    if(m.movingDistance<=.2f || m.movingSpeed<=.2f) return false;
+                    m.movingFireDistance=m.movingDistance; m.movingFireSpeed=m.movingSpeed;
+                }
                 m.fireSequence=shooter.LastActionSequence+1; m.fireSent=true;
                 SendLaserAction(model,shooter,m.fireSequence,CombatActionKind.Fire,(target.Feet+Vector3.up*.9f-shooter.Eye).normalized);
             }
             if(!client.fireSent) return false;
+            if(MovingLaserScenario)
+            { m.movingFireDistance=client.movingFireDistance; m.movingFireSpeed=client.movingFireSpeed; }
             m.fireSequence=client.fireSequence; m.ammo=shooter.SpecialAmmo; m.health=target.Health; m.damage=m.baselineHealth-m.health;
             m.shotCount=CountSmokeShots(shooter.Participant,shooter.LifeGeneration,m.fireSequence,out m.shotId);
             m.hitCount=0; m.hitIds=""; m.eventDamage=0;
@@ -325,8 +353,63 @@ namespace Wildstone.Networking
             if(!m.observed || !remote.observed) return false;
             if(m.shotId!=remote.shotId || m.hitIds!=remote.hitIds || m.life!=remote.life || m.targetLife!=remote.targetLife) throw new InvalidOperationException("Peers disagree on laser event identity.");
             if(laserAck<0) laserAck=now;
-            m.verified=now-laserAck>=1;
+            if(MovingLaserScenario) m.movingVerified=now-laserAck>=1;
+            else m.verified=now-laserAck>=1;
             return false;
+        }
+        void SmokeLaserMovingInput(NetworkInput output)
+        {
+            if(status.role!="host" || !laserMoveActive || laserIndex>=LaserWeapons.Length || combatAvatar==null) return;
+            float x=combatAvatar.State.Position.x;
+            if(x> -29.55f) laserMoveDirection=-1;
+            if(x< -30.45f) laserMoveDirection=1;
+            combatInputSequence=checked(Math.Max(combatInputSequence,combatAvatar.LastSampleSequence)+1);
+            output.Set(new FusionInput {Present=true,Sequence=combatInputSequence,Generation=combatAvatar.State.Generation,
+                Move=new Vector2(laserMoveDirection*.2f,0),Yaw=0,Pitch=0});
+            status.lasers[laserIndex].movementSamples++;
+        }
+        bool DriveLaserCover(ArenaMatch model,NetworkRunner runner,Status peer,LaserMetrics m,LaserMetrics remote,
+            CombatState shooter,CombatState target,WeaponSpec spec,double now)
+        {
+            status.stage="laser_cover_"+m.weapon;
+            if(!remote.movingVerified) return false;
+            // A bounded diagnostic-only world collider; movement and all verdicts still use production simulation.
+            if(!m.coverPlaced)
+            {
+                laserCover=new GameObject("Smoke laser cover"); laserCover.layer=0;
+                laserCover.transform.position=new Vector3(-30,1.5f,-11);
+                laserCover.AddComponent<BoxCollider>().size=new Vector3(4,3,.15f);
+                Physics.SyncTransforms();
+                m.coverPlaced=true; laserCoverStable=now; WriteOutput();
+            }
+            if(!remote.coverPlaced || now-laserCoverStable<1) return false;
+            if(!m.coverReady)
+            {
+                if(!Physics.Raycast(shooter.Eye,(target.Feet+Vector3.up*.9f-shooter.Eye).normalized,out var obstruction,3,
+                    MotorTuning.WorldMask,QueryTriggerInteraction.Ignore) || obstruction.collider.gameObject!=laserCover)
+                    throw new InvalidOperationException("Diagnostic cover does not obstruct the moving target.");
+                m.coverBaselineHealth=target.Health; m.coverReady=true; WriteOutput();
+            }
+            if(!remote.coverReady) return false;
+            var client=status.role=="client"?m:remote;
+            if(status.role=="client" && !m.coverFireSent)
+            {
+                if(model.Tick<shooter.FireReadyTick) return false;
+                m.coverSequence=shooter.LastActionSequence+1; m.coverFireSent=true;
+                SendLaserAction(model,shooter,m.coverSequence,CombatActionKind.Fire,(target.Feet+Vector3.up*.9f-shooter.Eye).normalized);
+            }
+            if(!client.coverFireSent) return false;
+            m.coverSequence=client.coverSequence; m.coverAmmo=shooter.SpecialAmmo; m.coverHealth=target.Health;
+            m.coverShots=CountSmokeShots(shooter.Participant,shooter.LifeGeneration,m.coverSequence,out m.coverShotId);
+            m.coverHits=CountSmokeHits(shooter.Participant,shooter.LifeGeneration,m.coverSequence,target.Participant,target.LifeGeneration,out _,out _);
+            if(m.coverHits!=0 || m.coverHealth!=m.coverBaselineHealth || m.coverShots>1 || m.coverAmmo<spec.Ammo-2 ||
+                shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
+                throw new InvalidOperationException("Cover shot damaged its protected target or duplicated ammunition/events.");
+            m.coverObserved=m.coverShots==1 && m.coverAmmo==spec.Ammo-2 && shooter.LastActionSequence==m.coverSequence;
+            if(!m.coverObserved || !remote.coverObserved) return false;
+            if(m.coverShotId!=remote.coverShotId || m.coverSequence!=remote.coverSequence || m.coverHealth!=remote.coverHealth)
+                throw new InvalidOperationException("Peers disagree on the blocked moving-target verdict.");
+            m.verified=true; WriteOutput(); return false;
         }
         FusionPlayer LaserAvatar(NetworkRunner runner,int participant)
         {
@@ -341,7 +424,8 @@ namespace Wildstone.Networking
         }
         void StopCombatInput()
         {
-            if(combatSession!=null) combatSession.InputRequested-=SmokeCombatInput;
+            if(combatSession!=null) { combatSession.InputRequested-=SmokeCombatInput; combatSession.InputRequested-=SmokeLaserMovingInput; }
+            if(laserCover!=null) Destroy(laserCover);
             combatSession=null;
         }
     }

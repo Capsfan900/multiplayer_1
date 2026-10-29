@@ -16,6 +16,15 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
 
 ## Current evidence
 
+- Latest diagnostic follow-up: real Photon moving-target/cover checks pass for
+  pistol, shotgun and sniper, with matching damage/ammo/events across peers and
+  zero damage through test cover. Continuous first-person starter-weapon samples
+  pass slide/recoil/reload return gates; 32 frames inspected. Fixed offscreen
+  capture readiness under OS-clamped windows; existing 13-pose and 16-screen modes
+  pass again. Production/public players are unchanged. [QA](QA.md) owns paths and
+  limits: projectiles, adverse latency, remote moving readability and human feel
+  still need acceptance.
+
 - 2026-10-29 continuation: native **49 EditMode/32 PlayMode** focused checks pass
   after fixing aborted online results, containing rejected recovery callbacks and
   adding remote firing/reload handling. Live controlled three-laser pickup/equip/

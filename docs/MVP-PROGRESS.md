@@ -8,7 +8,7 @@ Goal active; user explicitly resumed and delegated all work possible while away.
 2026-10-29 resume: user requested all backlog work and a state/goals brief, then
 reported successful playtesting with initial connection issues. Follow-up confirms
 another player in Texas on a different ISP and the issue after joining/clicking a
-team; exact visible symptoms/builds remain unspecified. Reconciled stale implementation checkboxes against
+team; the symptom is disconnect/menu return, with exact builds/error wording pending. Reconciled stale implementation checkboxes against
 recorded code/tests; remaining work is the acceptance queue in [BACKLOG](BACKLOG.md).
 Ruling: extend the existing compile-time diagnostic driver for three-laser live
 RPC verification and fix the observed aborted-results UI gap before speculative
@@ -34,6 +34,21 @@ could keep auto-assigned teams, leaving actual switching unexercised. Added boun
 clearing, retained connection identity and ten seconds of gameplay on both peers.
 The same-PC run passes; the user's external failure is not reproduced or claimed
 fixed. No production behavior or public build changed in this diagnostic follow-up.
+
+Next acceptance pass: extend the existing diagnostic player with moving-target/
+cover laser checks and a continuous first-person presentation sequence. Ruling:
+reuse production RPC/input and presentation methods inside `WILDSTONE_SMOKE`,
+with explicit fixture setup and peer acknowledgments; retain the existing static
+modes. This advances the accepted combat/readability gates without changing weapon
+balance or implying physical-input, adverse-network or human-feel acceptance.
+Separate Sol agents own network and visual diagnostics; root owns integration,
+native verification, image inspection and documentation. Moving Photon checks
+pass for all three lasers, including zero-damage cover shots. Continuous starter
+presentation passes 32 captures and slide/recoil/reload return gates; contact
+sheets inspected. Initial visual failures exposed a shared OS-window-size
+readiness bug; the corrected offscreen target checks pass sequence, 13-pose and
+16-screen modes. No production gameplay change. [QA](QA.md) records exact runs,
+failures and remaining external/visual acceptance limits.
 
 2026-10-28 latest delivery: user requested a build/release of the completed laser and
 first-person polish pass. Committed source snapshot `e9e091f` built from an isolated

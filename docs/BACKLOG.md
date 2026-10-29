@@ -50,8 +50,8 @@ active acceptance backlog, replacing the old bootstrap implementation order.
 | Order | Next actionable work | Evidence needed to advance |
 | --- | --- | --- |
 | 1 | Reproduce user-reported disconnect/menu return after joining and selecting a team | Other player confirmed in Texas on another ISP; exact builds/error wording still needed. Actual four-team switching diagnostic added; same-PC success is not a reproduction of the external symptom |
-| 2 | Extend live combat acceptance to moving targets, cover and projectiles | Three-laser stationary production pickup/equip/fire RPC verdicts now pass; remaining cases must preserve authoritative ammo/damage/event identities |
-| 3 | Accept moving gameplay/remote weapon readability | Remote shot/reload presentation and lifecycle/dedup checks now pass; moving first-/third-person captures and human aim/slide/audio acceptance remain |
+| 2 | Extend live combat acceptance to projectiles and adverse-network moving hits | All three lasers pass controlled moving-target and world-cover production RPC checks on same-PC Photon; projectile/deflection, measured rewind and latency cases remain |
+| 3 | Accept moving gameplay/remote weapon readability | Continuous first-person starter slide/fire/reload sample passes and 32 frames inspected; remote shot/reload checks pass. Natural first-/third-person movement, other weapon transitions and human aim/slide/audio acceptance remain |
 | 4 | Exercise full standalone loop and map traversal | All maps/weapons/items, UI/cancel/retry, death/respawn, zone completion, pickup reachability and route fairness |
 | 5 | Measure movement/combat under adverse network conditions | Host plus two clients, moving targets/cover/projectiles, prediction corrections and authority/recovery under canonical profiles |
 | 6 | Add measured performance and endurance evidence | Frame/tick/bandwidth/allocation measurements, separate-machine eight-player matrix, 30-minute profiles, two-hour soak and 100 reconnect cycles |
@@ -59,8 +59,9 @@ active acceptance backlog, replacing the old bootstrap implementation order.
 
 User feedback on 2026-10-29: the game works and feels "pretty good", with a few
 connection issues at the beginning. Follow-up identifies join/team selection and
-another player in Texas on a different ISP. Builds and exact visible symptom remain
-unconfirmed; this is human external-play evidence, not completion of the external matrix.
+another player in Texas on a different ISP. The symptom is disconnect/menu return;
+exact builds and error wording remain unconfirmed. This is human external-play
+evidence, not completion of the external matrix.
 The prior firewall inspection found application exceptions for old diagnostic
 players. System firewall changes are separate from gameplay work and remain unapplied.
 
