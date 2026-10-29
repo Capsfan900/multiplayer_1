@@ -563,6 +563,14 @@ Network profiles, explicitly expressed as round-trip latency:
 - Recovery: 250 ms RTT, 5% loss, packet duplication/reordering, 500 ms burst stalls,
   and a 5-second disconnect. This tests bounded degradation/recovery, not esports feel.
 
+Local diagnostic extension (2026-10-29): selected two-player combat checks can
+configure bounded SDK receive delay/jitter/loss on copied session configs. They
+require the Debug SDK simulator and record configured injection separately from
+observed SDK RTT. These delays add to existing transport latency; short functional
+passes do not complete this matrix or measure correction, fairness, rewind age,
+bandwidth or frame/tick budgets. [TOOLING](../../TOOLING.md) owns reproducible
+profile commands and [QA](../../QA.md) owns exact results and limitations.
+
 Test across 30/60/144/240 render FPS with the same 120 Hz simulation. Include wall
 seams, ceilings, fast slides, water exits, launch chains, predicted stamina depletion,
 external impulses, death during replay and respawn. Separate intended impulses and

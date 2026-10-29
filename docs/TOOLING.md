@@ -186,6 +186,9 @@ one of the following checks:
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario combat
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario laser-combat
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario laser-moving-cover
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario projectile-combat
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario laser-moving-cover -NetworkProfile regional80
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario projectile-combat -NetworkProfile adverse150
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario team-switch
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario migration
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario migration-crash
@@ -197,7 +200,7 @@ one of the following checks:
 The builder enables
 `WILDSTONE_SMOKE` only through that BuildPlayer invocation; normal players contain
 no automatic menu driver. Runs launch owned, hidden Windows player processes:
-two for `basic`, `reconnect`, `combat`, `laser-combat`, `laser-moving-cover` and `team-switch`; three for `migration`, `migration-crash` and `late-join`;
+two for `basic`, `reconnect`, `combat`, `laser-combat`, `laser-moving-cover`, `projectile-combat` and `team-switch`; three for `migration`, `migration-crash` and `late-join`;
 eight for `capacity`, admitted sequentially to avoid team-swap races in the test
 driver. They use the existing Photon App ID and drive actual Host/Join, teams,
 ready, loading and gameplay. The runner stops only its own processes on failure.
@@ -234,8 +237,37 @@ moves the host target using normal network input while the client fires. Both
 peers observe motion; each checks expected ammo, damage and event identities.
 A second shot through an explicit temporary world collider must consume one round
 and produce one matching shot event without target damage. Setup teleports, health
-resets and cover placement are diagnostic fixtures. No fault profile is injected,
+resets and cover placement are diagnostic fixtures. With baseline, no fault profile is injected,
 and the test does not measure SDK rewind age or establish projectile acceptance.
+
+`projectile-combat` uses a client pickup/equip/fire sequence for Pulse Lobber.
+Each peer must sample at least two distinct projectile ticks and more than 0.2 m
+of travel, then agree on shot/explosion/hit identities, ammo, falloff damage and
+removal. The second shot encounters temporary world cover. The protected target
+must remain strictly inside the blast radius and a ray from the actual detonation
+center must hit that cover; zero damage outside the radius cannot pass. Teleports
+and health resets occur only during explicit setup between shots.
+
+`-NetworkProfile` defaults to `baseline` (SDK simulation disabled). `regional80`
+configures added 80 ms RTT, +/-10 ms one-way jitter and 1% per-direction loss;
+`adverse150` configures added 150 ms RTT, +/-20 ms jitter and 2% loss. Injected
+profiles are restricted to `laser-moving-cover` and `projectile-combat` and require
+Fusion Debug DLLs: Release DLLs disable the simulator. Both peers receive copied
+session configs before startup; the shared config asset is never saved or edited.
+The pinned SDK internally clones simulation settings on runner initialization;
+the diagnostic preserves nonserialized prefab/execution-order data when creating
+its config copy. No OS/firewall/network-adapter settings are changed.
+
+The installed SDK applies half the configured RTT delay on receive at each peer.
+Noise delay ranges are 0.060–0.100 seconds and 0.110–0.190 seconds, respectively;
+additional jitter/loss fields stay zero. Existing transport latency is additional.
+Reports include configured values/application count and positive finite SDK remote
+RTT samples (count/min/max/mean), never a claim that observed RTT equals the profile
+label. These short functional checks do not satisfy external-network, prediction
+error, fairness, bandwidth, endurance or performance acceptance.
+Clients query their own SDK PlayerRef for server RTT; hosts query remote players.
+The SDK value includes peer processing time and is not raw ping. Output folders
+include the profile name to separate concurrent runs of the same scenario.
 
 `capacity -SoakSeconds` accepts 10–600 seconds (default 10), extending only the
 bounded diagnostic timeout. All eight peers must retain coherent players, avatars,

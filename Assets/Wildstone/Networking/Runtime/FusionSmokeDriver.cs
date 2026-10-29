@@ -20,8 +20,12 @@ namespace Wildstone.Networking
     {
         [Serializable] sealed class Status
         {
+            public FusionSmokeNetworkProfile.Report networkProfile;
+            public int sdkRemoteRttSamples;
+            public double sdkRemoteRttMinMs, sdkRemoteRttMaxMs, sdkRemoteRttMeanMs;
             public CombatMetrics combat;
             public LaserMetrics[] lasers;
+            public ProjectileMetrics projectile;
             public string role,scenario,stage="boot",room="",error="",phase="Closed",screen="Title";
             public bool success,finished,externalSimulation;
             public bool initialVerified,reconnectRequested,reconnectDisconnected,reconnectComplete,retainedAvatar;
@@ -60,6 +64,7 @@ namespace Wildstone.Networking
         PracticeSession presentation;
         bool connectedRequested,teamRequested,readyRequested,startRequested,finishing;
         double began,stableAt=-1,verifiedAt=-1,lastTickAt,nextWrite;
+        double nextRttSample;
         int firstMatchTick,lastMatchTick=-1;
         FusionSession retainedSession;
         bool retryRequested;
@@ -97,10 +102,12 @@ namespace Wildstone.Networking
             output=CheckedPath(args["--wildstone-smoke-output"]);
             if(args.TryGetValue("--wildstone-smoke-peer-output",out var peer)) peerOutput=CheckedPath(peer);
             status=new Status {role=args["--wildstone-smoke-role"],scenario=args.TryGetValue("--wildstone-smoke-scenario",out var scenario)?scenario:"basic"};
+            FusionSmokeNetworkProfile.ConfigureFromArgs(args);
+            status.networkProfile=FusionSmokeNetworkProfile.Configuration;
             began=Time.realtimeSinceStartupAsDouble;
             bool capacity=status.scenario=="capacity";
             if(capacity?CapacityRoleIndex(status.role)<0:status.role!="host" && status.role!="client" && status.role!="client2") throw new ArgumentException();
-            if(status.scenario!="basic" && status.scenario!="reconnect" && !IsMigrationScenario && status.scenario!="combat" && status.scenario!="laser-combat" && status.scenario!="laser-moving-cover" && status.scenario!="late-join" && status.scenario!="team-switch" && !capacity) throw new NotSupportedException("This smoke scenario is not implemented.");
+            if(status.scenario!="basic" && status.scenario!="reconnect" && !IsMigrationScenario && status.scenario!="combat" && status.scenario!="projectile-combat" && status.scenario!="laser-combat" && status.scenario!="laser-moving-cover" && status.scenario!="late-join" && status.scenario!="team-switch" && !capacity) throw new NotSupportedException("This smoke scenario is not implemented.");
             if(status.role=="client2" && !IsMigrationScenario && status.scenario!="late-join" && !capacity) throw new ArgumentException();
             if((IsMigrationScenario || capacity || status.scenario=="late-join") && Path.GetFileName(output)!=status.role+".json") throw new ArgumentException("This scenario requires fixed sibling status filenames.");
             if(capacity)
@@ -108,7 +115,7 @@ namespace Wildstone.Networking
                 status.roleIndex=CapacityRoleIndex(status.role);
                 status.capacitySoakSeconds=ParseCapacitySoakSeconds(args.TryGetValue("--wildstone-smoke-soak-seconds",out var soak)?soak:null);
             }
-            if((status.scenario=="reconnect" || status.scenario=="combat" || status.scenario=="laser-combat" || status.scenario=="laser-moving-cover" || status.scenario=="team-switch") && peerOutput==null) throw new ArgumentException("This scenario requires the peer status file.");
+            if((status.scenario=="reconnect" || status.scenario=="combat" || status.scenario=="projectile-combat" || status.scenario=="laser-combat" || status.scenario=="laser-moving-cover" || status.scenario=="team-switch") && peerOutput==null) throw new ArgumentException("This scenario requires the peer status file.");
             if(status.role!="host")
             {
                 joinRoom=args["--wildstone-smoke-room"].Trim().ToUpperInvariant();
@@ -209,6 +216,21 @@ namespace Wildstone.Networking
                     session.Phase==SessionPhase.Running && status.playerCount>=2 && status.avatarCount>=2 && presentation.LocalPlayer!=null;
                 if(playing)
                 {
+                    if(now>=nextRttSample && runner!=null && runner.IsRunning)
+                    {
+                        nextRttSample=now+.25;
+                        foreach(var remote in runner.ActivePlayers)
+                        {
+                            // Fusion clients expose their server RTT through LocalPlayer; hosts expose each remote client.
+                            if(runner.IsServer ? remote==runner.LocalPlayer : remote!=runner.LocalPlayer) continue;
+                            double ms=runner.GetPlayerRtt(remote)*1000;
+                            if(double.IsNaN(ms) || double.IsInfinity(ms) || ms<=0) continue;
+                            status.sdkRemoteRttSamples++;
+                            status.sdkRemoteRttMinMs=status.sdkRemoteRttSamples==1?ms:Math.Min(status.sdkRemoteRttMinMs,ms);
+                            status.sdkRemoteRttMaxMs=Math.Max(status.sdkRemoteRttMaxMs,ms);
+                            status.sdkRemoteRttMeanMs+=(ms-status.sdkRemoteRttMeanMs)/status.sdkRemoteRttSamples;
+                        }
+                    }
                     int connected=0;
                     foreach(var player in model.Players)
                     {
@@ -273,7 +295,7 @@ namespace Wildstone.Networking
                         WriteOutput();
                     }
                 }
-                bool combatReady=(status.scenario=="laser-combat" || status.scenario=="laser-moving-cover") ? playing && DriveLaserCombat(model,runner,peerStatus,now) : status.scenario!="combat" || (playing && DriveCombat(session,model,runner,peerStatus,now));
+                bool combatReady=status.scenario=="projectile-combat" ? playing && DriveProjectileCombat(model,runner,peerStatus,now) : ( status.scenario=="laser-combat" || status.scenario=="laser-moving-cover") ? playing && DriveLaserCombat(model,runner,peerStatus,now) : status.scenario!="combat" || (playing && DriveCombat(session,model,runner,peerStatus,now));
                 bool observeStability=(status.scenario=="basic" || !status.initialVerified || status.reconnectComplete) && combatReady;
                 if(playing && !status.success && observeStability)
                 {

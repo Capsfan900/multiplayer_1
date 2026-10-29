@@ -86,6 +86,9 @@ namespace Wildstone.Networking
             }
             ValidateStart(room, settings, authentication);
             var config = NetworkProjectConfig.Global;
+#if WILDSTONE_SMOKE
+            config = FusionSmokeNetworkProfile.Apply(config);
+#endif
             ValidateProjectConfig(config);
             savedRoom=room; savedSettings=settings.GetCopy(); savedAuthentication=authentication;
             if (!rules.BeginConnect(Now))

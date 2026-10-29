@@ -1,10 +1,60 @@
 # Verification and remaining acceptance
 
-Updated 2026-10-27. Active project: `C:\Users\tyler\orca\workspaces\multiplayer_1\mvp-2`.
+Updated 2026-10-29. Active project: `C:\Users\tyler\orca\workspaces\multiplayer_1\mvp-2`.
 Authored code, native Unity behavior, a Windows build and real internet play remain
 separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
+
+### 2026-10-29 projectile and injected-network continuation
+
+Base `b401a93` plus the diagnostic delta, verified in
+`D:/WildstoneBuilds/resume-20261029`. Pulse Lobber coverage now requires observed
+flight on both peers and matching terminal state, including a within-radius
+covered target. Added SDK profiles use copied process-local config and are absent
+from normal players. No service, firewall or public-release change is involved.
+
+- Initial `BuildSmoke-20261029-110711-763.log` fails: SDK `NetworkProjectConfig.Copy`
+  exists in XML/IL but is internal, so the diagnostic cannot call it directly.
+  The corrected copy preserves nonserialized prefab/execution-order fields via
+  `MemberwiseClone`, replaces only network conditions, and relies on the verified
+  SDK runner initialization copy for simulation state. Native build
+  `BuildSmoke-20261029-110934-195.log` passes.
+- Baseline `Artifacts/Smoke/20261029-111014-922-projectile-combat/result.json`
+  passes. Direct Pulse damage is 57.3335, matching actual explosion-center falloff;
+  cover keeps health 100 at 2.195 m from the explosion (inside its 4 m radius),
+  where unobstructed damage would be 38.05. Both peers observe flight, matching
+  action/event identities, terminal removal and exactly one ammo spend per shot.
+- The simultaneous `20261029-111014-922-laser-moving-cover` regional80 attempt
+  completes all gameplay verdicts but the wrapper correctly fails its RTT evidence
+  gate. Host mean SDK RTT is 95.0 ms; client samples are absent because the SDK
+  requires a client to query its own PlayerRef. Corrected sampling uses own player
+  on clients and remote players on hosts; this failed run is not promoted to a pass.
+- Normal compilation and focused session checks pass in
+  `Artifacts/Unity/EditMode-20261029-111042-884.xml`: **9/9**, zero failures/skips.
+  Final diagnostic rebuild `BuildSmoke-20261029-111252-821.log` passes.
+
+The following rebuilt runs pass all gameplay, profile-report, RTT-sampling,
+player-exit and log gates. Paths are under `Artifacts/Smoke/` in the D: root:
+
+| Run | Configured injection | Mean SDK RTT host/client | Result |
+| --- | --- | --- | --- |
+| `20261029-111633-346-projectile-combat-baseline` | None; final wrapper/profile-named folder rerun | 10.92 / 11.25 ms (222/222 samples) | Pulse flight, damage, cover and terminal identities pass |
+| `20261029-111410-545-laser-moving-cover` | Added 80 ms RTT, +/-10 ms one-way jitter, 1% receive loss at each peer | 96.72 / 94.82 ms (125/123 samples) | All three moving laser hits and cover shots pass |
+| `20261029-111410-540-laser-moving-cover` | Added 150 ms RTT, +/-20 ms jitter, 2% receive loss at each peer | 160.75 / 163.28 ms (303/301 samples) | All three moving laser hits and cover shots pass |
+| `20261029-111410-544-projectile-combat` | Same adverse150 profile | 162.20 / 162.90 ms (280/279 samples) | Pulse flight, damage, cover and terminal identities pass |
+
+Each peer reports one application of the requested profile and Debug SDK mode.
+In the adverse projectile run the client samples seven direct-flight and five
+cover-flight snapshots, with exact matching final damage/ammo/event identities.
+RTT includes SDK processing time; it is not raw ICMP ping or input latency.
+The profiles configure probability, not a measurement of the realized loss rate.
+These concurrent same-PC, two-player, short functional runs do not cover three-
+player fairness, asymmetric paths, prediction error, rewind age, grenade/disc/stun,
+deflection, external networks, endurance or performance budgets. No production
+behavior changed and no public build was published.
+Source parity, final build/test/run identities and these result summaries are
+recorded in `Artifacts/Resume/projectile-profiles-20261029.json`.
 
 ### 2026-10-29 moving laser and continuous presentation follow-up
 

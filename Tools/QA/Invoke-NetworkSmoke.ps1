@@ -1,11 +1,15 @@
 param(
-    [ValidateSet('basic','reconnect','migration','migration-crash','combat','laser-combat','laser-moving-cover','capacity','late-join','team-switch')][string]$Scenario = 'basic',
+    [ValidateSet('basic','reconnect','migration','migration-crash','combat','laser-combat','laser-moving-cover','projectile-combat','capacity','late-join','team-switch')][string]$Scenario = 'basic',
+    [ValidateSet('baseline','regional80','adverse150')][string]$NetworkProfile = 'baseline',
     [string]$Executable,
     [ValidateRange(30,900)][int]$TimeoutSeconds = 150,
     [ValidateRange(10,600)][int]$SoakSeconds = 10
 )
 
 $ErrorActionPreference = 'Stop'
+if($NetworkProfile -ne 'baseline' -and $Scenario -notin @('laser-moving-cover','projectile-combat')) {
+    throw 'Injected network profiles are supported only for laser-moving-cover and projectile-combat.'
+}
 $effectiveTimeoutSeconds = if($Scenario -eq 'capacity'){[Math]::Max($TimeoutSeconds,$SoakSeconds+150)}else{$TimeoutSeconds}
 $project = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $smokeRoot = Join-Path $project 'Artifacts/Smoke'
@@ -18,7 +22,7 @@ $allowed = [IO.Path]::GetFullPath((Join-Path $project 'Artifacts/Unity')) + [IO.
 if (-not $Executable.StartsWith($allowed,[StringComparison]::OrdinalIgnoreCase) -or (Split-Path $Executable -Leaf) -ne 'WildstoneArena.exe') {
     throw 'Use a Wildstone test player built under this workspace Artifacts/Unity directory.'
 }
-$run = Join-Path $smokeRoot ((Get-Date -Format 'yyyyMMdd-HHmmss-fff')+'-'+$Scenario)
+$run = Join-Path $smokeRoot ((Get-Date -Format 'yyyyMMdd-HHmmss-fff')+'-'+$Scenario+'-'+$NetworkProfile)
 New-Item -ItemType Directory -Path $run -Force | Out-Null
 $hostStatus = Join-Path $run 'host.json'
 $clientStatus = Join-Path $run 'client.json'
@@ -54,6 +58,7 @@ function Start-Peer([string]$Role,[string]$Room) {
     $peerPath = if($Role -eq 'host'){$clientStatus}else{$hostStatus}
     $arguments = @('-batchmode','-nographics','-logFile',('"'+(Join-Path $run ($Role+'.log'))+'"'),
         '--wildstone-smoke-role',$Role,'--wildstone-smoke-scenario',$Scenario,
+        '--wildstone-smoke-network-profile',$NetworkProfile,
         '--wildstone-smoke-output',('"'+$statusPath+'"'),'--wildstone-smoke-peer-output',('"'+$peerPath+'"'))
     if($Scenario -eq 'capacity'){$arguments += @('--wildstone-smoke-soak-seconds',$SoakSeconds.ToString([Globalization.CultureInfo]::InvariantCulture))}
     if($Room){$arguments += @('--wildstone-smoke-room',$Room)}
@@ -62,7 +67,7 @@ function Start-Peer([string]$Role,[string]$Room) {
     $roles.Add($Role)
     return $peer
 }
-$result = [ordered]@{scenario=$Scenario; capacitySoakSeconds=$(if($Scenario -eq 'capacity'){$SoakSeconds}else{$null}); timeoutSeconds=$effectiveTimeoutSeconds; executable=$Executable; startedUtc=[DateTime]::UtcNow.ToString('o'); passed=$false; error=$null; run=$run}
+$result = [ordered]@{scenario=$Scenario; networkProfile=$NetworkProfile; networkEvidence='Configured in-process injection plus sampled SDK remote RTT; not external-network or performance acceptance.'; capacitySoakSeconds=$(if($Scenario -eq 'capacity'){$SoakSeconds}else{$null}); timeoutSeconds=$effectiveTimeoutSeconds; executable=$Executable; startedUtc=[DateTime]::UtcNow.ToString('o'); passed=$false; error=$null; run=$run}
 try {
     $deadline = [DateTime]::UtcNow.AddSeconds($effectiveTimeoutSeconds)
     $hostPeer = Start-Peer 'host' ''
@@ -141,6 +146,24 @@ try {
     if($runtimeFailures.Count){throw ("Player logs contain $($runtimeFailures.Count) runtime exception/assertion records.")}
     if($Scenario -eq 'migration-crash' -and -not $crashInjected){throw 'The required host crash was not injected.'}
     if($Scenario -eq 'late-join' -and $roles.Count -ne 3){throw 'The required late client was not launched.'}
+    foreach($state in $requiredStates) {
+        $profile=$state.networkProfile
+        if($null -eq $profile -or $profile.profile -ne $NetworkProfile -or $profile.appliedCount -lt 1) {
+            throw 'A peer did not apply and report the requested process-local network profile.'
+        }
+        $expectedRtt=0; $expectedJitter=0; $expectedLoss=0.0
+        if($NetworkProfile -eq 'regional80'){$expectedRtt=80; $expectedJitter=10; $expectedLoss=.01}
+        if($NetworkProfile -eq 'adverse150'){$expectedRtt=150; $expectedJitter=20; $expectedLoss=.02}
+        if($profile.configuredAddedRttMs -ne $expectedRtt -or $profile.configuredOneWayJitterMs -ne $expectedJitter -or
+            $profile.configuredLossProbabilityPerDirection -ne $expectedLoss -or $profile.injected -ne ($NetworkProfile -ne 'baseline') -or
+            [Math]::Abs($profile.delayMinSeconds-($expectedRtt-2*$expectedJitter)/1000.0) -gt .000001 -or
+            [Math]::Abs($profile.delayMaxSeconds-($expectedRtt+2*$expectedJitter)/1000.0) -gt .000001) {
+            throw 'A peer reported different injection values from the requested profile.'
+        }
+        if($NetworkProfile -ne 'baseline' -and ($profile.sdkBuildType -ne 'Debug' -or $state.sdkRemoteRttSamples -lt 1)) {
+            throw 'Injected network smoke requires Fusion Debug DLLs and positive SDK remote RTT samples on each peer.'
+        }
+    }
     if($Scenario -eq 'team-switch') {
         foreach($state in $requiredStates) {
             if(-not $state.teamSwitchComplete -or $state.teamSwitchStep -ne 4 -or
@@ -175,6 +198,29 @@ try {
                     $verdict.shotCount -ne 1 -or $verdict.hitCount -ne $expectedHits -or -not $verdict.shotId -or -not $verdict.hitIds -or
                     $verdict.shotId -ne $other.lasers[$i].shotId -or $verdict.hitIds -ne $other.lasers[$i].hitIds){
                     throw 'Laser smoke is missing a complete matching pickup/equip/ammo/damage/event verdict.'
+                }
+            }
+        }
+    }
+    if($Scenario -eq 'projectile-combat') {
+        foreach($state in $requiredStates) {
+            $p=$state.projectile
+            $other=if($state.role -eq 'host'){$requiredStates | Where-Object role -eq 'client'}else{$requiredStates | Where-Object role -eq 'host'}
+            if(-not $p.picked -or -not $p.equipped -or @($p.shots).Count -ne 2){throw 'Projectile smoke is missing pickup/equip or both cases.'}
+            for($i=0;$i -lt 2;$i++) {
+                $v=$p.shots[$i]; $r=$other.projectile.shots[$i]
+                if(-not $v.verified -or -not $v.observed -or -not $v.despawned -or $v.samples -lt 2 -or
+                    $v.lastTick -le $v.firstTick -or $v.lastTravel-$v.firstTravel -le .2 -or
+                    $v.shotCount -ne 1 -or $v.explosions -ne 1 -or -not $v.identity -or -not $v.shotId -or -not $v.explosionId -or
+                    $v.ammo -ne (9-$i) -or $v.identity -ne $r.identity -or $v.shotId -ne $r.shotId -or
+                    $v.explosionId -ne $r.explosionId -or $v.hitId -ne $r.hitId -or [Math]::Abs($v.damage-$r.damage) -gt .01) {
+                    throw 'Projectile smoke requires matching sampled travel, terminal event, despawn and single-spend verdicts.'
+                }
+                if($i -eq 0 -and ($v.hits -ne 1 -or -not $v.hitId -or $v.expectedDamage -le 20 -or [Math]::Abs($v.damage-$v.expectedDamage) -gt .01 -or [Math]::Abs($v.eventDamage-$v.expectedDamage) -gt .01)) {
+                    throw 'Projectile positive control is missing matching falloff damage.'
+                }
+                if($i -eq 1 -and (-not $v.coverBlocks -or $v.blastDistance -ge 3.5 -or $v.expectedDamage -le 20 -or $v.damage -ne 0 -or $v.hits -ne 0)) {
+                    throw 'Projectile cover case did not demonstrate a blocked target strictly inside blast range.'
                 }
             }
         }

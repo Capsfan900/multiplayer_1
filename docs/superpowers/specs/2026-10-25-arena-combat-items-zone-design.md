@@ -15,6 +15,13 @@ laser. Both peers must observe displacement and velocity before fire, agree on
 ammo/damage/event identities, and observe a second shot blocked by a diagnostic
 world collider with no target damage. This is controlled moving-target/cover
 evidence, not measured rewind age, injected latency, projectiles or balance proof.
+Diagnostic `projectile-combat` extends this path to Pulse Lobber: production pickup,
+selection and fire must produce a projectile observed travelling on both peers,
+one matching terminal explosion, its removal, one ammo spend and correct falloff
+damage. A second shot hits explicit world cover with its protected target still
+inside the explosion radius; target damage must remain zero. Initial placement,
+health resets and temporary cover are fixtures. This does not implement or accept
+deflection, other projectile categories or natural moving-target counterplay.
 The [foundation design](2026-10-25-multiplayer-foundation-design.md) governs Unity
 URP, Fusion Host Mode, prediction, recovery and implementation order.
 

@@ -5,6 +5,23 @@ Goal active; user explicitly resumed and delegated all work possible while away.
 
 ## Current position
 
+Next resume: extend controlled live coverage to Pulse Lobber flight, terminal
+blast/cover and replicated identities. Ruling: retain existing production pickup/
+fire/host simulation with explicit initial fixtures; require the covered target
+inside the actual explosion radius so a miss cannot masquerade as cover protection.
+Add bounded SDK fault profiles to the diagnostic player only, using copied config
+and Debug SDK validation before runner startup. These profiles add delay/loss to
+the existing transport; they are not absolute real-network latency or performance
+acceptance. Projectile deflection remains unimplemented and separately open.
+Root owns native verification/docs; Sol delegates implement and independently
+review diagnostics and installed SDK behavior. Native baseline Pulse and injected
+adverse150 Pulse runs pass; moving lasers pass regional80 and adverse150. Both
+peers record configured profiles, positive SDK RTT and matching combat identities.
+Initial native compilation exposed internal SDK Copy accessibility; initial RTT
+verification exposed the client's own-player query requirement. Corrected runs
+and nine passing normal session tests are recorded in [QA](QA.md). No production
+or public player changed; the full acceptance backlog remains open.
+
 2026-10-29 resume: user requested all backlog work and a state/goals brief, then
 reported successful playtesting with initial connection issues. Follow-up confirms
 another player in Texas on a different ISP and the issue after joining/clicking a

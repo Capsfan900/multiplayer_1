@@ -16,6 +16,15 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
 
 ## Current evidence
 
+- Projectile/fault-profile continuation: Pulse Lobber flight, damage and cover
+  pass baseline and added 150 ms RTT/jitter/2% loss; all three moving lasers pass
+  added 80 ms/1% and 150 ms/2% profiles. Both peers record positive SDK RTT and
+  matching authoritative verdicts. Nine normal session checks pass. This is
+  controlled same-PC functional evidence; deflection remains unimplemented and
+  full fairness/rewind/external/performance gates remain open. Diagnostic-only
+  session config copies leave production/public players unchanged. [QA](QA.md)
+  records exact builds, failed attempts and final runs.
+
 - Latest diagnostic follow-up: real Photon moving-target/cover checks pass for
   pistol, shotgun and sniper, with matching damage/ammo/events across peers and
   zero damage through test cover. Continuous first-person starter-weapon samples

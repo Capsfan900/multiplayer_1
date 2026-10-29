@@ -426,6 +426,7 @@ namespace Wildstone.Networking
         {
             if(combatSession!=null) { combatSession.InputRequested-=SmokeCombatInput; combatSession.InputRequested-=SmokeLaserMovingInput; }
             if(laserCover!=null) Destroy(laserCover);
+            if(projectileCover!=null) Destroy(projectileCover);
             combatSession=null;
         }
     }

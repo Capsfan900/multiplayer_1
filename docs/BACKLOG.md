@@ -50,10 +50,10 @@ active acceptance backlog, replacing the old bootstrap implementation order.
 | Order | Next actionable work | Evidence needed to advance |
 | --- | --- | --- |
 | 1 | Reproduce user-reported disconnect/menu return after joining and selecting a team | Other player confirmed in Texas on another ISP; exact builds/error wording still needed. Actual four-team switching diagnostic added; same-PC success is not a reproduction of the external symptom |
-| 2 | Extend live combat acceptance to projectiles and adverse-network moving hits | All three lasers pass controlled moving-target and world-cover production RPC checks on same-PC Photon; projectile/deflection, measured rewind and latency cases remain |
+| 2 | Extend live combat acceptance to other projectiles, deflection and measured rewind | Pulse flight/blast/within-radius cover passes baseline and injected adverse150; three moving lasers pass regional80/adverse150. Grenade/disc/stun, deflection implementation and full latency matrix remain |
 | 3 | Accept moving gameplay/remote weapon readability | Continuous first-person starter slide/fire/reload sample passes and 32 frames inspected; remote shot/reload checks pass. Natural first-/third-person movement, other weapon transitions and human aim/slide/audio acceptance remain |
 | 4 | Exercise full standalone loop and map traversal | All maps/weapons/items, UI/cancel/retry, death/respawn, zone completion, pickup reachability and route fairness |
-| 5 | Measure movement/combat under adverse network conditions | Host plus two clients, moving targets/cover/projectiles, prediction corrections and authority/recovery under canonical profiles |
+| 5 | Measure movement/combat under adverse network conditions | Initial two-player same-PC SDK injected delay/jitter/loss combat checks pass. Host plus two clients, mixed/asymmetric paths, prediction corrections, rewind measurement and authority/recovery remain |
 | 6 | Add measured performance and endurance evidence | Frame/tick/bandwidth/allocation measurements, separate-machine eight-player matrix, 30-minute profiles, two-hour soak and 100 reconnect cycles |
 | 7 | Complete independent-network acceptance | At least two external networks, direct/relay paths, rotate hosts, graceful/crash recovery; capture exact builds and logs |
 
