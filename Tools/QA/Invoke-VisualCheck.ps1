@@ -1,6 +1,6 @@
-param([string]$Executable,[switch]$Motion,[switch]$Weapons,[switch]$Sequence)
+param([string]$Executable,[switch]$Motion,[switch]$Weapons,[switch]$Sequence,[switch]$Music,[switch]$Firefight)
 $ErrorActionPreference='Stop'
-if(([int][bool]$Motion+[int][bool]$Weapons+[int][bool]$Sequence) -gt 1){throw 'Choose one diagnostic capture mode.'}
+if(([int][bool]$Motion+[int][bool]$Weapons+[int][bool]$Sequence+[int][bool]$Music+[int][bool]$Firefight) -gt 1){throw 'Choose one diagnostic capture mode.'}
 $project=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 if(-not $Executable){$Executable=(Get-Content (Join-Path $project 'Artifacts/Smoke/latest-build.json') -Raw|ConvertFrom-Json).executable}
 $Executable=(Resolve-Path -LiteralPath $Executable).Path
@@ -13,11 +13,14 @@ New-Item -ItemType Directory -Path $run -Force|Out-Null
 $log=Join-Path $run 'player.log'
 $arguments=@('-batchmode','-force-d3d11','-screen-fullscreen','0','-screen-width','1280','-screen-height','720',
     '-logFile',('"'+$log+'"'),'--wildstone-visual-output',('"'+$run+'"'))
-$expectedCaptures=if($Sequence){32}elseif($Weapons){26}elseif($Motion){13}else{16}
+# Batch-mode players run without audio: the music check runs a normal (muted) player so streaming can be asserted.
+if($Music){$arguments=@($arguments|Where-Object {$_ -ne '-batchmode'})+'--wildstone-music-check'}
+$expectedCaptures=if($Firefight){67}elseif($Sequence){32}elseif($Weapons){35}elseif($Motion){13}elseif($Music){5}else{16}
 if($Sequence){$arguments+='--wildstone-sequence-check'}
 if($Motion){$arguments+='--wildstone-motion-check'}
 if($Weapons){$arguments+='--wildstone-weapon-check'}
-$record=[ordered]@{mode=$(if($Sequence){'continuous-presentation-samples-not-gameplay-or-framerate-proof'}elseif($Weapons){'weapon-effect-fixtures-not-gameplay-proof'}elseif($Motion){'visual-pose-fixtures-not-gameplay-proof'}else{'static-screen-captures'});expectedCaptures=$expectedCaptures;executable=$Executable;arguments=$arguments;startedUtc=[DateTime]::UtcNow.ToString('o');passed=$false;error=$null}
+if($Firefight){$arguments+='--wildstone-firefight-check'}
+$record=[ordered]@{mode=$(if($Firefight){'firefight-frame-sequences-not-gameplay-proof'}elseif($Music){'music-streaming-check-listener-muted'}elseif($Sequence){'continuous-presentation-samples-not-gameplay-or-framerate-proof'}elseif($Weapons){'weapon-effect-fixtures-not-gameplay-proof'}elseif($Motion){'visual-pose-fixtures-not-gameplay-proof'}else{'static-screen-captures'});expectedCaptures=$expectedCaptures;executable=$Executable;arguments=$arguments;startedUtc=[DateTime]::UtcNow.ToString('o');passed=$false;error=$null}
 $player=$null
 try {
     $player=Start-Process -FilePath $Executable -ArgumentList $arguments -WorkingDirectory (Split-Path $Executable) -PassThru -WindowStyle Hidden
@@ -36,6 +39,17 @@ try {
         $pngHeight=[int]$header[20]*16777216+[int]$header[21]*65536+[int]$header[22]*256+[int]$header[23]
         if($pngWidth -ne $capture.width -or $pngHeight -ne $capture.height -or
             [Math]::Abs($capture.cameraAspect-$pngWidth/[double]$pngHeight) -gt .0001){throw 'Capture dimensions/projection differ from the offscreen target.'}
+    }
+    if($Music -and -not ($status.captures[-1].sfx -match '^LaserFire.* output RMS .*; LaserCellNova.* output RMS .*; wind speedwind_00 looping$')){throw 'No recorded weapon cue reached the mixer.'}
+    if($Firefight){
+        $previous=$null
+        foreach($capture in $status.captures){
+            if($capture.stage -match '^range-(15|30|45)m$'){$previous=$null;continue}
+            # Ages come from the real unscaled effect clock: within one frame of nominal and rising through each sequence.
+            if([Math]::Abs($capture.simulatedSeconds-$capture.simulatedFrame/60.0) -gt (1/60.0+.002)){throw "Firefight sample $($capture.stage) $($capture.simulatedFrame) is more than a frame off its nominal age."}
+            if($previous -and $previous.stage -eq $capture.stage -and $capture.simulatedSeconds -le $previous.simulatedSeconds){throw "Firefight sample $($capture.stage) $($capture.simulatedFrame) does not advance."}
+            $previous=$capture
+        }
     }
     if($Sequence){
         $samples=@{}; $previousFrame=-1

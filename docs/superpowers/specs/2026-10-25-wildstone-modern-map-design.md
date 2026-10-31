@@ -81,6 +81,61 @@ open court—to aid orientation within a monochrome palette. Balance paths by me
 travel time, exposure and escape options rather than assuming visual symmetry is
 fair. Do not add smaller-team buffs or special spawn rules through this art brief.
 
+Spawn facing (2026-10-30; implemented and tested). Each arrival court has an L-shaped
+side and front screen, which blocks a direct opening sightline. Each corner spawn
+faces out through the gap between the front screen's outer end and the boundary
+wall (`ArenaLayouts.Kit.CornerStarts`), not into the inside corner of the screen. A
+player's first view is the exit route.
+`ArenaWorldTests.SpawnsFaceTheirShelterOpening` checks every map: the first thing
+the eye ray hits must not be an arrival piece, and the view must stay clear past
+4.5 m. Practice respawns restore the same yaw. The view still looks down a walled
+alley; opening it further would mean changing the screen geometry and rechecking
+the sightline rule.
+
+Plain traversal and travel distance (2026-10-30; the check is implemented, the
+distances are measurements). `ArenaValidation.ValidateTraversal` builds a 0.5 m
+grid of standable floors from the real colliders. It links cells by walking (rise
+up to 0.45 m), by a jump onto a ledge up to 2.2 m (under the motor's 2.4 m apex) or
+by a drop. Jumps and drops may land up to 1.15 m away, because the 0.38 m capsule
+keeps the cells right beside a ledge face unstandable. Every start must reach every
+pickup and zone point and get back. The check is part of `ValidateWorld`, so an
+unreachable pickup now fails the arena build. Wall-runs, dashes and launches only
+add routes, so a failure means a place needs advanced movement.
+
+Outer walls (implemented; it enforces the clear death boundaries required below,
+and its 8 m reach and 2.8 m clearance are proposed values from motor arithmetic).
+The same check fails the build when a reachable floor within 8 m of an outer wall
+sits less than 2.8 m below its top, because a running jump could land a player on
+the perimeter. The 6 m walls of map revision 3 failed it on all three maps:
+- Atrium's gallery and Terrace Steps' upper court run flush into the side walls,
+  2 m below the top;
+- Split Gallery's crossover and Terrace Steps' north edge stop 3 m short of a wall.
+
+Map revision 4 raises every outer wall to 8 m. Advanced movement (wall-run chains,
+launches) is not checked.
+
+The check also reports each team's walking distance from its nearer start. The
+"comparable travel effort" requirement above is not yet met on Terrace Steps. Mean
+distances in metres (teams 0 / 1 / 2 / 3), map revision 4:
+
+| Map | To weapon pickups | To zone points |
+| --- | --- | --- |
+| Atrium | 45 / 47 / 46 / 48 | 48 / 50 / 48 / 50 |
+| Split Gallery | 48 / 49 / 49 / 49 | 49 / 50 / 49 / 50 |
+| Terrace Steps | 48 / 62 / 51 / 68 | 44 / 63 / 51 / 68 |
+
+The northern starts (teams 1 and 3) spawn under raised slabs: Atrium's north
+gallery, and Terrace Steps' upper court and west terrace. They walk out south and
+jump onto a ramp's low side. On Atrium that costs at most 3 m. On Terrace Steps,
+team 3 walks about 86 m to the sniper against 65 m for team 0, and the northern
+teams walk 29-55% farther than team 0 on average. One measured option, not adopted:
+lifting the northern starts and their screens onto the +4 m courts. That gives
+weapon means of 48 / 47 / 51 / 49 m and zone means of 44 / 48 / 51 / 56 m. But team 1
+would reach the sniper in 27 m (team 0: 65 m), and its screens would block the zone
+route on the west terrace. A layout change for this is open and needs the
+user's direction. Walking distance is not travel time; exposure and escape options
+are not measured.
+
 ## Authoring and validation sequence
 
 ### Three-map MVP scope
@@ -135,3 +190,22 @@ Map revision 2 adds one laser pistol, shotgun and sniper pickup per arena. Place
 uses existing supported floors and preserves baked scene geometry/lightmaps. The
 combat owner defines ammo/behavior; default layouts, saved catalog and scene metadata
 must agree. Native support/clearance checks cover the new pickup locations.
+Map revision 4 raises the outer walls from 6 m to 8 m (see the outer-wall rule
+above) and needs a fresh bake.
+Map revision 6 (D039, user request) adds four health packs per arena, one at the
+midpoint of each edge so that every pack lies between two corner starts:
+
+| Map | Health packs (x, floor, z) |
+| --- | --- |
+| Atrium | (±28.5, 0, 2), (0, 0, −24), (0, 0, 14) |
+| Split Gallery | (±36, 0, 0), (0, 4, ±17) |
+| Terrace Steps | (±29, 0, −8), (0, 0, −32), (0, 0, 22) |
+
+Every pack is more than 5 m from every other pickup, twice the 2.5 m reach, so
+reach circles and prompts never overlap
+(`ArenaDefinitionTests.EveryArenaOffersFourSpacedHealthPacks`). Revision 5 was an
+unshipped intermediate: its Atrium north pack sat 4.5 m below the sniper. Mean
+walking distance to the four packs (teams 0 / 1 / 2 / 3): Atrium 45 / 47 / 45 / 48 m,
+Split Gallery 50 / 50 / 51 / 51 m, Terrace Steps 45 / 57 / 46 / 55 m. Terrace
+Steps keeps the northern-start imbalance described above. Geometry is unchanged;
+the scenes were rebuilt and rebaked for the new catalog.

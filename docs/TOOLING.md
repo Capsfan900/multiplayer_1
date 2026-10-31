@@ -197,19 +197,27 @@ one of the following checks:
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario capacity
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario capacity -SoakSeconds 300
 ./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario late-join
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario deflection -NetworkProfile adverse150
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario rematch
+./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario capacity -SoakSeconds 1800 -TimeoutSeconds 2100
+./Tools/QA/Invoke-ReconnectCycles.ps1 -Cycles 100
+./Tools/QA/Check-NetworkEvidence.ps1
 ```
 
 The builder enables
 `WILDSTONE_SMOKE` only through that BuildPlayer invocation; normal players contain
 no automatic menu driver. Runs launch owned, hidden Windows player processes:
-two for `basic`, `reconnect`, `combat`, `laser-combat`, `laser-moving-cover`, `projectile-combat`, `grenade-combat`, `special-projectiles` and `team-switch`; three for `migration`, `migration-crash` and `late-join`;
+two for `basic`, `reconnect`, `combat`, `laser-combat`, `laser-moving-cover`, `projectile-combat`, `grenade-combat`, `special-projectiles`, `deflection`, `stun-client`, `rematch` and `team-switch`; three for `migration`, `migration-crash` and `late-join`;
 eight for `capacity`, admitted sequentially to avoid team-swap races in the test
 driver. They use the existing Photon App ID and drive actual Host/Join, teams,
 ready, loading and gameplay. The runner stops only its own processes on failure.
 No new account, provider, deployment or paid subscription is required.
 
 `Artifacts/Smoke/latest-build.json` identifies the diagnostic executable. Per-run
-JSON and player logs are under `Artifacts/Smoke/<timestamp>-<scenario>/`.
+JSON and player logs are under `Artifacts/Smoke/<timestamp>-<scenario>/`. Each
+peer's JSON carries `stageTimes`, the driver stages with the whole second each
+began (`stage@seconds;`, latest ~3000 characters). On a `DeadlineExceeded` it shows
+which step used the time.
 A pass requires every required process report and clean exit codes. Room codes are temporary;
 do not log guest identifiers or credentials. These checks exercise real cloud
 connections from this PC and do not establish independent-network or hardware
@@ -249,6 +257,11 @@ removal. The second shot encounters temporary world cover. The protected target
 must remain strictly inside the blast radius and a ray from the actual detonation
 center must hit that cover; zero damage outside the radius cannot pass. Teleports
 and health resets occur only during explicit setup between shots.
+A reliable RPC resent after injected loss can reach the host past the 150 ms
+attack window, which drops it unseen (`WILDSTONE COMBAT RPC EXPIRED` in the host
+log). If the host has not acknowledged a fire or throw after 1 s, the client
+sends the same sequence again, as a player would press again; `resends` in each
+shot record counts these. `grenade-combat` does the same.
 
 `grenade-combat` uses two actual grenade throws following the production pickup
 RPC. Both peers observe gravity, a backstop bounce, travel and removal, and require
@@ -264,14 +277,34 @@ sampled direction changes or reflected event positions prove its route. Removal
 must precede lifetime/range expiry. Three stun shots check initial suppression and
 expiry, damage without refreshing the active immunity interval, and stun after
 immunity ends. Both peers compare events/ammo/timers; the host must observe active
-suppression. This flag check is not motor/input-response or human-feel acceptance.
+suppression. On the third shot the host holds forward input on its stunned target
+through expiry: the replicated position must move under 0.05 m in at least two
+stunned host samples on both peers, then over 0.3 m by 0.4 s after expiry. This
+probes the host's own avatar only, not a predicting client target or human feel.
+
+`stun-client` (2026-10-31) makes the predicting client the stun target:
+`./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario stun-client [-NetworkProfile adverse150]`.
+- The host places the client's player on open ground and the client holds forward.
+- After the client reports more than 1 m of travel, the host applies
+  `CombatRules.Stun` to it, standing in for the bolt.
+- The client gate: the last tick its predicted state was stunned must come before
+  the stun's end tick, and the first free tick at or after it. This holds at any
+  frame rate.
+- Both peers: under 0.05 m of travel in the last 0.15 s before the end tick. Stun
+  removes input, not momentum; earlier the player is still coasting.
+- Both peers: over 0.3 m by 0.4 s after the end. The client's largest per-frame step
+  after release must stay under 0.5 m.
+- The wrapper re-checks these from both peers' `stunClient` records. Bolt flight and
+  external networks are not covered.
 
 `-NetworkProfile` defaults to `baseline` (SDK simulation disabled). `regional80`
 configures added 80 ms RTT, +/-10 ms one-way jitter and 1% per-direction loss;
 `adverse150` configures added 150 ms RTT, +/-20 ms jitter and 2% loss. Injected
-profiles are restricted to `laser-moving-cover`, `projectile-combat`, `grenade-combat`
-and `special-projectiles` and require
-Fusion Debug DLLs: Release DLLs disable the simulator. Both peers receive copied
+profiles are restricted to `laser-moving-cover`, `projectile-combat`, `grenade-combat`,
+`special-projectiles`, `deflection`, `stun-client` and `gunplay`, and require
+Fusion Debug DLLs: Release DLLs disable the simulator. Injected-profile runs get a
+180 s scenario deadline in the player and at least 210 s in the wrapper; baseline
+keeps 120 s and 150 s. Both peers receive copied
 session configs before startup; the shared config asset is never saved or edited.
 The pinned SDK internally clones simulation settings on runner initialization;
 the diagnostic preserves nonserialized prefab/execution-order data when creating
@@ -288,15 +321,85 @@ Clients query their own SDK PlayerRef for server RTT; hosts query remote players
 The SDK value includes peer processing time and is not raw ping. Output folders
 include the profile name to separate concurrent runs of the same scenario.
 
-`capacity -SoakSeconds` accepts 10–600 seconds (default 10), extending only the
-bounded diagnostic timeout. All eight peers must retain coherent players, avatars,
+`capacity -SoakSeconds` accepts 10–7200 seconds (default 10; `-TimeoutSeconds` up
+to 2400; the timeout is never below `SoakSeconds`+150), extending only the bounded
+diagnostic timeout. A match ends after 480 s
+and then holds on Results, so a long hold is mostly connected Results time, and the
+capacity peers send no gameplay actions: it is a connection and memory soak, not a
+gameplay soak. All eight peers must retain coherent players, avatars,
 seats and four teams of two throughout the hold, with advancing SDK ticks and no
 recovery or authority change. The hold starts in Running; natural Finished time is
 reported separately and never counted as running gameplay. The Windows runner
 samples its owned processes and writes start/end working set, private bytes,
-timestamps and observed hold duration to `result.capacityMemory`. Missing, zero
+timestamps and observed hold duration to `result.capacityMemory`, plus a `series`
+with one sample per minute of hold. Missing, zero
 or incomplete memory evidence fails; Unity/Mono process counters are not used.
 This is a short functional soak, not acceptance of frame budgets or endurance.
+Each memory point also carries the peer's `managedHeapBytes` and `gcCollections`
+(Gen0 count so far). Each status also records `maxFrameGapSeconds`, the largest
+frame gap that process has seen. A coherence loss after a gap over 2 s fails as
+"environment stalled … rerun on an idle machine" rather than as a game failure. The
+host logs `WILDSTONE PEER LEFT participant=… generation=… tick=…` for every peer it
+retires.
+
+`capacity -Gameplay` turns the hold into a gameplay soak. From the first coherent
+Running frame every peer feeds movement input (weaving forward while turning, with
+jump, dash and slide presses), fires its starter at the nearest living enemy every
+0.4 s and reloads when empty. The host rematches 3 s into each Results screen and the
+ordinary lobby flow readies all eight seats again, so rounds chain in one room.
+Between rounds only the eight retained seats (four teams of two), the same runner and
+advancing SDK ticks must hold; each new round may carry a new authority generation.
+`-RoundSeconds 20..480` makes the host smoke-finish each round early, for quick
+functional runs; without it rounds last the natural 480 s. A gameplay result needs
+every peer to have fired and to have started at least `1+floor(SoakSeconds/(round+120))`
+rounds, and at least one death in total. `result.soak` lists rounds, shots, reloads,
+deaths, running and between-round seconds per peer. Folders are named
+`<stamp>-capacity-gameplay-<profile>`. Aim is the bot's straight line to the enemy,
+so hits depend on cover; this exercises load and endurance, not balance or feel.
+The result also carries `capacityMemory[].workingSetGrowthBytes`/`privateGrowthBytes`
+(start to end only) and `capacityTraffic[]`: per-role in/out bytes per second for
+running and finished time, from `NetworkRunner.TryGetFusionStatistics`. Those
+statistics exist only with Fusion's Debug DLLs (the current import);
+`capacityStatsAvailable` is false otherwise. Check that `statsForwardTicks` roughly
+equals `sdkTicks` before trusting the rates; header and relay overhead are not
+documented.
+
+`laser-combat`, `laser-moving-cover` and `gunplay` results carry `rewind`, per weapon
+and in total: hitscan queries, how many the 150 ms cap clamped, and the applied and
+SDK-requested view ages (mean and max, ms) from `FusionCombatWorld`. These are
+reported, not gated.
+
+`deflection` (D037) runs two rounds in one session, host pushing then client
+pushing. The shooter takes the Pulse Lobber and the pusher the Push Lens from their
+production pickups, 12 m apart. The pusher fires when its predicted orb distance at
+resolution is about 4.5 m. Both peers must see one `Deflected` event, the orb flipped
+to the pusher (owner, team, flag, launch tick kept, velocity reversed), one blast
+and one hit on the shooter credited to the push with the expected falloff damage,
+no damage to the pusher and no projectile left.
+
+`rematch` plays two rounds in one room. The 480 s clock is the only shortcut: the
+host ends each round with smoke-only `FusionMatch.SmokeFinish`, which also wounds a
+player and takes a pickup, so round 2 must visibly start fresh. Both peers must:
+- show online Results with "Leave match": the host has "Rematch", the client
+  "Waiting for the host…", and neither has "Play again";
+- leave the session unchanged after a client rematch press;
+- after the host's rematch, return to the lobby with ready cleared and the same
+  runner, room, match ID, seat, team and connection generation;
+- start round 2 with a new match object, zero score, no projectiles, full health,
+  first lives with starter ammo, all pickups available and a new HUD.
+
+The host must publish a round-2 recovery checkpoint before ending round 2. Both
+peers must report the same winners. Baseline only.
+
+`Invoke-ReconnectCycles.ps1 -Cycles N` runs `Invoke-NetworkSmoke.ps1 -Scenario
+reconnect` N times on one build. Each cycle is a fresh host, client and room:
+join, 10 s of play, host-side disconnect, reconnect into the held seat, 10 s more.
+The summary `Artifacts/Smoke/<stamp>-reconnect-cycles.json` is rewritten after
+every cycle. It does not repeat reconnects into one long-lived host. `-Executable`
+pins a build; otherwise it pins the one `latest-build.json` names at the start.
+`Check-NetworkEvidence.ps1` type-checks the Networking sources with and without
+`WILDSTONE_SMOKE` (which `Compile-Managed.ps1` does not cover) and checks the rewind
+clamp rule, rewind averaging and the soak bound.
 
 `combat` first verifies actual SDK movement and duplicate-fire deduplication. It
 then records a controlled host-authoritative teleport fixture, waits for both peers
@@ -364,20 +467,106 @@ rendering, such as `Wildstone.Tests.FirstPersonBodyTests.EachLegSegmentRendersWi
 Ordinary focused tests retain the headless default.
 
 Weapon expression captures: `./Tools/QA/Invoke-VisualCheck.ps1 -Weapons` records
-26 packaged render fixtures: ten weapon shots against two map facings, plasma and
-grenade blasts, disc ricochet, stun impact, Lens charge and overlapping laser beams.
+35 packaged render fixtures: ten weapon shots against two map facings, plasma and
+grenade blasts, disc ricochet, stun impact, Lens charge, the grenade held with the
+throw key down and its arc shown (`weapon-grenade-aim`), overlapping laser beams,
+a remote soldier 7 m ahead at the peak of its hit flash (`weapon-remote-hit`),
+six pickup pads on the court, including a health pack, one of them mid-respawn (`weapon-pickups`), and a
+remote soldier 6 m ahead with an active shield (`weapon-status-shield`), stunned
+(`weapon-status-stun`), or on the frame its shield breaks (`weapon-status-shield-break`).
+`weapon-remote-wallrun` shows two remote soldiers wall-running toward the lens
+beside diagnostic walls, the left-wall run on the right of the frame.
+`weapon-low-ammo` leaves five rounds in the starter so the HUD count shows the
+low-ammo warning colour. The last frame, `weapon-kill-banner`, shows the HUD banner
+after two quick kills, the second a headshot; it comes last because the banner
+outlasts a step.
 These use production presentation and explicitly empty-world projectile rules;
 they are labeled fixtures and do not replace input/network/human-feel acceptance.
 Continuous first-person samples: `./Tools/QA/Invoke-VisualCheck.ps1 -Sequence`
-records 32 PNGs across run, slide/return, fire/recoil settle and reload/return.
+records 32 PNGs across run (with a dash at frame 11), slide/return, fire/recoil
+settle and reload/return.
 It retains presentation history while advancing fixed 1/60-second synthetic frames
 with the matching combat tick rate. Each sample records state, camera/hands poses,
 simulation time and separate wall time; wrapper gates require visible pose changes
 and return to rest. It is not natural gameplay, remote readability or framerate proof.
 The fixture uses the starter weapon; the other weapon modes remain distinct.
 
+Firefight sequences (2026-10-30): `./Tools/QA/Invoke-VisualCheck.ps1 -Firefight`
+records 67 PNGs: six sequences at frames 0, 1, 2, 4, 6, 9, 14 and 20 after each
+shot, two at frames 0, 2, 4, 8, 14, 22, 34 and 50 after each blast, and three range
+views.
+- Four sequences fire a real Line Driver, Laser SMG, Laser Shotgun and Laser Sniper
+  shot. Each lands a headshot on a remote soldier 12 m ahead, strafing at 5 m/s, so
+  the frames show the beam, sparks, hit flash, view punch and viewmodel flare.
+- A fifth swings the Laser Sword at the strafing soldier, placed at 60% of the
+  sword's reach (`firefight-lasersword-NN`).
+- The next is a remote sniper rail from the right flank that passes 0.7 m beside
+  the lens.
+- The last two detonate a grenade and a Pulse Lobber orb on the court 8 m ahead,
+  2 m from the soldier. The fixture world has no floor, so the flight is skipped and
+  the blast is placed where the host would report it.
+- Particles age on the unscaled clock, so a shot fires only after a normal-length
+  frame. Firing right after the previous sequence's PNG encoding aged a blast by
+  most of a second before its first sample.
+- Samples are copied on the GPU at render time and encoded after the sequence.
+- `Time.captureDeltaTime` holds fast frames to 1/60 s. On a slow frame (the
+  shot-setup frame) the unscaled effect clock still follows real time, so each
+  capture records its true age. The wrapper requires ages within one frame of
+  nominal and rising through each sequence.
+- Three single views (`firefight-range-15m/30m/45m`, added 2026-10-31) show the
+  strafing soldier straight ahead at each distance with the Line Driver held and
+  nothing fired. They skip the age gates but keep the count and file checks.
+- Fixture captures set `forceMatrixRecalculationPerRender` on skinned meshes,
+  because the forced render runs before the frame's own skinning pass.
+- Since 2026-10-31 every first-person fixture uses the game's default view, 100
+  degrees horizontal at 16:9 (`FixtureFov`). The one exception is the explicit 60-degree slide pose.
+  Earlier captures used 90 degrees vertical and drew the world about 1.5x smaller.
+
+These are labeled fixtures, not gameplay, remote-network or feel proof.
+
+Music streaming (2026-10-30): `./Tools/QA/Invoke-VisualCheck.ps1 -Music`. Batch-mode
+players run without audio, so this mode drops `-batchmode` and launches a normal
+hidden player with `AudioListener.volume` 0. That keeps real streaming and mixing
+with silent speakers. It records five PNGs: the title, one per map and a recorded
+weapon cue. Each music step waits until the active music voice plays the screen's
+own track (`MusicMix.TrackFor`) for more than 0.5 s, with volume above 0 and
+source-output RMS above 1e-4. The last step fires a Line Driver shot and a sniper
+shot through `ArenaAudio` on Terrace Steps. It waits until a `LaserFire` clip and a
+`LaserCellNova` tail both reach the mixer with output RMS above 1e-4. The step also
+reports the speed-wind voice's clip, and the script fails unless all three are
+present. Steps time out with
+a diagnostic otherwise. The static mode records "not checked" for music. This proves
+streaming and recorded-cue playback in the packaged player. It does not prove the
+speaker level, the mix, or how anything sounds.
+
 All modes validate the offscreen camera/UI target and PNG dimensions, so a clamped
 hidden window does not stall capture or silently define the image's aspect ratio.
 `width`/`height` describe the PNG; `screenWidth`/`screenHeight` describe the OS window.
-`-Motion`, `-Weapons` and `-Sequence` are mutually exclusive. `-Action PreparePresentation`
+`-Motion`, `-Weapons`, `-Sequence`, `-Firefight` and `-Music` are mutually exclusive. `-Action PreparePresentation`
 imports/builds the model catalog without regenerating map geometry or baked scenes.
+Forced render requests are skipped until every scene is loaded. A request during a
+map load or unload can cull already-destroyed reflection probes, which raises a URP
+`ReflectionProbeManager` NRE.
+
+Viewmodel framing: `./Tools/Unity/Invoke-Unity.ps1 -Action CaptureViewmodel` (always
+graphics). It renders the hip view and full ADS for ten held weapons over the baked
+Atrium spawn into `Artifacts/Visual/Viewmodel-<stamp>/`. The log also gets one
+`WILDSTONE VIEWMODEL MEASURE` line per weapon: lens-space grip, sight, muzzle,
+support marker and weapon bounds. Bounds are a world AABB, so they are loose on the
+diagonal spawn view. Use it to tune `WeaponView.HipPose` in minutes rather than
+through a player build. Before the weapons, it renders two views of each baked map,
+with no HUD or viewmodel: `map-<id>-overview` (a high corner looking at the centre)
+and `map-<id>-ground` (eye height at the centre, looking toward the first spawn).
+Use them to judge palette, lighting and grade changes after `Prepare` and `Bake`.
+
+Frame-time sample: after `BuildSmoke`, run `./Tools/QA/Invoke-PerfSample.ps1`. It
+opens a **visible** player window for about 40 s with audio muted. The player renders
+Atrium through the normal render loop into a 1920x1080 target, so a small desktop
+does not shrink it. The scene is the local fixture, seven strafing soldiers firing
+beams every 0.1 s and a grenade blast every 1.2 s. It measures Ultra (level 5) and
+then Low (level 1), each with a 3 s warm-up and 8 s of sampling, uncapped with VSync
+off. It writes `perf.json` (mean/p50/p95/p99/max ms) plus one PNG per tier under
+`Artifacts/Visual/Perf-<stamp>/`. Each tier also reports managed allocation per
+measured frame (`gcAllocMeanBytes`, `gcAllocMaxBytes`, from the development player's
+"GC Allocated In Frame" counter) and `gen0Collections` over those frames. This is
+same-PC evidence, not a networked load or lower-end GPU measurement.

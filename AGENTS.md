@@ -47,3 +47,10 @@ test run. Do not claim runtime success from documents, concept images or compila
 
 Keep secrets out of files and builds. Follow the user's existing authorization;
 the design does not authorize paid accounts, service deployment or subscriptions.
+
+## Temporary storage cleanup
+
+- At the end of build, release, test or asset-generation work, clean up disposable task-owned staging files under `D:\WildstoneBuilds`, `D:\WildstoneArchive` and `D:\WildstoneArtifactsArchive`. These locations must not accumulate temporary copies indefinitely.
+- Verify the exact targets belong to the completed task and no editor, build, player or other agent uses them. Remove regenerable caches and superseded scratch outputs first; never delete a shared parent wholesale.
+- Before removing a source snapshot, verify all needed source and uncommitted work exist in the authoritative checkout or a verified backup. Preserve required release packages/manifests, referenced QA evidence, and unique music takes/stems or other authored assets until their retention need is resolved. An archive name alone does not make its contents disposable.
+- Report cleanup in the handoff, including any retained temporary files and why they are still needed.

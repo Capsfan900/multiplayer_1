@@ -13,10 +13,12 @@ $project = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 if (-not $PackageAssemblies) { $PackageAssemblies = Join-Path $project 'Library/ScriptAssemblies' }
 # Installed engine DLLs expose disabled modules too; this assertion is not a Package Manager resolution check.
 $manifest = Get-Content -LiteralPath (Join-Path $project 'Packages/manifest.json') -Raw | ConvertFrom-Json
-if ($manifest.dependencies.'com.unity.modules.audio' -ne '1.0.0') {
-    throw 'Wildstone requires com.unity.modules.audio 1.0.0 explicitly enabled in Packages/manifest.json.'
+foreach ($module in 'audio', 'particlesystem') {
+    if ($manifest.dependencies."com.unity.modules.$module" -ne '1.0.0') {
+        throw "Wildstone requires com.unity.modules.$module 1.0.0 explicitly enabled in Packages/manifest.json."
+    }
 }
-Write-Output 'Audio declaration checked. Installed DLL references do not verify Unity Package Manager resolution or fresh-import module availability.'
+Write-Output 'Audio and particle module declarations checked. Installed DLL references do not verify Unity Package Manager resolution or fresh-import module availability.'
 $dotnet = Join-Path $UnityData 'DotNetSdk/dotnet.exe'
 $compiler = Join-Path $UnityData 'DotNetSdk/sdk/8.0.318/Roslyn/bincore/csc.dll'
 $referenceRoot = Join-Path $UnityData 'UnityReferenceAssemblies/unity-4.8-api'
