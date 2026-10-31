@@ -6,6 +6,39 @@ separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
 
+### 2026-10-30 current-state public preview release
+
+User-requested [Better Bean Battles preview](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261030-07d8cc8), captured while another agent
+continued authoring. Game source commit: `07d8cc8176c5328f556f008a40a3de2862b78a32`.
+Snapshot: 1865 nonignored files, with source/copy SHA-256 equality
+verified before acceptance at `2026-10-31T02:52:30Z`. Later edits are excluded.
+This release record changes documentation only after the frozen game-source commit;
+it does not change the player inputs. No live authoring file, index, branch or running
+Editor was modified by this release operation.
+
+- Build root: `D:/WildstoneBuilds/release-20261030-225213/source`.
+- Command: `./Tools/Unity/Invoke-Unity.ps1 -Action BuildWindows -TimeoutMinutes 30`.
+  Unity `6000.5.10f1` succeeded with `WILDSTONE BUILD OK`; log:
+  `Artifacts/Unity/BuildWindows-20261030-225312-389.log` under that build root.
+  Initial fresh-import Fusion assembly/settings diagnostics appear in that log;
+  the completed build passed and the tracked source tree remained clean.
+- Existing public Photon app settings were supplied separately. Ignored local
+  service credentials were excluded; no Host/Join connection was tested here.
+- Fresh `WildstoneArena.exe -batchmode -nographics -logFile <release-startup.log>`
+  stayed alive for 15 seconds, with zero runtime exception/assertion matches;
+  only the owned player was terminated. Record: `D:/WildstoneBuilds/release-20261030-225213/startup-result.json`.
+- `BetterBeanBattles-Windows-x64-preview-20261030-07d8cc8.zip`: 75098659 bytes, 200 files, ZIP CRC
+  passed; executable/player data present; Unity backup/debug folders excluded.
+  SHA-256: `7f1859522cbea94b406652112430dd5d92044bd5d24579f0b2b74fffcf12825d`.
+- Delivery records beside the isolated source: `source-capture.json`,
+  `release-manifest.json`, `release-notes.md`, startup log and ZIP/checksum.
+  GitHub publication is checked separately against the manifest/checksum.
+- This is a local development preview build, not a GitHub Actions execution.
+  Full suites, physical-input/visual/listening checks and external-network
+  multiplayer acceptance were not repeated. Historical tests below remain
+  historical evidence. Full MVP acceptance remains open.
+
+
 ### 2026-10-29 menu backdrop, motion and music (managed only)
 
 `pwsh -File Tools/QA/Compile-Managed.ps1 -Scope All -RunManagedTests` on the

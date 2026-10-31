@@ -4,10 +4,15 @@ Updated: 2026-10-30. **Photon-only Windows preview published; full multiplayer M
 Active worktree: `C:\Users\tyler\orca\workspaces\multiplayer_1\mvp-2`, branch `mvp-2`.
 The original project at `C:\Users\tyler\Main Storage\multiplayer_1` remains untouched.
 
-Latest public download: [laser arsenal and first-person polish preview e9e091f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-e9e091f).
-Built from committed snapshot `e9e091f` in `D:/WildstoneBuilds/wildstone-e9e091f`.
-Fresh Windows build, 15-second headless startup, archive integrity and anonymous
-download checks pass. [QA](QA.md) records the failed C: attempt and acceptance limits.
+Latest public download: [Better Bean Battles preview 07d8cc8](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261030-07d8cc8).
+Game sources were frozen at `07d8cc8176c5328f556f008a40a3de2862b78a32` from the current files on
+2026-10-30 (22:52 EDT), then built at `D:/WildstoneBuilds/release-20261030-225213/source`.
+A documentation-only release record follows that build-source commit. Fresh Unity
+Windows build, 15-second headless startup and ZIP CRC/SHA-256 checks pass.
+[QA](QA.md#2026-10-30-current-state-public-preview-release) records the exact
+commands and limits. The separate authoring checkout and its ongoing work were
+left untouched. The uncommitted labels below describe the authoring checkout at
+capture; those files are committed in this isolated release snapshot.
 
 The user resumed all tasks and requested GPT-6.1 Sol delegates. We recovered the
 existing authored checkpoint rather than reimplementing it: 194 files were copied
