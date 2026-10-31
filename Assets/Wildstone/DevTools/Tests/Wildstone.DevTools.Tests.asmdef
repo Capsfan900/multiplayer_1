@@ -1,0 +1,1 @@
+{"name":"Wildstone.DevTools.Tests","rootNamespace":"Wildstone.DevTools.Tests","references":["Wildstone.Runtime","Wildstone.DevTools"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}
