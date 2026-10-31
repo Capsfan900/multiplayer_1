@@ -36,14 +36,14 @@ One JSON object per line, `t` = seconds since recording started. Rows:
 
 | type | When | Main fields |
 |---|---|---|
-| `meta` | once at start | build identity, Unity, GPU, CPU, RAM, screen, refresh, quality, vsync |
+| `meta` | once at start | wall-clock start, build identity, Unity, GPU, CPU, RAM, screen, refresh, quality, vsync, dash/slide stamina costs |
 | `settings` | start and every settings change | sensitivity, FOV, ADS toggle, reduced motion, bindings |
 | `screen` | menu screen change | Title, Playing, Pause, Results, ... |
 | `session` | match start/stop | map, tick rate, online flag, phase, winner |
 | `input` | every gameplay key press | action name (Forward ... Aim), tick |
 | `combat` | every combat event, every tick, never sampled | kind, actor, seq, action, target, weapon, amount (spread for Shot, damage for Hit), head, reason, pos, vec |
 | `move` | any tick with motor events, per participant | events (Jump, Dash, Slide, Land, WallStart, WallEnd, WallJump, Perfect, Launch), speed, pos |
-| `sample` | every 6th tick (20 Hz) | local pos/vel/speed/yaw/pitch, grounded, sliding, wallrun, dashing, stamina, held buttons, hp, shield, weapon, ammo, charges, reloading, stunned, ADS, bloom, target pos/hp, zone, captor, scores |
+| `sample` | every 6th tick (20 Hz) | local pos/vel/speed/yaw/pitch, grounded, sliding, wallrun, dashing, stamina, held buttons, dash ready / air dash used / slide ready (same clock and checks as `ArenaMotor`), hp, shield, weapon, ammo, charges, reloading, stunned, ADS, bloom, target pos/hp, zone, captor, scores |
 | `perf` | each real second | frames, avg/p95/max ms, frames over 25/50 ms, GC count, managed MB, playing flag |
 | `mark` | F8 | n, tick, screen |
 | `end` | quit | reason, marks |
@@ -77,7 +77,8 @@ ordinary runs give clean performance numbers.
 ### Report
 
 The report covers counts, per-weapon accuracy/damage/kills, accuracy by range
-and movement state, pressed-vs-happened gaps, rule refusals by reason, movement time split and speed,
+and movement state, pressed-vs-happened gaps with a reason for each ignored jump/dash/slide (cooldown, air dash
+already used, low stamina, already sliding, in the air), rule refusals by reason, movement time split and speed,
 zone time, frame-time summary with worst moments, a 5-second context for each F8 mark, and player-log
 exceptions.
 
@@ -93,9 +94,12 @@ exceptions.
    fire exactly 10 single shots, reload once, jump 5 times, slide 3 times, dash 2 times, press F8 twice,
    pause once, then quit. Every line must say PASS. A FAIL means the recorder or the drill is off.
    Resolve it before trusting reports.
-4. **Usefulness (human, pending):** after one normal session the report must point at at least one
+4. **Usefulness (human):** after one normal session the report must point at at least one
    concrete, actionable thing (an ignored input, a bad accuracy situation, a frame spike at a mark). If
-   two sessions in a row produce nothing actionable, reconsider what is recorded.
+   two sessions in a row produce nothing actionable, reconsider what is recorded. First free-play
+   session (2026-10-31, 2.1 min, Split Gallery) met this: 16 of 51 dash presses ignored, 29 Pickup
+   presses refused "Unknown pickup" (nothing in reach), a 114 ms freeze at match start, and press/event
+   counts that reconcile exactly (Fire presses = shots in the earlier run).
 
 ## Verification
 
@@ -106,6 +110,8 @@ exceptions.
 | Video pipeline | 3 s `ddagrab` + `h264_nvenc` capture and frame extract, ffmpeg 9.0.1, RTX 4070 Ti | worked 2026-10-31 (2560×1440, 30 fps) |
 | Player build | `./Tools/Unity/Invoke-Unity.ps1 -Action BuildWindows` | OK 2026-10-31; `git status` afterwards showed only the add-on's new files |
 | Player smoke | built exe with `--wildstone-record`, title screen ~5 s, normal window close | meta, settings, screen, perf and `end` rows written; recorder start logged; no exceptions |
+| Real play | two developer sessions (1.3 and 2.1 min) via `Play-Recorded.ps1` | complete recordings, F8 marks + screenshots, 0 player-log exceptions; found and fixed: no F8 feedback, mm:ss rounding, `-Video` ignored (PowerShell `$video`/`$Video` clash), pause over-count |
+| Video start/stop | `Play-Recorded.ps1 -Video` with a stand-in exe that exits at once | ffmpeg started, `video.json` written, clean stop (0.53 s MKV) 2026-10-31; full play session with video still pending |
 
 ## Limits
 

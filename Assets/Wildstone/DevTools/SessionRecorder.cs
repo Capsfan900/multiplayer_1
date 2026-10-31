@@ -49,7 +49,8 @@ namespace Wildstone.DevTools
                 .Str("unity",Application.unityVersion).Str("gpu",SystemInfo.graphicsDeviceName).Str("cpu",SystemInfo.processorType)
                 .Num("ramMB",SystemInfo.systemMemorySize).Str("screen",Screen.width+"x"+Screen.height)
                 .Num("refreshHz",(float)Screen.currentResolution.refreshRateRatio.value).Str("quality",QualitySettings.names[QualitySettings.GetQualityLevel()])
-                .Num("vsync",QualitySettings.vSyncCount).Num("targetFps",Application.targetFrameRate).End();
+                .Num("vsync",QualitySettings.vSyncCount).Num("targetFps",Application.targetFrameRate)
+                .Num("dashCost",MotorTuning.Source.dashCost).Num("slideCost",MotorTuning.Source.slideCost).End();
             Debug.Log("Wildstone session recording to "+path);
         }
 
@@ -190,7 +191,8 @@ namespace Wildstone.DevTools
             CombatState target=null; foreach(var other in match.Players) if(other.Participant!=local) { target=other; break; }
             Line("sample",t).Num("tick",tick).Vec("pos",m.Position).Vec("vel",m.Velocity).Num("speed",Flat(m.Velocity)).Num("vy",m.Velocity.y)
                 .Num("yaw",m.Yaw).Num("pitch",m.Pitch).Bool("grounded",m.Grounded).Bool("sliding",m.Sliding).Bool("wallrun",m.WallRunning)
-                .Bool("dashing",m.DashUntil>(m.Tick+1)*(double)MotorTuning.TickDelta).Num("stamina",m.Stamina).Str("held",m.Held.ToString())
+                .Bool("dashing",m.DashUntil>Now(m)).Bool("dashReady",Now(m)>=m.DashReadyAt).Bool("airDashUsed",m.AirDashUsed)
+                .Bool("slideReady",Now(m)>=m.SlideReadyAt).Num("stamina",m.Stamina).Str("held",m.Held.ToString())
                 .Bool("alive",p.Alive).Num("hp",p.Health).Num("shield",p.Shield).Str("weapon",CombatRules.CurrentWeapon(p).ToString())
                 .Num("ammo",p.SelectedSpecial?p.SpecialAmmo:p.StarterAmmo).Num("grenades",p.GrenadeAmmo).Num("blinks",p.BlinkCharges)
                 .Num("shieldCharges",p.ShieldCharges).Bool("reloading",p.ReloadUntil>tick).Bool("stunned",tick<p.StunUntil)
@@ -200,6 +202,8 @@ namespace Wildstone.DevTools
                 .Num("score0",match.ScoreTicks.Count>0?match.Score(0):0).Num("score1",match.ScoreTicks.Count>1?match.Score(1):0).End();
         }
         static float Flat(Vector3 v) => new Vector2(v.x,v.z).magnitude;
+        // Same clock as ArenaMotor.Now, so readiness flags match the motor's own checks.
+        static double Now(in MotorState m) => (m.Tick+1)*(double)MotorTuning.TickDelta;
 
         public SessionLog Line(string type,float t) { line.Clear(); line.Append('{'); first=true; return Str("type",type).Num("t",t); }
         public SessionLog Str(string key,string value) { if(value==null) return this; Key(key).Append('"'); Escape(value); line.Append('"'); return this; }

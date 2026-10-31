@@ -53,6 +53,8 @@ def analyze(rows):
     by = defaultdict(list)
     for r in rows:
         by[r["type"]].append(r)
+    for rows_of_type in by.values():
+        rows_of_type.sort(key=lambda r: r.get("t") or 0)  # lookups below bisect by time
     combat, samples, moves, inputs = by["combat"], by["sample"], by["move"], by["input"]
     mine = [c for c in combat if c.get("actor") == LOCAL]
 
@@ -141,7 +143,7 @@ def analyze(rows):
         "jumps": move_counts["Jump"], "dashes": move_counts["Dash"], "slides": move_counts["Slide"],
         "landings": move_counts["Land"], "wallruns": move_counts["WallStart"], "walljumps": move_counts["WallJump"],
         "kills": sum(kills.values()), "deaths": sum(1 for d in deaths if d.get("target") == LOCAL),
-        "marks": len(by["mark"]), "pauses": sum(1 for s in by["screen"] if s.get("screen") == "Pause"),
+        "marks": len(by["mark"]), "pauses": sum(1 for a, b in zip(by["screen"], by["screen"][1:]) if a.get("screen") == "Playing" and b.get("screen") == "Pause"),
     }
     # Pressed vs happened: a gap is input the game ate (cooldown, stamina, buffer, state) - often the feel problem.
     eaten = {
@@ -182,9 +184,11 @@ def report(a):
         out.append("Deaths: " + ", ".join(f"{k} x{v}" for k, v in a["killed_by"].items()))
 
     out += ["", "## Pressed vs happened", "", "A gap means the game ignored the press (cooldown, stamina, state). Big gaps are feel problems.", ""]
+    why = why_ignored(by)
     for k, (p, h) in a["eaten"].items():
         if p or h:
-            out.append(f"- {k}: pressed {p}, happened {h}" + (f" -> **{p - h} ignored**" if p > h else ""))
+            reasons = ", ".join(f"{r} {n}" for r, n in why.get(k, Counter()).most_common())
+            out.append(f"- {k}: pressed {p}, happened {h}" + (f" -> **{p - h} ignored**" if p > h else "") + (f" ({reasons})" if reasons else ""))
     if a["refused"]:
         out += ["", "Refused by the rules (action: reason x count):"]
         for (act, reason), k in a["refused"].most_common(10):
@@ -217,7 +221,7 @@ def report(a):
             kinds = Counter(f"{x['kind']} ({x.get('action')}: {x.get('reason')})" if x["kind"] == "Rejected" else x["kind"] for x in near)
             out.append(f"- **Mark {m['n']}** at {clock(t1)} (mark-{m['n']}.png): "
                        f"{dict(kinds) or 'no combat'}; moves {dict(mv) or 'none'}; "
-                       + (f"weapon {s[-1].get('weapon')}, hp {s[-1].get('hp'):.0f}, speed {max(x.get('speed', 0) for x in s):.1f} max; " if s else "")
+                       + (f"weapon {s[-1].get('weapon')}, hp {s[-1].get('hp') or 0:.0f}, speed {max(x.get('speed', 0) for x in s):.1f} max; " if s else "")
                        + (f"worst frame {max(x['maxMs'] for x in pf):.0f} ms" if pf else ""))
     return "\n".join(out) + "\n"
 
@@ -231,6 +235,42 @@ def check(counts, expect):
         ok &= good
         print(f"{'PASS' if good else 'FAIL'} {k}: expected {v}, recorded {got}")
     return ok
+
+
+def why_ignored(by):
+    """Match each Jump/Dash/Slide press to the motor event it caused; label the unmatched ones from the state at that
+    moment (readiness fields mirror ArenaMotor's checks). Returns {action: Counter(reason)}."""
+    import bisect
+    meta = (by["meta"] or [{}])[0]
+    samples = by["sample"]
+    times = [x["t"] for x in samples]
+    events = {"Jump": ("Jump", "WallJump"), "Dash": ("Dash",), "Slide": ("Slide",)}
+    out = {}
+    for action, kinds in events.items():
+        happened = [m["t"] for m in by["move"] if m.get("who") == LOCAL and any(k in m["events"].split(", ") for k in kinds)]
+        reasons, j = Counter(), 0
+        for press in (i["t"] for i in by["input"] if i["action"] == action):
+            while j < len(happened) and happened[j] < press - 0.02:
+                j += 1
+            if j < len(happened) and happened[j] <= press + 0.3:  # input is consumed on the next 120 Hz tick(s)
+                j += 1
+                continue
+            k = bisect.bisect_right(times, press) - 1
+            st = samples[k] if k >= 0 else {}
+            if "dashReady" not in st:
+                reasons["unknown (older recording)"] += 1
+            elif not st.get("alive", True) or st.get("stunned"):
+                reasons["dead or stunned"] += 1
+            elif action == "Dash":
+                reasons["cooldown" if not st["dashReady"] else "air dash already used" if not st.get("grounded") and st.get("airDashUsed")
+                        else "low stamina" if st.get("stamina", 0) < meta.get("dashCost", 0) else "other"] += 1
+            elif action == "Slide":
+                reasons["already sliding" if st.get("sliding") else "cooldown" if not st["slideReady"] else "in the air" if not st.get("grounded")
+                        else "low stamina" if st.get("stamina", 0) < meta.get("slideCost", 0) else "other"] += 1
+            else:
+                reasons["in the air" if not st.get("grounded") else "other"] += 1
+        out[action] = reasons
+    return out
 
 
 def moments(a):
@@ -279,10 +319,13 @@ def extract_frames(a, folder):
 
 def selftest():
     rows = [{"type": "meta", "t": 0, "build": "test"}, {"type": "screen", "t": 0, "screen": "Playing"},
+            {"type": "screen", "t": 0, "screen": "Pause"}, {"type": "screen", "t": 0, "screen": "Settings"},
+            {"type": "screen", "t": 0, "screen": "Pause"}, {"type": "screen", "t": 0, "screen": "Playing"},
             {"type": "session", "t": 0, "event": "start", "map": "atrium"}]
     for i in range(40):  # 2 s of samples at 20 Hz, local at origin, target 12 m away
         rows.append({"type": "sample", "t": i / 20, "tick": i * 6, "pos": [0, 0, 0], "targetPos": [12, 0, 0], "zone": [0, 0, 0],
-                     "speed": 0, "grounded": True, "alive": True, "ads": 0, "hp": 100, "weapon": "LineDriver"})
+                     "speed": 0, "grounded": True, "alive": True, "ads": 0, "hp": 100, "weapon": "LineDriver",
+                     "dashReady": True, "airDashUsed": False, "slideReady": True, "stamina": 100})
     for seq in range(1, 5):  # 4 shots, 3 hit, the last hit kills
         rows.append({"type": "combat", "t": seq / 4, "tick": seq * 30, "kind": "Shot", "actor": 1, "seq": seq, "weapon": "LineDriver"})
         if seq < 4:
@@ -290,13 +333,15 @@ def selftest():
                          "weapon": "LineDriver", "amount": 40, "head": seq == 3})
     rows.append({"type": "combat", "t": 1, "tick": 90, "kind": "Death", "actor": 2, "target": 2})
     rows.append({"type": "combat", "t": 1.2, "tick": 140, "kind": "Rejected", "actor": 1, "action": "Fire", "reason": "Cooldown"})
-    rows += [{"type": "input", "t": 1, "action": "Jump"}] * 3
+    rows += [{"type": "input", "t": t, "action": "Jump"} for t in (1, 1, 1.5)]  # jumps happen at 1 and 1.5: one press ignored
+    rows += [{"type": "input", "t": 1, "action": "Dash"}, {"type": "input", "t": 1.58, "action": "Dash"}]
+    next(r for r in rows if r["type"] == "sample" and r["tick"] == 186)["dashReady"] = False  # t=1.55: dash on cooldown
     rows += [{"type": "move", "t": 1, "tick": 120, "who": 1, "events": "Jump, Dash"}, {"type": "move", "t": 1.5, "tick": 180, "who": 1, "events": "Jump"}]
     rows += [{"type": "perf", "t": 1, "frames": 60, "avgMs": 10, "p95Ms": 12, "maxMs": 30, "over25ms": 1, "over50ms": 0, "gc": 0, "playing": True},
              {"type": "mark", "t": 1.8, "n": 1, "tick": 216}, {"type": "end", "t": 2, "reason": "quit"}]
     a = analyze(rows)
     c = a["counts"]
-    assert (c["shots"], c["hits"], c["kills"], c["jumps"], c["dashes"], c["marks"]) == (4, 3, 1, 2, 1, 1), c
+    assert (c["shots"], c["hits"], c["kills"], c["jumps"], c["dashes"], c["marks"], c["pauses"]) == (4, 3, 1, 2, 1, 1, 1), c
     w = a["weapons"]["LineDriver"]
     assert (w["damage"], w["headshots"], w["kills"]) == (120, 1, 1), w
     assert a["by_range"]["10-25 m"] == Counter(shots=4, hits=3), a["by_range"]
@@ -316,6 +361,8 @@ def selftest():
         with open(os.path.join(folder, "video.json"), "w", encoding="utf-8-sig") as f:
             json.dump({"startedUtc": "2026-10-31T17:00:00.0000000+00:00"}, f)
         assert abs(video_offset({"meta": [{"startedUtc": "2026-10-31T17:00:02.5000000Z"}]}, folder) - 2.5) < 1e-6
+    why = why_ignored(a["by"])
+    assert why["Dash"] == Counter({"cooldown": 1}) and why["Jump"] == Counter({"other": 1}), why
     assert clock(51.06) == "0:51.1" and clock(61.7) == "1:01.7", clock(51.06)
     print("selftest passed")
 

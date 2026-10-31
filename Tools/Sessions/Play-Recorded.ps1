@@ -20,14 +20,14 @@ Write-Output 'Play normally. Press F8 whenever something feels wrong (saves a ma
 
 # Screen video: GPU desktop duplication + NVENC at 30 fps, so it costs almost no CPU or game frame time. MKV survives
 # being cut off. video.json holds the wall-clock start the analyzer uses to line frames up with the data (~0.5 s).
-$video = $null
+$capture = $null  # not $video: PowerShell names ignore case, and that would overwrite the -Video switch
 $ffmpeg = (Get-Command ffmpeg -ErrorAction SilentlyContinue).Source
 if ($Video -and -not $ffmpeg) { throw 'ffmpeg not found on PATH; install it (winget install Gyan.FFmpeg) or run without -Video.' }
 if ($Video) {
     $info = New-Object System.Diagnostics.ProcessStartInfo $ffmpeg
     $info.Arguments = '-hide_banner -loglevel error -y -f lavfi -i ddagrab=output_idx=0:framerate=30 -c:v h264_nvenc -preset p4 -cq 30 "' + (Join-Path $run 'session.mkv') + '"'
     $info.UseShellExecute = $false; $info.RedirectStandardInput = $true; $info.CreateNoWindow = $true
-    $video = [System.Diagnostics.Process]::Start($info)
+    $capture = [System.Diagnostics.Process]::Start($info)
     @{ startedUtc = (Get-Date).ToUniversalTime().ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'video.json')
     Write-Output 'Screen recording on (main monitor).'
 }
@@ -38,9 +38,9 @@ try {
     $player.WaitForExit()
 }
 finally {
-    if ($video -and -not $video.HasExited) {
-        $video.StandardInput.Write('q'); $video.StandardInput.Close()   # ffmpeg's clean stop
-        if (-not $video.WaitForExit(15000)) { $video.Kill() }
+    if ($capture -and -not $capture.HasExited) {
+        $capture.StandardInput.Write('q'); $capture.StandardInput.Close()   # ffmpeg's clean stop
+        if (-not $capture.WaitForExit(15000)) { $capture.Kill() }
     }
 }
 if (-not (Test-Path (Join-Path $run 'session.jsonl'))) { throw "No session.jsonl was written; this build may not include the recorder. See $log" }
