@@ -25,34 +25,39 @@ namespace Wildstone.Networking
         readonly Dictionary<string,double> vulnerableUntil = new Dictionary<string,double>(StringComparer.Ordinal);
         long generation;
         public FusionLobbyAdmission(SessionState rules, ContentVersion content) { this.rules = rules; this.content = content; }
+        // Why the last Admit refused, as a fixed code with no identifiers, so hosts can log join failures safely.
+        public string Rejection { get; private set; }
+        bool Reject(string reason) { Rejection = reason; return false; }
         public bool Admit(PlayerRef player, string verifiedSubject, byte[] credential, double now)
         {
+            Rejection = null;
             if (player == PlayerRef.None || string.IsNullOrWhiteSpace(verifiedSubject) || verifiedSubject.Length > 128 ||
-                Array.Exists(verifiedSubject.ToCharArray(), char.IsControl) || credential == null || credential.Length != 32) return false;
+                Array.Exists(verifiedSubject.ToCharArray(), char.IsControl) || credential == null || credential.Length != 32) return Reject("invalid-peer");
             rules.Tick(now);
             var snapshot = rules.CaptureSeats(now);
             if (peers.TryGetValue(player, out var current))
                 return string.Equals(current.VerifiedSubject, verifiedSubject, StringComparison.Ordinal) &&
                     credentials.TryGetValue(verifiedSubject, out var currentHash) && currentHash.MatchesCredential(credential) &&
                     Array.Exists(snapshot.Seats, seat => seat.Connected && seat.VerifiedSubject == verifiedSubject &&
-                        seat.ConnectionGeneration == current.ConnectionGeneration);
+                        seat.ConnectionGeneration == current.ConnectionGeneration) || Reject("rebind-mismatch");
             foreach (var subject in new List<string>(credentials.Keys))
                 if (!Array.Exists(snapshot.Seats, seat => seat.VerifiedSubject == subject))
                 { credentials.Remove(subject); vulnerableUntil.Remove(subject); }
             generation = Math.Max(generation, snapshot.LastConnectionGeneration);
-            if (generation >= long.MaxValue - 1) return false;
+            if (generation >= long.MaxValue - 1) return Reject("generation-exhausted");
             long next = ++generation;
             foreach (var seat in snapshot.Seats)
                 if (seat.VerifiedSubject == verifiedSubject)
                 {
-                    if (seat.Connected || !credentials.TryGetValue(verifiedSubject, out var expected) || !expected.MatchesCredential(credential) ||
-                        !rules.Reconnect(verifiedSubject, next, now)) return false;
+                    if (seat.Connected) return Reject("seat-already-connected");
+                    if (!credentials.TryGetValue(verifiedSubject, out var expected) || !expected.MatchesCredential(credential)) return Reject("seat-credential-mismatch");
+                    if (!rules.Reconnect(verifiedSubject, next, now)) return Reject("reconnect-refused");
                     double deadline = seat.DisconnectedAt + SeatTable.VulnerableSeconds;
                     if (vulnerableUntil.TryGetValue(verifiedSubject, out double original)) deadline = Math.Min(deadline, original);
                     vulnerableUntil[verifiedSubject] = deadline;
                     return Remember(player, verifiedSubject, now);
                 }
-            if (rules.Phase != SessionPhase.Lobby && rules.Phase != SessionPhase.Running) return false;
+            if (rules.Phase != SessionPhase.Lobby && rules.Phase != SessionPhase.Running) return Reject("phase-" + rules.Phase);
             int team = -1, minimum = int.MaxValue;
             for (int candidate = 0; candidate < SeatTable.TeamCount; candidate++)
             {
@@ -60,7 +65,8 @@ namespace Wildstone.Networking
                 foreach (var seat in snapshot.Seats) if (seat.Team == candidate) count++;
                 if (count < SeatTable.SlotsPerTeam && count < minimum) { team = candidate; minimum = count; }
             }
-            if (team < 0 || !rules.TryAdmit(verifiedSubject, team, next, content, now)) return false;
+            if (team < 0) return Reject("teams-full");
+            if (!rules.TryAdmit(verifiedSubject, team, next, content, now)) return Reject("session-refused");
             credentials[verifiedSubject] = FusionCredentialHash.FromCredential(credential);
             freshAccounts.Add(player);
             return Remember(player, verifiedSubject, now);
@@ -69,7 +75,7 @@ namespace Wildstone.Networking
         {
             foreach (var seat in rules.CaptureSeats(now).Seats)
                 if (seat.VerifiedSubject == subject) { peers.Add(player, seat); return true; }
-            return false;
+            return Reject("seat-missing");
         }
         public bool IsFreshAdmission(PlayerRef player) => freshAccounts.Contains(player);
         public bool RequiresFreshLife(PlayerRef player, double now) => IsFreshAdmission(player) ||

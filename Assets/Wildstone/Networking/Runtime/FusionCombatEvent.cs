@@ -16,8 +16,9 @@ namespace Wildstone.Networking
         public int Tick, Target, TargetLife, SubIndex;
         public Vector3 Position, Vector;
         public float Amount;
+        public NetworkBool Headshot;
 
-        public static bool IsPresentationEvent(CombatEventKind kind) => kind >= CombatEventKind.Shot && kind <= CombatEventKind.Ricochet;
+        public static bool IsPresentationEvent(CombatEventKind kind) => kind >= CombatEventKind.Shot && kind <= CombatEventKind.Deflected;
 
         public static FusionCombatEvent FromCombat(CombatEvent value, int sequence, int authorityGeneration)
         {
@@ -28,12 +29,12 @@ namespace Wildstone.Networking
                 Sequence = sequence, AuthorityGeneration = authorityGeneration,
                 Kind = value.Kind, Action = FusionCombatAction.FromCombat(value.Action), Weapon = value.Weapon,
                 Tick = value.Tick, Target = value.Target, TargetLife = value.TargetLife, SubIndex = value.SubIndex,
-                Position = value.Position, Vector = value.Vector, Amount = value.Amount
+                Position = value.Position, Vector = value.Vector, Amount = value.Amount, Headshot = value.Headshot
             };
         }
 
         public CombatEvent ToCombat() => new CombatEvent(Kind, Action.ToCombat(), Tick, Target, TargetLife,
-            Position, Vector, Amount, reason: null, subIndex: SubIndex, weapon: Weapon);
+            Position, Vector, Amount, reason: null, subIndex: SubIndex, weapon: Weapon, headshot: Headshot);
 
         // Old entries may be evicted between snapshots; effects can be missed but never drive gameplay state.
         public static int FirstAvailableSequence(int cursor, int latest)

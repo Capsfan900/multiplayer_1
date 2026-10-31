@@ -98,10 +98,27 @@ namespace Wildstone.Tests
             presentation.SendMessage("LateUpdate");
             Assert.That(owner.GetComponent<WeaponView>().TryGetMuzzle(out var muzzle),Is.True);
             Assert.That(Vector3.Distance(first.GetPosition(0),muzzle),Is.LessThan(.0001f));
-            var second=effects.transform.Find("Burst 4").GetComponent<LineRenderer>();
+            var second=effects.transform.Find("Burst 3").GetComponent<LineRenderer>(); // a Line Driver shot uses bursts 0 (glow), 1 (core) and 2 (sheath)
             bool previouslyEnabled=second.enabled;
             session.PresentNetworkTick(new[]{shot},-1,false); presentation.SendMessage("LateUpdate");
             Assert.That(second.enabled,Is.EqualTo(previouslyEnabled),"Repeated network event does not create another beam.");
+        }
+        // Offline practice drives its target fixture with the strafing drill (PracticeSession.Drill) instead of freezing it.
+        [Test] public void PracticeTargetFixtureStrafesFacingThePlayer()
+        {
+            var ground=GameObject.CreatePrimitive(PrimitiveType.Cube); ground.transform.position=Vector3.down*.5f;
+            ground.transform.localScale=new Vector3(80,1,80); ground.AddComponent<MotorSurface>(); Physics.SyncTransforms();
+            try
+            {
+                typeof(PracticeSession).GetMethod("Begin",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(session,new object[]{map});
+                var step=typeof(PracticeSession).GetMethod("Step",BindingFlags.Instance|BindingFlags.NonPublic);
+                for(int i=0;i<360;i++) step.Invoke(session,new object[]{true});
+                var target=session.Motors[PracticeSession.TargetParticipant].CaptureState();
+                Assert.That(Vector3.Distance(target.Position,Vector3.forward*6),Is.GreaterThan(1),"The target moved off its spawn.");
+                var toPlayer=session.LocalPlayer.Feet-target.Position; toPlayer.y=0;
+                Assert.That(Vector3.Angle(session.Match.Find(PracticeSession.TargetParticipant).Aim,toPlayer),Is.LessThan(10),"It faces the player.");
+            }
+            finally { Object.DestroyImmediate(ground); }
         }
         [Test] public void ExternalRegistryCallsCannotReplaceOfflinePracticeMotors()
         {

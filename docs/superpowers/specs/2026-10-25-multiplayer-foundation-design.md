@@ -50,8 +50,12 @@ never mutate gameplay and may be evicted under overload; acknowledgement/rejecti
 diagnostic text is not replicated. Woven object sizes must fit the SDK allocation
 limit, verified separately from compilation. Hitscan queries use SDK-observed view
 ticks with the section 8 rewind cap; static cover and travelling projectiles retain
-current-time queries. Combat RPCs use the SDK send tick and reject commands older
-than the implemented 150 ms window, future ticks and retired connection/life epochs.
+current-time queries. Combat RPCs use the SDK send tick and reject future ticks and
+retired connection/life epochs. They also reject commands older than their window
+(D035):
+- fire, grenade, Blink and shield have 150 ms;
+- pickup, reload and weapon selection have 500 ms, because the host judges them on
+  current state and a resend after loss must not silently drop the press.
 Client render snapshots currently allocate at 20 Hz. Avatar discovery polls at
 5 Hz using reusable runner-local SDK lists. Rebuild the presentation registry only
 when membership, avatar reference, network ID or effective render root changes;
@@ -373,6 +377,30 @@ late callbacks and commands from a retired generation. A retry cannot duplicate 
 seat or start a second local runner. UI distinguishes joining, full team,
 incompatible build, reconnecting, migrating and failed recovery.
 
+Rematch (implemented 2026-10-30). A finished match leaves the session `Running`;
+`Completed` is not used yet. Only the host can then return it to `Lobby`, through
+`FusionGameCoordinator.Rematch`. No client RPC or input reaches that path.
+- It requires a normally `Finished` match. An aborted round has already closed the
+  session.
+- Kept: the room code, match ID, runner and map/content pin. Seats, teams and
+  connection generations stay too, with reconnect credentials and holds. Changing
+  the map needs a new room.
+- Reset: every seat's readiness and avatar. The absence deadline, pending load
+  deadlines, the match object and all avatars are retired.
+- Peers follow the replicated lobby phase. The next start takes the ordinary lobby
+  → loading → warmup path. The new match starts at the session's current authority
+  generation.
+- A peer admitted while Results is showing waits, without an avatar, for that lobby.
+  Joins and reconnects in the lobby behave as in any lobby.
+- Known limit, from code reading and unmeasured: a migration before the next
+  match's first checkpoint finds only the previous match's snapshot. The 3-second
+  rollback bound should reject it, so that round aborts.
+
+Acceptance: `SessionRulesTests.Rematch*`,
+`AbortedOnlineResultsTests.FinishedRoundRematchNeedsTheHostAndPeersFollowTheLobbyInTheSameSession`
+and the two-process `Invoke-NetworkSmoke.ps1 -Scenario rematch`. Native results
+belong in QA.
+
 Flow: establish a temporary Photon guest connection -> create or join a private room
 by code in the same region -> host assigns a seat -> load matching content ->
 exchange readiness -> spawn. The code locates the session; it is not account
@@ -388,6 +416,26 @@ gameplay seats must both respect the eight-player limit, including reconnect cas
 Empty and one-player teams are legal; teams are selectable in the lobby and locked
 in a match. Starting requires at least two occupied teams. Clients pin protocol,
 build, map and ruleset versions; another player cannot supply executable content.
+
+Whenever the host removes a peer, it writes one player-log warning,
+`WILDSTONE HOST REMOVED PEER reason=<code> phase=<phase>`, in every build. That covers
+a refused admission at startup or join, and a load timeout. Codes are fixed strings
+with no player, user, session or credential data:
+- `invalid-peer`, `rebind-mismatch`, `generation-exhausted`;
+- `seat-already-connected`, `seat-credential-mismatch`, `reconnect-refused`;
+- `phase-<phase>`, `teams-full`, `session-refused`, `seat-missing`;
+- `lobby-not-ready`, `load-timeout`, `credential-unreadable`, `simulation-frozen`.
+
+A client `Requested` disconnect with no such line in the host log was not a host
+removal. Acceptance: `FusionLobbyAdmissionTests.RefusedAdmissionsNameAFixedReason`.
+
+The SDK can report a joined remote peer before it reports that peer's guest ID.
+Implemented 2026-10-30: such a peer is not removed at once. The host retries its
+admission every tick for up to 5 seconds, and only then refuses it as `invalid-peer`.
+The host's own identity never waits. A pending peer has no seat, so its RPCs and
+inputs bind to nothing. The 5-second wait is a builder value. Acceptance:
+`FusionSessionBoundaryTests.APeerWithoutAUserIdIsRetriedUntilItsDeadlineInsteadOfRemoved`
+and the [reconnect cycles](../../QA.md#2026-10-30-reconnect-cycles-and-late-peer-identity).
 
 On a remote-client disconnect, neutralize inputs, remove zone presence and reserve
 the guest's seat for 30 seconds. Keep its avatar vulnerable for five seconds

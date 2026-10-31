@@ -14,10 +14,11 @@ namespace Wildstone.Networking
                 sample.Move.x < -1 || sample.Move.x > 1 || sample.Move.y < -1 || sample.Move.y > 1 ||
                 !ArenaMotor.Finite(sample.Yaw) || sample.Yaw < -180 || sample.Yaw > 180 ||
                 !ArenaMotor.Finite(sample.Pitch) || sample.Pitch < -89 || sample.Pitch > 89 ||
-                (((int)sample.Held | (int)sample.Pressed) & ~7) != 0) return default;
+                (((int)sample.Held | (int)sample.Pressed) & ~15) != 0) return default;
 
             acceptedSampleSequence = sample.Sequence;
-            var input = sample.ToMotor();
+            // The Aim bit is combat intent only; ArenaMotor receives movement buttons.
+            var input = sample.ToMotor().ForMotor();
             // The sample token deduplicates input only; runner scheduling owns motor time and sequence.
             input.Tick = state.Tick + 1;
             input.Sequence = state.LastInputSequence + 1;

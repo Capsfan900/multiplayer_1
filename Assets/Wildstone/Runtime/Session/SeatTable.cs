@@ -78,14 +78,15 @@ namespace Wildstone.Session
             }
         }
 
-        public void ClearReadiness()
+        // requireRespawn: a rematch retires every avatar, so each seat spawns fresh like a new admission.
+        public void ClearReadiness(bool requireRespawn = false)
         {
             lock (gate)
                 for (int i = 0; i < seats.Count; i++)
                 {
                     var s = seats[i];
                     seats[i] = new SeatSnapshot(s.VerifiedSubject, s.Team, s.Slot, s.ConnectionGeneration,
-                        s.Connected, false, s.RequiresRespawn, s.DisconnectedAt, s.HoldUntil);
+                        s.Connected, false, s.RequiresRespawn || requireRespawn, s.DisconnectedAt, s.HoldUntil);
                 }
         }
 

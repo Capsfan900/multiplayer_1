@@ -20,14 +20,14 @@ namespace Wildstone.Networking
         [Serializable] sealed class GrenadeVerdict
         {
             public bool placed,ready,fireSent,gravityObserved,bounceObserved,despawned,coverBlocks,observed,verified;
-            public int connection,authority,sequence,shooter,life,target,targetLife,ammo,samples,firstTick=-1,lastTick=-1,actionTick=-1,expireTick=-1,explosionTick=-1,shotCount,explosions,hits;
+            public int connection,authority,sequence,resends,shooter,life,target,targetLife,ammo,samples,firstTick=-1,lastTick=-1,actionTick=-1,expireTick=-1,explosionTick=-1,shotCount,explosions,hits;
             public float baselineHealth,health,damage,eventDamage,firstTravel,lastTravel,expectedDamage,blastDistance;
             public string identity="",shotId="",explosionId="",hitId="";
             public Vector3 explosion,targetEye,previousVelocity;
         }
         int grenadeIndex;
         GameObject grenadeFloor,grenadeBackstop,grenadeCover;
-        double grenadeBegan=-1,grenadeStable=-1,grenadeAck=-1;
+        double grenadeBegan=-1,grenadeStable=-1,grenadeAck=-1,grenadeThrown=-1;
         bool DriveGrenadeCombat(ArenaMatch model,NetworkRunner runner,Status peer,double now)
         {
             // Completion already includes both peers; transient status-file reads must not revoke it.
@@ -107,8 +107,14 @@ namespace Wildstone.Networking
             if(status.role=="client" && !m.fireSent)
             {
                 if(model.Tick<shooter.GrenadeReadyTick) return false;
-                m.sequence=shooter.LastActionSequence+1; m.fireSent=true; WriteOutput();
+                m.sequence=shooter.LastActionSequence+1; m.fireSent=true; grenadeThrown=now; WriteOutput();
                 SendLaserAction(model,shooter,m.sequence,CombatActionKind.Grenade,Vector3.back);
+            }
+            else if(status.role=="client" && shooter.LastActionSequence<m.sequence && now-grenadeThrown>1)
+            {
+                // A loss-resent RPC can reach the host past the 150 ms attack window and is dropped unseen
+                // (FusionPlayer.AcceptsCombatTick); press again with the same sequence, which the host dedups.
+                m.resends++; grenadeThrown=now; SendLaserAction(model,shooter,m.sequence,CombatActionKind.Grenade,Vector3.back);
             }
             if(!firing.fireSent) return false;
             m.sequence=firing.sequence; m.ammo=shooter.GrenadeAmmo; m.health=target.Health; m.damage=m.baselineHealth-m.health;

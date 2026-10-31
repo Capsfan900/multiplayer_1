@@ -11,6 +11,14 @@ namespace Wildstone.Tests
             gravity=-30,minEntrySpeed=6,maxEntryFallSpeed=9,maxApproachCos=.8f,minLookAlongCos=-.05f,
             maxDuration=1.75f,gravityStartScale=.1f,gravityEndScale=.6f,entryUpSpeed=3,speedDecay=.35f,
             minSustainSpeed=4,accel=14,topSpeed=13.75f,maxSpeed=22,exitUpSpeed=10,exitPushSpeed=7,exitTangentBoost=4 };
+        [Test] public void AimBitIsCombatIntentThatTheMotorNeverSees()
+        {
+            var input=new MotorInput { Present=true,Held=MotorButtons.Aim|MotorButtons.Slide,Pressed=MotorButtons.Aim|MotorButtons.Jump };
+            Assert.That(input.Aiming,Is.True);
+            var motor=input.ForMotor();
+            Assert.That(motor.Held,Is.EqualTo(MotorButtons.Slide)); Assert.That(motor.Pressed,Is.EqualTo(MotorButtons.Jump)); Assert.That(motor.Aiming,Is.False);
+            Assert.That(input.Held,Is.EqualTo(MotorButtons.Aim|MotorButtons.Slide),"ForMotor copies; the combat sample keeps its aim bit.");
+        }
         [Test] public void BackwardIntentBrakesThroughAcceleration()
         {
             Assert.That(AirMath.AirAccelerate(Vector3.forward*11,Vector3.back,11,35,.1f).z,Is.EqualTo(7.5f));

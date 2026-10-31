@@ -12,10 +12,12 @@ namespace Wildstone.Networking
     {
         public readonly CombatAction Action;
         public readonly int RunnerTick, ViewFrom, ViewTo, Target;
-        public readonly float Alpha, RewindSeconds;
+        // RewindSeconds is the queried age; RequestedRewindSeconds is the SDK view age before the cap (0 without an SDK view).
+        public readonly float Alpha, RewindSeconds, RequestedRewindSeconds;
         public readonly bool Hit;
-        public FusionHitscanRecord(CombatAction action,int now,int from,int to,float alpha,float rewind,bool hit,int target)
-        { Action=action; RunnerTick=now; ViewFrom=from; ViewTo=to; Alpha=alpha; RewindSeconds=rewind; Hit=hit; Target=target; }
+        public bool Clamped => RequestedRewindSeconds>RewindSeconds+.000001f;
+        public FusionHitscanRecord(CombatAction action,int now,int from,int to,float alpha,float rewind,float requested,bool hit,int target)
+        { Action=action; RunnerTick=now; ViewFrom=from; ViewTo=to; Alpha=alpha; RewindSeconds=rewind; RequestedRewindSeconds=requested; Hit=hit; Target=target; }
     }
 
     // Host-only historical hitscan; support, Blink and travelling collisions remain on the authoritative timeline.
@@ -28,11 +30,16 @@ namespace Wildstone.Networking
         readonly Dictionary<Hitbox,int> owners=new Dictionary<Hitbox,int>();
         readonly List<LagCompensatedHit> hits=new List<LagCompensatedHit>(64);
         public event Action<FusionHitscanRecord> ShotResolved;
+#if WILDSTONE_SMOKE
+        // FusionMatch owns the world instance; smoke diagnostics observe every host query (and restored worlds) here.
+        internal static event Action<FusionHitscanRecord> SmokeShotResolved;
+#endif
         sealed class Binding
         {
             public PlayerRef Player;
             public Func<bool> Alive;
             public Hitbox[] Hitboxes;
+            public Hitbox Head;
             public Func<int> PoseEpoch;
             public int ObservedEpoch, EarliestTick;
         }
@@ -48,7 +55,9 @@ namespace Wildstone.Networking
                 if(owners.TryGetValue(box,out int previous) && previous!=participant)
                     throw new ArgumentException("Hitboxes cannot belong to multiple players.");
             Unbind(participant); present.Bind(participant,motor,alive);
-            participants.Add(participant,new Binding {Player=player,Alive=alive,Hitboxes=boxes,
+            Hitbox head=null;
+            foreach(var box in boxes) if(box.Type==HitboxTypes.Sphere) head=box;
+            participants.Add(participant,new Binding {Player=player,Alive=alive,Hitboxes=boxes,Head=head,
                 PoseEpoch=poseEpoch,ObservedEpoch=poseEpoch?.Invoke()??0,EarliestTick=runner.Tick.Raw});
             foreach(var box in boxes)
             {
@@ -92,7 +101,7 @@ namespace Wildstone.Networking
             BoundView(now,runner.DeltaTime,sdkFrom,sdkTo,sdkAlpha,out int from,out int to,out float alpha);
             var direction=displacement/distance;
             bool found=Physics.Raycast(origin,direction,out var wall,distance,MotorTuning.WorldMask,QueryTriggerInteraction.Ignore);
-            float nearest=found?wall.distance:distance;
+            float nearest=found?wall.distance:distance, cover=found?wall.distance:float.PositiveInfinity;
             if(found) hit=new CombatHit(0,wall.point,wall.normal,wall.distance);
             // Static geometry is queried separately so live avatar colliders cannot bypass historical hitboxes.
             runner.LagCompensation.RaycastAll(origin,direction,distance,from,to,alpha,hits,
@@ -110,10 +119,21 @@ namespace Wildstone.Networking
                     hit=new CombatHit(participant,candidate.Point,candidate.Normal,candidate.Distance);
                 }
             }
-            ShotResolved?.Invoke(new FusionHitscanRecord(action,now,from,to,alpha,
-                (now-(from+(to-from)*alpha))*runner.DeltaTime,found,found?hit.Participant:0));
+            // The body box contains the head sphere, so it selects the target; a rewound head-sphere crossing before cover marks a headshot.
+            if(found && hit.Participant!=0 && participants[hit.Participant].Head!=null)
+                foreach(var candidate in hits)
+                    if(candidate.Hitbox==participants[hit.Participant].Head && candidate.Distance<cover)
+                    { hit=new CombatHit(hit.Participant,hit.Point,hit.Normal,hit.Distance,true); break; }
+            float dt=runner.DeltaTime;
+            var record=new FusionHitscanRecord(action,now,from,to,alpha,ViewAge(now,dt,from,to,alpha),
+                sdkFrom is int sdk?ViewAge(now,dt,sdk,sdkTo??sdk,alpha):0,found,found?hit.Participant:0);
+            ShotResolved?.Invoke(record);
+#if WILDSTONE_SMOKE
+            SmokeShotResolved?.Invoke(record);
+#endif
             return found;
         }
+        internal static float ViewAge(int now,float deltaTime,int from,int to,float alpha) => (now-(from+(to-from)*alpha))*deltaTime;
         internal static void BoundView(int now,float deltaTime,int? sdkFrom,int? sdkTo,float? sdkAlpha,
             out int from,out int to,out float alpha)
         {

@@ -1,6 +1,6 @@
 # Staged backlog
 
-Updated: 2026-10-29. **Execution resumed in `mvp-2`, with a published Photon-only Windows preview.**
+Updated: 2026-10-30. **Execution resumed in `mvp-2`, with a published Photon-only Windows preview.**
 Local implementation spans the stages below; full visual and internet acceptance
 remain open. Follow the
 [implementation plan](superpowers/plans/2026-10-25-wildstone-mvp.md) and [handoff](HANDOFF.md).
@@ -11,7 +11,30 @@ Delivery checkpoint: current-state snapshot `e9e091f` is published as public pre
 `preview-20261028-e9e091f` at the user's request. Anonymous download and checksum verification passed. Build/startup/package evidence is in
 [QA](QA.md). Ongoing development and remaining acceptance stages stay open.
 
-Current work: playtest D026 expanded laser arsenal/balance and D025 first-person legs, arm/hand animation and pronounced
+Current work (2026-10-30): user playtest of the D028–D031 quality pass. Its
+integration evidence is complete in [QA](QA.md#2026-10-30-quality-pass-integration-d028d031):
+- native full suites;
+- Photon gunplay at baseline and adverse150, and core regressions;
+- four packaged visual modes;
+- a same-PC 1080p frame-time sample.
+The 2026-10-30 presentation follow-up has its own evidence in
+[QA](QA.md#2026-10-30-presentation-follow-up-spawn-view-shot-reads-hud-slide-body):
+spawn facing, shot reads, the HUD, the laser kit and the slide body. D032 music
+(ACE-Step loops, packaged streaming verified, not yet heard) is in
+[QA](QA.md#2026-10-30-music-ace-step-chill-house-loops-d032). D033 recorded weapon and
+movement audio (packaged playback verified, not yet heard) is in
+[QA](QA.md#2026-10-30-recorded-weapon-and-movement-audio). D034 maps, weapon energy
+art and fire feedback (packaged captures verified, not yet played) are in
+[QA](QA.md#2026-10-30-maps-weapons-and-fire-feedback). D036 online held-fire cadence
+(two-process gunplay verified, not yet played) is in
+[QA](QA.md#2026-10-30-online-held-fire-cadence-d036). The user-reported slide bug
+(own body in view while sliding) is fixed by hiding the visible legs during slides
+([QA](QA.md#2026-10-30-no-legs-in-view-while-sliding)). D037 Push Lens deflection
+passes a real two-process check
+([QA](QA.md#2026-10-30-push-lens-deflection-d037)), and rewind age is now measured
+([QA](QA.md#2026-10-30-measured-rewind-age)).
+Human feel, balance and in-motion team recognition remain the gate.
+Earlier: playtest D026 expanded laser arsenal/balance and D025 first-person legs, arm/hand animation and pronounced
 slide feel, then finish external-network acceptance and packaged input checks.
 D026 adds laser pistol/shotgun/sniper pickups on all maps, rapid starter fire and distinct weapon presentation; native155 EditMode/51 PlayMode plus35 final checks pass.
 D025 implementation passes 35 focused native checks, thirteen inspected pose
@@ -37,7 +60,7 @@ open. See [QA](QA.md).
 | --- | --- |
 | 1 | Native project/Windows build verified; real Fusion configured; separate-process private Host/Join/lobby/gameplay passed; external runtime acceptance pending. |
 | 2 | Native motor, replay and shared-orb state checks pass; actual Fusion movement/world rollback implemented; remote reconciliation and network profiles pending. |
-| 3 | Photon guest admission, lobby/team/load, late admission, retained-seat reconnect, eight-player capacity, graceful migration and abrupt-crash recovery pass through real Photon using separate processes; external acceptance remains open. |
+| 3 | Photon guest admission, lobby/team/load, late admission, retained-seat reconnect, same-room online rematch, eight-player capacity, graceful migration and abrupt-crash recovery pass through real Photon using separate processes; external acceptance remains open. |
 | 4 | Host match/combat state and SDK historical hitscan integrated; native fixtures, real two-process duplicate-fire/events and controlled stationary hit replication pass; moving-target/adverse-network acceptance remains open. |
 | 5 | Three maps and zone rules validated locally; online scoring/recovery and fairness measurement pending. |
 | 6 | Full roster and two consumables authored/tested locally; moving counterplay/readability acceptance pending. |
@@ -49,13 +72,18 @@ active acceptance backlog, replacing the old bootstrap implementation order.
 
 | Order | Next actionable work | Evidence needed to advance |
 | --- | --- | --- |
-| 1 | Reproduce user-reported disconnect/menu return after joining and selecting a team | Other player confirmed in Texas on another ISP; exact builds/error wording still needed. Actual four-team switching passes. New local pre-game Requested disconnect lacks host admission-rejection detail: instrument safe reason-only admission diagnostics next. It is not confirmed as the same external symptom |
-| 2 | Extend live combat acceptance to moving projectile counterplay, deflection and measured rewind | Pulse and grenade flight/blast/cover plus disc ricochet/damage deduplication and stun timing pass baseline/adverse150; three moving lasers pass regional80/adverse150. Deflection implementation, motor/input suppression, measured rewind and full latency matrix remain |
-| 3 | Accept moving gameplay/remote weapon readability | Continuous first-person starter slide/fire/reload sample passes and 32 frames inspected; remote shot/reload checks pass. Natural first-/third-person movement, other weapon transitions and human aim/slide/audio acceptance remain |
-| 4 | Exercise full standalone loop and map traversal | All maps/weapons/items, UI/cancel/retry, death/respawn, zone completion, pickup reachability and route fairness |
+| 1 | Reproduce user-reported disconnect/menu return after joining and selecting a team | Other player confirmed in Texas on another ISP; exact builds/error wording still needed. Actual four-team switching passes. New local pre-game Requested disconnect lacked host admission-rejection detail. Hosts now log a reason-only `WILDSTONE HOST REMOVED PEER` line for every removal ([QA](QA.md#2026-10-30-host-removal-reasons)); five local Photon runs did not reproduce it. Next: the host's Player.log from the next failing external session. It is not confirmed as the same external symptom. Reconnect cycles then found and fixed a join race: the SDK can report a peer before its user ID, and the host removed it as `invalid-peer` ([QA](QA.md#2026-10-30-reconnect-cycles-and-late-peer-identity)). It is a candidate cause of the startup disconnect, unconfirmed |
+| 2 | Extend live combat acceptance to moving projectile counterplay, deflection and measured rewind | Pulse and grenade flight/blast/cover plus disc ricochet/damage deduplication and stun timing pass baseline/adverse150; three moving lasers pass regional80/adverse150. Adverse150 laser moving-cover shotgun misses trace to the 150 ms rewind cap ([QA](QA.md#laser-moving-cover-investigation)). Rewind age is now measured: requested view age is about 80 ms on the same PC, 184 ms mean at regional80 and 283 ms at adverse150, so the cap clamps every regional80 shot; raising it awaits the user ([QA](QA.md#2026-10-30-measured-rewind-age)). D037 Push Lens deflection passes host- and client-push online at baseline/adverse150 ([QA](QA.md#2026-10-30-push-lens-deflection-d037)). A host-side stun probe shows the stunned target's replicated position holding under forward input, then moving once released; a predicting client target, natural moving counterplay and the full latency matrix remain. Under adverse150 loss a resent attack RPC can arrive past the 150 ms window and is dropped; the smoke fixtures now press again ([QA](QA.md#2026-10-30-smoke-harness-peer-reads-stun-probe-and-late-attacks)) |
+| 3 | Accept moving gameplay/remote weapon readability | Continuous first-person starter slide/fire/reload sample passes and 32 frames inspected; remote shot/reload checks pass. `-Firefight` frame sequences of four hitscan headshots on a strafing soldier and an incoming sniper rail are inspected ([QA](QA.md#2026-10-30-firefight-frame-sequences)). Natural first-/third-person movement, other weapon transitions and human aim/slide/audio acceptance remain |
+| 4 | Exercise full standalone loop and map traversal | Plain-movement reachability of every pickup and zone point from every start now gates the arena build, and per-team walking distances are measured ([QA](QA.md#2026-10-30-map-traversal-and-travel-distance)). Outer walls are now out of jump reach (map revision 4, 8 m). Terrace Steps' northern starts walk 29-55% farther than team 0; a layout fix awaits the user's direction. Still needed: all maps/weapons/items, UI/cancel/retry, death/respawn, zone completion and travel time/exposure |
 | 5 | Measure movement/combat under adverse network conditions | Initial two-player same-PC SDK injected delay/jitter/loss combat checks pass. Host plus two clients, mixed/asymmetric paths, prediction corrections, rewind measurement and authority/recovery remain |
-| 6 | Add measured performance and endurance evidence | Frame/tick/bandwidth/allocation measurements, separate-machine eight-player matrix, 30-minute profiles, two-hour soak and 100 reconnect cycles |
+| 6 | Add measured performance and endurance evidence | A same-PC 1080p frame-time sample exists (`Invoke-PerfSample.ps1`: 8 soldiers plus effects, Ultra p99 2.04 ms, RTX 4070 Ti). The capacity soak now accepts 1800 s and reports per-peer bandwidth and memory growth, and `Invoke-ReconnectCycles.ps1` runs fresh reconnect sessions ([TOOLING](TOOLING.md)): 100 of 100 pass after the late-identity fix ([QA](QA.md#2026-10-30-reconnect-cycles-and-late-peer-identity)). Online rematch now lets a soak harness chain real matches in one room. Still needed: lower-end GPU, allocation measurements, separate-machine eight-player matrix, a gameplay (not Results-screen) 30-minute soak, two-hour soak |
 | 7 | Complete independent-network acceptance | At least two external networks, direct/relay paths, rotate hosts, graceful/crash recovery; capture exact builds and logs |
+
+User feedback on 2026-10-30, after a first local play of the 16:06 build
+(`d838ac03…`): "so far that is really good and like those improvements, keep going".
+This is an early, general approval of the quality pass and the afternoon's additions.
+It is not acceptance of any single item, of online play or of balance.
 
 User feedback on 2026-10-29: the game works and feels "pretty good", with a few
 connection issues at the beginning. Follow-up identifies join/team selection and

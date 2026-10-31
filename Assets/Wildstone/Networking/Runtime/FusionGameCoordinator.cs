@@ -86,6 +86,10 @@ namespace Wildstone.Networking
             }
             try
             {
+                // Only the host's rematch takes a loaded session back to Lobby; every peer follows it there.
+                if(loading && lobby.Phase==SessionPhase.Lobby) { FollowRematch(); return; }
+                // The rematch despawns the finished match; a client may observe that before the lobby phase arrives.
+                if(match!=null && (match.Object==null || !match.Object.IsValid)) match=null;
                 if(!loading && (lobby.Phase==SessionPhase.Loading || lobby.Phase==SessionPhase.Warmup || lobby.Phase==SessionPhase.Running))
                 {
                     loading=true; loadDeadline=Time.realtimeSinceStartupAsDouble+SessionState.OperationTimeoutSeconds;
@@ -167,13 +171,32 @@ namespace Wildstone.Networking
             bridge.Status="The online match could not continue. Return to the lobby and retry.";
             menu.LeaveWithFailure(bridge.Status); ResetSession(); bridge.Refresh();
         }
+        // Host-only: a normally finished match returns this room to its lobby with seats, teams and reconnect holds kept.
+        // Clients have no request path; they follow the replicated lobby phase.
+        public bool Rematch()
+        {
+            var runner=session?.Runner; var lobby=session?.Lobby;
+            if(runner==null || !runner.IsRunning || !runner.IsServer || lobby==null || match==null || !match.Initialized ||
+                match.Model==null || match.Model.Phase!=ArenaMatchPhase.Finished || !lobby.ReturnToLobby()) return false;
+            FollowRematch();
+            // Retire every match-scoped object; the lobby object, its seats and the runner survive.
+            foreach(var obj in new List<NetworkObject>(runner.GetAllNetworkObjects()))
+                if(obj!=null && obj.IsValid && (obj.GetComponent<FusionMatch>()!=null || obj.GetComponent<FusionPlayer>()!=null)) runner.Despawn(obj);
+            return true;
+        }
+        void FollowRematch()
+        {
+            ResetWorld();
+            if(presentation.Flow.Screen!=MenuScreen.Online) presentation.Show(MenuScreen.Online);
+        }
         void HostMatch(FusionLobby lobby,NetworkRunner runner)
         {
             if(match==null)
             {
                 var prefab=Resources.Load<NetworkObject>("WildstoneFusionMatch");
                 if(prefab==null) throw new InvalidOperationException("Network match prefab missing.");
-                match=runner.Spawn(prefab,onBeforeSpawned:(r,obj)=>obj.GetComponent<FusionMatch>().Initialize(presentation.Catalog.Find(mapId))).GetComponent<FusionMatch>();
+                int authority=checked((int)session.Rules.AuthorityGeneration);
+                match=runner.Spawn(prefab,onBeforeSpawned:(r,obj)=>obj.GetComponent<FusionMatch>().Initialize(presentation.Catalog.Find(mapId),false,authority)).GetComponent<FusionMatch>();
             }
             match.RecoveryWarmup = lobby.Phase != SessionPhase.Running;
             for(int i=0;i<lobby.Seats.Length;i++)
@@ -209,6 +232,8 @@ namespace Wildstone.Networking
                     }
                     continue;
                 }
+                // A peer admitted while Results is showing cannot join a finished round; it waits for the rematch lobby.
+                if(existing==null && match.Model.Phase==ArenaMatchPhase.Finished) continue;
                 var map=presentation.Catalog.Find(mapId); int slot=0; ArenaSpawn spawn=default;
                 foreach(var candidate in map.Spawns) if(candidate.Team==seat.Team && slot++==seat.Slot) { spawn=candidate; break; }
                 var playerPrefab=Resources.Load<NetworkObject>("WildstoneFusionPlayer");
@@ -283,7 +308,7 @@ namespace Wildstone.Networking
         }
         void SendCombat(FusionPlayer local,ArenaMatch model)
         {
-            presentation.Input.ConsumeActions(commands,model.Tick+1,model.TickRate,model.Find(local.Participant),presentation.Flow.GameplayInput && model.Phase==ArenaMatchPhase.Running);
+            presentation.Input.ConsumeActions(commands,match.NextActionTick,model.TickRate,model.Find(local.Participant),presentation.Flow.GameplayInput && model.Phase==ArenaMatchPhase.Running);
             if(!presentation.Flow.GameplayInput || model.Phase!=ArenaMatchPhase.Running) return;
             var player=model.Find(local.Participant);
             actionSequence=Math.Max(actionSequence,player.LastActionSequence);

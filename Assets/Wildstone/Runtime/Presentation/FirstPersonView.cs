@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using Wildstone.Combat;
 using Wildstone.Movement;
 
 namespace Wildstone.Presentation
@@ -41,7 +42,19 @@ namespace Wildstone.Presentation
         public float Pitch { get; private set; }
         public event Action<MotorEvents> LocalEvents;
         readonly MotorFeedbackHistory feedbackHistory=new MotorFeedbackHistory();
-        float rollKick,kickRemaining,slideRoll,slideFov,baseFieldOfView;
+        float rollKick,kickRemaining,slideRoll,slideFov,baseFieldOfView,adsProgress,shake,punch;
+        // Movement lens (vibegame1 PlayerFeedback/CameraFX pattern, scaled from its 95° to this ~68° vertical lens):
+        // decaying FOV impulses on dash/jump/land/launch, a wall-run hold and a landing nod. Cosmetic like the shake:
+        // the eye stays the authoritative one (vibegame1's positional landing dip would move it off the shot origin).
+        float fovKick,wallFov,nod,airSpeed;
+        bool wasSliding;
+        public const float DashKick=4,JumpKick=2,WallJumpKick=3,PerfectKick=2,LaunchKick=4,LandKick=-2.5f,SlideEndKick=-2,WallRunHold=3;
+        public const float HardLanding=22,LandNod=2.5f,SlideNod=1.2f,DashRoll=1.4f;
+        WeaponKind adsWeapon;
+        public float BaseFieldOfView=>baseFieldOfView;
+        // Cosmetic movement FOV (slide/wall-run holds and kicks) before ADS zoom, which fades it out.
+        public float KickFieldOfView=>(slideFov+wallFov+fovKick)*(1-adsProgress);
+        public float AdsProgress=>adsProgress;
         bool hasBaseFieldOfView,hasPresentationState;
         int presentationGeneration;
         Vector3 lastPosition;
@@ -69,8 +82,44 @@ namespace Wildstone.Presentation
                 Vector3 right=Quaternion.Euler(0,Yaw,0)*Vector3.right;
                 rollKick=(Vector3.Dot(-state.LastWallNormal,right)>=0?-1:1)*MotorTuning.Source.wallRunExitRollKick;
                 kickRemaining=.28f;
+                Kick(WallJumpKick);
+            }
+            if((fresh&MotorEvents.Dash)!=0)
+            {
+                Kick(DashKick);
+                // A strafe dash banks the view into its travel, through the wall-jump roll kick.
+                float side=Vector3.Dot(state.DashDirection,Quaternion.Euler(0,Yaw,0)*Vector3.right);
+                if(Mathf.Abs(side)>.3f) { rollKick=-Mathf.Sign(side)*DashRoll; kickRemaining=.28f; }
+            }
+            if((fresh&MotorEvents.Slide)!=0) nod+=SlideNod; // the nose dips as the slide commits
+            if((fresh&MotorEvents.Perfect)!=0) Kick(PerfectKick); // a perfect wall jump's stamina refund, otherwise unseen
+            if((fresh&MotorEvents.Launch)!=0) Kick(LaunchKick);
+            if((fresh&MotorEvents.Jump)!=0) Kick(JumpKick);
+            if((fresh&MotorEvents.Land)!=0)
+            {
+                // Scaled by the fall; stepping off a kerb does not thud.
+                float k=Mathf.Clamp01(Mathf.Max(airSpeed,-state.Velocity.y)/HardLanding);
+                if(k>=.08f && !ReducedMotion) { nod+=LandNod*k; Kick(LandKick*k); }
             }
             if(fresh!=MotorEvents.None) LocalEvents?.Invoke(fresh);
+        }
+        // ADS zoom is presentation of the authoritative AdsProgress; aim still reads Yaw/Pitch only.
+        public void SetAds(WeaponKind weapon,float progress)
+        {
+            adsWeapon=weapon; adsProgress=ArenaMotor.Finite(progress)?Mathf.Clamp01(progress):0;
+        }
+        // Distance-scaled blast shake. Cosmetic rotation only, suppressed by reduced motion.
+        public void AddShake(float amount)
+        {
+            if(ReducedMotion || !ArenaMotor.Finite(amount) || amount<=0) return;
+            shake=Mathf.Min(1.5f,shake+amount);
+        }
+        // View punch on the local player's own shots: the camera tips up and recovers in about .15 s. Cosmetic like
+        // the shake: shots read Yaw/Pitch, never the camera transform.
+        public void AddRecoil(float degrees)
+        {
+            if(ReducedMotion || !ArenaMotor.Finite(degrees) || degrees<=0) return;
+            punch=Mathf.Min(3,punch+degrees);
         }
         public void SetBaseFieldOfView(float value)
         {
@@ -78,9 +127,10 @@ namespace Wildstone.Presentation
             baseFieldOfView=value; hasBaseFieldOfView=true;
             if(ViewCamera!=null) ViewCamera.fieldOfView=baseFieldOfView+(ReducedMotion?0:slideFov);
         }
+        void Kick(float degrees) { if(!ReducedMotion) fovKick=Mathf.Clamp(fovKick+degrees,-10,10); }
         public void ResetPresentation()
         {
-            rollKick=kickRemaining=slideRoll=slideFov=0;
+            rollKick=kickRemaining=slideRoll=slideFov=shake=punch=fovKick=wallFov=nod=airSpeed=0; wasSliding=false;
             hasPresentationState=false;
             if(ViewCamera!=null)
             {
@@ -106,6 +156,12 @@ namespace Wildstone.Presentation
             float blend=1-Mathf.Exp(-12*dt);
             slideRoll=Mathf.Lerp(slideRoll,state.Sliding?-Mathf.Clamp(state.LastMove.x,-1,1)*2.5f:0,blend);
             slideFov=Mathf.Lerp(slideFov,state.Sliding?6:0,blend);
+            wallFov=Mathf.Lerp(wallFov,state.WallRunning?WallRunHold:0,blend);
+            if(wasSliding && !state.Sliding) Kick(SlideEndKick); // the world closing up as the slide's speed goes
+            wasSliding=state.Sliding;
+            airSpeed=state.Grounded?0:Mathf.Max(0,-state.Velocity.y);
+            float settle=Mathf.Exp(-11*dt);
+            fovKick*=settle; nod*=settle;
             float roll=0;
             if(state.WallRunning)
             {
@@ -113,10 +169,14 @@ namespace Wildstone.Presentation
                 roll=(Vector3.Dot(-state.WallNormal,right)>=0?1:-1)*MotorTuning.Source.wallRunCameraRoll;
             }
             roll+=rollKick*(kickRemaining/.28f)+slideRoll;
-            if(ReducedMotion) { roll=0; slideRoll=slideFov=0; }
+            if(ReducedMotion) { roll=0; slideRoll=slideFov=shake=punch=fovKick=wallFov=nod=0; }
             kickRemaining=Mathf.Max(0,kickRemaining-dt);
-            ViewCamera.fieldOfView=baseFieldOfView+slideFov;
-            ViewCamera.transform.SetPositionAndRotation(state.Position+Vector3.up*(state.CapsuleHeight-.15f),Quaternion.Euler(Pitch,Yaw,roll));
+            shake=Mathf.MoveTowards(shake,0,dt*2.2f);
+            punch*=Mathf.Exp(-18*dt);
+            float t=Time.unscaledTime*22, jolt=shake*shake*1.6f;
+            Vector3 tremor=new Vector3(Mathf.PerlinNoise(t,.3f)-.5f,Mathf.PerlinNoise(.7f,t)-.5f,Mathf.PerlinNoise(t,5.1f)-.5f)*jolt;
+            ViewCamera.fieldOfView=WeaponCatalog.AdsVerticalFov(baseFieldOfView+KickFieldOfView,adsWeapon,adsProgress);
+            ViewCamera.transform.SetPositionAndRotation(state.Position+Vector3.up*(state.CapsuleHeight-.15f),Quaternion.Euler(Pitch-punch+nod+tremor.x,Yaw+tremor.y,roll+tremor.z));
         }
     }
 }

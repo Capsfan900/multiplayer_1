@@ -90,6 +90,24 @@ namespace Wildstone.Tests
                 "Expired seat is a fresh anonymous lobby admission.");
             Assert.That(rules.CaptureSeats(31).Seats[0].ConnectionGeneration, Is.GreaterThan(1));
         }
+        // Every refusal names a fixed reason (logged by the host when it removes the peer); success clears it.
+        [Test] public void RefusedAdmissionsNameAFixedReason()
+        {
+            var rules=Lobby(); var admission=new FusionLobbyAdmission(rules,Content);
+            Assert.That(admission.Admit(PlayerRef.None,"a",Credential(1),0),Is.False); Assert.That(admission.Rejection,Is.EqualTo("invalid-peer"));
+            Assert.That(admission.Admit(PlayerRef.FromIndex(0),"a",Credential(1),0),Is.True); Assert.That(admission.Rejection,Is.Null);
+            Assert.That(admission.Admit(PlayerRef.FromIndex(0),"other",Credential(1),0),Is.False); Assert.That(admission.Rejection,Is.EqualTo("rebind-mismatch"));
+            Assert.That(admission.Admit(PlayerRef.FromIndex(1),"a",Credential(1),0),Is.False); Assert.That(admission.Rejection,Is.EqualTo("seat-already-connected"));
+            Assert.That(admission.Disconnect(PlayerRef.FromIndex(0),1),Is.True);
+            Assert.That(admission.Admit(PlayerRef.FromIndex(1),"a",Credential(2),2),Is.False); Assert.That(admission.Rejection,Is.EqualTo("seat-credential-mismatch"));
+            for(int i=1;i<SeatTable.Capacity;i++) Assert.That(admission.Admit(PlayerRef.FromIndex(i+1),"p"+i,Credential((byte)(i+1)),3),Is.True);
+            Assert.That(admission.Admit(PlayerRef.FromIndex(20),"ninth",Credential(20),3),Is.False); Assert.That(admission.Rejection,Is.EqualTo("teams-full"));
+            var loading=Lobby(); var late=new FusionLobbyAdmission(loading,Content);
+            late.Admit(PlayerRef.FromIndex(0),"a",Credential(1),0); late.Admit(PlayerRef.FromIndex(1),"b",Credential(2),0);
+            foreach(var seat in loading.CaptureSeats(0).Seats) loading.SetReady(seat.VerifiedSubject,seat.ConnectionGeneration,true);
+            Assert.That(loading.StartLoading(0),Is.True);
+            Assert.That(late.Admit(PlayerRef.FromIndex(2),"c",Credential(3),0),Is.False); Assert.That(late.Rejection,Is.EqualTo("phase-Loading"));
+        }
         static FusionLobbyAdmission Running(out SessionState rules)
         {
             rules=Lobby(); var admission=new FusionLobbyAdmission(rules,Content);

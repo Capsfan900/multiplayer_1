@@ -16,7 +16,7 @@ namespace Wildstone.UI
         public event Action Changed;
         public event Action<string> Join;
         public event Action HostMatch, Leave, StartMatch;
-        public event Action ReconnectRequested;
+        public event Action ReconnectRequested, RematchRequested;
         public event Action<int> Team;
         public event Action<bool> SetReady;
         public void Refresh() => Changed?.Invoke();
@@ -27,5 +27,7 @@ namespace Wildstone.UI
         public void ToggleReady() => SetReady?.Invoke(!Ready);
         public void StartGame() => StartMatch?.Invoke();
         public void RetryConnection() { if(CanReconnect) ReconnectRequested?.Invoke(); }
+        // Only the networking host acts on this; anywhere else the request is ignored.
+        public void Rematch() => RematchRequested?.Invoke();
     }
 }

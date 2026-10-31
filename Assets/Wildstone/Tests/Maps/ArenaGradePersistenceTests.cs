@@ -52,11 +52,12 @@ namespace Wildstone.Tests
                     Assert.That(persisted.OfType<Tonemapping>().Count(), Is.EqualTo(1));
                     Assert.That(persisted.OfType<Bloom>().Count(), Is.EqualTo(1));
                     Assert.That(tone.mode.overrideState, Is.True);
-                    Assert.That(tone.mode.value, Is.EqualTo(TonemappingMode.ACES));
+                    Assert.That(tone.mode.value, Is.EqualTo(TonemappingMode.Neutral));
                     Assert.That(bloom.intensity.overrideState, Is.True);
-                    Assert.That(bloom.intensity.value, Is.EqualTo(run == 0 ? .12f : .23f));
+                    Assert.That(bloom.intensity.value, Is.EqualTo(run == 0 ? .6f : .23f));
                     Assert.That(bloom.threshold.overrideState, Is.True);
-                    Assert.That(bloom.threshold.value, Is.EqualTo(1.2f));
+                    Assert.That(bloom.threshold.value, Is.EqualTo(1.05f));
+                    Assert.That(profile.TryGet<ColorAdjustments>(out _), Is.True, "D028 grade components persist.");
                     bloom.intensity.Override(.23f);
                     EditorUtility.SetDirty(bloom);
                     AssetDatabase.SaveAssets();

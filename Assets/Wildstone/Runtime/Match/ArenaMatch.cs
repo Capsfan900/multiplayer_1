@@ -85,11 +85,12 @@ namespace Wildstone.Match
             int mask=0,count=0; for(int i=0;i<players.Count;i++) if(players[i].Connected) mask|=1<<players[i].Team;
             for(;mask!=0;mask&=mask-1) count++; return count;
         }
-        public bool SetPose(int participant,int life,Vector3 feet,Vector3 aim,float capsuleHeight=1.8f)
+        // aiming is the ADS bit of the same consumed movement input; the motor itself ignores it.
+        public bool SetPose(int participant,int life,Vector3 feet,Vector3 aim,float capsuleHeight=1.8f,bool aiming=false)
         {
             var p=Find(participant);
             if(p==null || p.LifeGeneration!=life || !CombatRules.Finite(feet) || !CombatRules.Direction(aim) || !CombatRules.Finite(capsuleHeight) || capsuleHeight<.8f || capsuleHeight>1.8f) return false;
-            p.Feet=feet; p.Aim=aim; p.CapsuleHeight=capsuleHeight; return true;
+            p.Feet=feet; p.Aim=aim; p.CapsuleHeight=capsuleHeight; p.AimHeld=aiming; return true;
         }
         public bool SetConnection(int participant,int generation,bool connected,bool forceFreshLife=false)
         {
@@ -133,16 +134,23 @@ namespace Wildstone.Match
                 if(p.Alive && (p.Feet.y<map.KillHeight || (!p.Connected && Tick>=p.DisconnectUntil))) p.Health=0;
                 if(p.Alive && p.Health<=0) Kill(p);
                 p.Supported=world.TrySupport(p.Feet,out p.SupportPoint,out p.SupportNormal);
+                AdvanceAim(p);
             }
             ScoreZone();
             return true;
         }
         CombatAction SystemAction(CombatState p) => new CombatAction { Participant=p.Participant, LifeGeneration=p.LifeGeneration,
             ConnectionGeneration=p.ConnectionGeneration, AuthorityGeneration=AuthorityGeneration, Tick=Tick, Sequence=-1 };
-        void Emit(CombatEventKind kind,CombatAction action,int target=0,float amount=0,Vector3 position=default,Vector3 vector=default,string reason=null,int subIndex=0,WeaponKind weapon=WeaponKind.None)
+        void Emit(CombatEventKind kind,CombatAction action,int target=0,float amount=0,Vector3 position=default,Vector3 vector=default,string reason=null,int subIndex=0,WeaponKind weapon=WeaponKind.None,bool headshot=false)
         {
             if(events.Count==events.Capacity) throw new InvalidOperationException("Combat event capacity exceeded.");
-            events.Add(new CombatEvent(kind,action,Tick,target,Find(target)?.LifeGeneration??0,position,vector,amount,reason,subIndex,weapon));
+            events.Add(new CombatEvent(kind,action,Tick,target,Find(target)?.LifeGeneration??0,position,vector,amount,reason,subIndex,weapon,headshot));
+        }
+        // Deterministic per tick after combat: the next tick's shots see this tick's ADS/bloom.
+        void AdvanceAim(CombatState p)
+        {
+            p.AdsProgress=CombatRules.AdvanceAds(p.AdsProgress,CombatRules.AdsTarget(p),CombatRules.CurrentWeapon(p),1f/TickRate);
+            if(p.Bloom>0 && Tick>=p.BloomRecoverTick) p.Bloom=Math.Max(0,p.Bloom-WeaponCatalog.BloomDecayPerSecond/TickRate);
         }
         void Expire()
         {
@@ -165,12 +173,12 @@ namespace Wildstone.Match
             p.LastActionSequence=a.Sequence;
             switch(a.Kind)
             {
-                case CombatActionKind.SelectStarter: p.SelectedSpecial=false; break;
+                case CombatActionKind.SelectStarter: if(p.SelectedSpecial) p.AdsProgress=0; p.SelectedSpecial=false; break;
                 case CombatActionKind.SelectSpecial:
-                    if(p.SpecialWeapon==WeaponKind.None) return Reject(a,"No special weapon."); p.SelectedSpecial=true; break;
+                    if(p.SpecialWeapon==WeaponKind.None) return Reject(a,"No special weapon."); if(!p.SelectedSpecial) p.AdsProgress=0; p.SelectedSpecial=true; break;
                 case CombatActionKind.Reload:
                     if(p.Suppressed(Tick) || p.SelectedSpecial || p.StarterAmmo==WeaponCatalog.StarterAmmo || p.ReloadUntil>0 || p.Pending!=null) return Reject(a,"Cannot reload.");
-                    p.ReloadUntil=Tick+Ticks(WeaponCatalog.ReloadSeconds); break;
+                    p.ReloadUntil=Tick+Ticks(WeaponCatalog.ReloadSeconds); p.AdsProgress=0; break;
                 case CombatActionKind.Shield:
                     if(p.ShieldCharges==0 || p.Shield>0) return Reject(a,"Shield unavailable or already active.");
                     p.ShieldCharges--; p.Shield=WeaponCatalog.Shield; p.ShieldUntil=Tick+Ticks(WeaponCatalog.ShieldSeconds);
@@ -185,18 +193,20 @@ namespace Wildstone.Match
                 case CombatActionKind.Fire:
                 case CombatActionKind.Grenade:
                     bool grenade=a.Kind==CombatActionKind.Grenade;
-                    if(p.Suppressed(Tick) || p.Pending!=null || (!grenade && p.ReloadUntil>0) || Tick<(grenade?p.GrenadeReadyTick:p.FireReadyTick)) return Reject(a,"Attack cooldown or control loss.");
                     var weapon=grenade?WeaponKind.Grenade:(p.SelectedSpecial?p.SpecialWeapon:WeaponKind.LineDriver);
+                    int slack=WeaponCatalog.IsAutomatic(weapon)?Ticks(WeaponCatalog.FireSlackSeconds):0;
+                    if(p.Suppressed(Tick) || p.Pending!=null || (!grenade && p.ReloadUntil>0) || Tick<(grenade?p.GrenadeReadyTick:p.FireReadyTick-slack)) return Reject(a,"Attack cooldown or control loss.");
                     if(weapon==WeaponKind.None) return Reject(a,"Missing weapon.");
                     var spec=WeaponCatalog.Get(weapon);
                     int ammo=grenade?p.GrenadeAmmo:(p.SelectedSpecial?p.SpecialAmmo:p.StarterAmmo);
                     if(weapon!=WeaponKind.LaserSword && ammo<=0) return Reject(a,"No ammunition.");
                     if(IsProjectile(weapon) && projectiles.Count+reservedProjectiles>=WeaponCatalog.MaximumProjectiles) return Reject(a,"Projectile capacity reached.");
-                    if(grenade) { p.GrenadeAmmo--; p.GrenadeReadyTick=Tick+Ticks(spec.Interval); }
+                    if(grenade) { p.GrenadeAmmo--; p.GrenadeReadyTick=Tick+Ticks(spec.Interval); p.AdsProgress=0; }
                     else
                     {
                         if(weapon!=WeaponKind.LaserSword) { if(p.SelectedSpecial) p.SpecialAmmo--; else p.StarterAmmo--; }
-                        p.FireReadyTick=Tick+Ticks(spec.Interval);
+                        // A held automatic stream within slack of its ready tick keeps that schedule (D036).
+                        p.FireReadyTick=(Tick-p.FireReadyTick<=slack?p.FireReadyTick:Tick)+Ticks(spec.Interval);
                     }
                     if(IsProjectile(weapon)) reservedProjectiles++;
                     reservedWeapon=weapon;
@@ -218,36 +228,41 @@ namespace Wildstone.Match
             else if(item.Item=="shield") { if(p.ShieldCharges==1) return Reject(a,"Shield slot full."); p.ShieldCharges=1; }
             else if(weapon==WeaponKind.Grenade) { if(p.GrenadeAmmo==2) return Reject(a,"Grenades full."); p.GrenadeAmmo=2; }
             else if(weapon==WeaponKind.LineDriver) { if(p.StarterAmmo==WeaponCatalog.StarterAmmo) return Reject(a,"Starter clip full."); p.StarterAmmo=WeaponCatalog.StarterAmmo; p.ReloadUntil=0; }
-            else { p.SpecialWeapon=weapon; p.SpecialAmmo=WeaponCatalog.Get(weapon).Ammo; p.SelectedSpecial=true; p.Pending=null; }
+            else { p.SpecialWeapon=weapon; p.SpecialAmmo=WeaponCatalog.Get(weapon).Ammo; p.SelectedSpecial=true; p.Pending=null; p.AdsProgress=0; }
             item.Generation++; item.AvailableTick=Tick+Ticks(WeaponCatalog.PickupSeconds); Emit(CombatEventKind.Pickup,a,p.Participant,position:item.Position); return true;
         }
         void Resolve(CombatAction a,WeaponKind weapon,ICombatWorld world)
         {
             if(weapon==WeaponKind.None) return;
             var p=Find(a.Participant); var spec=WeaponCatalog.Get(weapon);
+            // Hitscan spread uses the ADS/bloom state at fire time; the Shot event carries it for presentation replay.
+            float spread=WeaponCatalog.IsHitscan(weapon)?WeaponCatalog.SpreadDegrees(weapon,p.AdsProgress,p.Bloom):0;
             if(IsProjectile(weapon) || WeaponCatalog.IsHitscan(weapon))
-                Emit(CombatEventKind.Shot,a,p.Participant,position:p.Eye,vector:a.Direction,weapon:weapon);
+                Emit(CombatEventKind.Shot,a,p.Participant,position:p.Eye,vector:a.Direction,amount:spread,weapon:weapon);
             if(IsProjectile(weapon))
             {
                 reservedProjectiles--;
                 var shot=freeProjectiles[--freeProjectileCount];
                 shot.Action=a; shot.OwnerTeam=p.Team; shot.Weapon=weapon; shot.Position=p.Eye;
-                shot.Velocity=a.Direction*spec.Speed+(weapon==WeaponKind.Grenade?Vector3.up*6:Vector3.zero);
-                shot.ExpireTick=Tick+Ticks(spec.Lifetime); shot.Bounces=0; shot.HitMask=0; shot.Travel=0;
+                shot.Velocity=weapon==WeaponKind.Grenade?GrenadeLaunch(a.Direction):a.Direction*spec.Speed;
+                shot.ExpireTick=Tick+Ticks(spec.Lifetime); shot.Bounces=0; shot.HitMask=0; shot.Travel=0; shot.Deflected=false;
                 projectiles.Add(shot);
             }
             else if(WeaponCatalog.IsHitscan(weapon))
             {
+                float bloom=WeaponCatalog.BloomPerShot(weapon);
+                if(bloom>0) { p.Bloom=Math.Min(1,p.Bloom+bloom); p.BloomRecoverTick=Tick+Ticks(WeaponCatalog.BloomDelaySeconds); }
+                uint seed=WeaponCatalog.ShotSeed(a);
                 for(int pellet=0;pellet<WeaponCatalog.HitscanPellets(weapon);pellet++)
                 {
-                    Vector3 direction=WeaponCatalog.HitscanDirection(weapon,a.Direction,pellet);
+                    Vector3 direction=WeaponCatalog.HitscanDirection(weapon,a.Direction,pellet,spread,seed);
                     CombatHit hit;
                     bool found=world is IHitscanCombatWorld hitscan?
                         hitscan.Hitscan(a,p.Eye,direction*spec.Range,0,out hit):
                         world.Sweep(p.Eye,direction*spec.Range,0,p.Participant,0,out hit);
                     if(found && hit.Participant!=0 && CombatRules.Finite(hit.Point) && CombatRules.Finite(hit.Distance) &&
                         hit.Distance>=0 && hit.Distance<=spec.Range && (hit.Point-p.Eye).sqrMagnitude<=spec.Range*spec.Range+.01f)
-                        Hit(a,p.Team,Find(hit.Participant),spec.Damage,world,false,hit.Point,subIndex:pellet,weapon:weapon);
+                        Hit(a,p.Team,Find(hit.Participant),spec.Damage,world,false,hit.Point,subIndex:pellet,weapon:weapon,head:hit.Head);
                 }
             }
             else
@@ -277,6 +292,24 @@ namespace Wildstone.Match
                         var flat=new Vector3(pending.Direction.x,0,pending.Direction.z).normalized;
                         Emit(CombatEventKind.Impulse,pending.Action,target.Participant,position:target.Feet,vector:flat*14+Vector3.up*4);
                     }
+                    // D037: the nearest enemy projectile still in flight in the same cone is relaunched along the push and
+                    // owned by the pusher, once. One per push keeps one live projectile per owning action (TryRestore).
+                    // A fuse ending this tick is already committed; fuse, range, bounces and hit mask carry on.
+                    ArenaProjectile caught=null; float nearest=spec.Range*spec.Range;
+                    foreach(var shot in projectiles)
+                    {
+                        var delta=shot.Position-p.Eye;
+                        if(shot.Deflected || shot.OwnerTeam==p.Team || Tick>=shot.ExpireTick || delta.sqrMagnitude>nearest ||
+                            Vector3.Dot(delta.normalized,pending.Direction)<.8870108f || !world.Visible(p.Eye,shot.Position)) continue;
+                        caught=shot; nearest=delta.sqrMagnitude;
+                    }
+                    if(caught!=null)
+                    {
+                        Emit(CombatEventKind.Deflected,pending.Action,caught.Action.Participant,position:caught.Position,vector:pending.Direction,weapon:caught.Weapon);
+                        int launched=caught.Action.Tick; caught.Action=pending.Action; caught.Action.Tick=launched;
+                        caught.OwnerTeam=p.Team; caught.Deflected=true;
+                        caught.Velocity=caught.Weapon==WeaponKind.Grenade?GrenadeLaunch(pending.Direction):pending.Direction*WeaponCatalog.Get(caught.Weapon).Speed;
+                    }
                     p.Pending=null;
                 }
                 else
@@ -302,11 +335,12 @@ namespace Wildstone.Match
                 attack.HitMask|=1<<target.Participant; Hit(attack.Action,owner.Team,target,spec.Damage,world,false,hit.Point);
             }
         }
-        void Hit(CombatAction action,int team,CombatState target,float damage,ICombatWorld world,bool stun,Vector3 point,bool selfDamage=false,int subIndex=0,WeaponKind weapon=WeaponKind.None)
+        void Hit(CombatAction action,int team,CombatState target,float damage,ICombatWorld world,bool stun,Vector3 point,bool selfDamage=false,int subIndex=0,WeaponKind weapon=WeaponKind.None,bool head=false)
         {
             if(target==null || !target.Alive || (target.Team==team && !(selfDamage && target.Participant==action.Participant))) return;
-            float prior=target.Shield, dealt=CombatRules.Damage(target,damage);
-            Emit(CombatEventKind.Hit,action,target.Participant,dealt,point,subIndex:subIndex,weapon:weapon);
+            float multiplier=head?WeaponCatalog.HeadshotMultiplier(weapon):1;
+            float prior=target.Shield, dealt=CombatRules.Damage(target,damage*multiplier);
+            Emit(CombatEventKind.Hit,action,target.Participant,dealt,point,subIndex:subIndex,weapon:weapon,headshot:multiplier>1);
             if(prior>0 && target.Shield==0) Emit(CombatEventKind.ShieldBroken,action,target.Participant);
             if(stun && CombatRules.Stun(target,Tick,TickRate)) Emit(CombatEventKind.Stunned,action,target.Participant);
         }
@@ -321,9 +355,8 @@ namespace Wildstone.Match
                     if(shot.Weapon==WeaponKind.Grenade || shot.Weapon==WeaponKind.PulseLobber) Explode(shot,world);
                     ReleaseProjectile(i); continue;
                 }
-                if(shot.Weapon==WeaponKind.Grenade) shot.Velocity+=Vector3.down*(18*dt);
-                Vector3 delta=shot.Velocity*dt; float remaining=delta.magnitude;
-                if(shot.Weapon!=WeaponKind.Grenade) remaining=Math.Min(remaining,Math.Max(0,spec.Range-shot.Travel));
+                if(shot.Weapon==WeaponKind.Grenade) { StepGrenade(world,shot.Action.Participant,shot.HitMask,dt,ref shot.Position,ref shot.Velocity,ref shot.Travel); continue; }
+                Vector3 delta=shot.Velocity*dt; float remaining=Math.Min(delta.magnitude,Math.Max(0,spec.Range-shot.Travel));
                 for(int bounce=0;bounce<4 && remaining>.0001f;bounce++)
                 {
                     var direction=shot.Velocity.normalized;
@@ -331,25 +364,32 @@ namespace Wildstone.Match
                     { shot.Position+=direction*remaining; shot.Travel+=remaining; break; }
                     float traveled=Math.Max(0,Math.Min(remaining,hit.Distance)); shot.Position+=direction*traveled; shot.Travel+=traveled; remaining-=traveled;
                     if(shot.Weapon==WeaponKind.PulseLobber) { Explode(shot,world); remove=true; break; }
-                    if(hit.Participant!=0 && shot.Weapon!=WeaponKind.Grenade)
+                    if(hit.Participant!=0)
                     {
                         shot.HitMask|=1<<hit.Participant; Hit(shot.Action,shot.OwnerTeam,Find(hit.Participant),spec.Damage,world,shot.Weapon==WeaponKind.StunGun,hit.Point);
                         if(shot.Weapon==WeaponKind.StunGun) { remove=true; break; }
                         shot.Position+=direction*.005f; remaining=Math.Max(0,remaining-.005f); continue;
                     }
-                    if(shot.Weapon==WeaponKind.Grenade)
-                    {
-                        shot.Velocity=Vector3.Reflect(shot.Velocity,hit.Normal)*.55f;
-                        shot.Position+=hit.Normal*.005f; break;
-                    }
                     if(shot.Weapon==WeaponKind.ReboundDisc && shot.Bounces<2)
                     { shot.Bounces++; shot.Velocity=Vector3.Reflect(shot.Velocity,hit.Normal); shot.Position+=hit.Normal*.005f; Emit(CombatEventKind.Ricochet,shot.Action,position:shot.Position,subIndex:shot.Bounces); }
                     else { remove=true; break; }
                 }
-                if(!remove && shot.Travel>=spec.Range && shot.Weapon!=WeaponKind.Grenade)
+                if(!remove && shot.Travel>=spec.Range)
                 { if(shot.Weapon==WeaponKind.PulseLobber) Explode(shot,world); remove=true; }
                 if(remove) ReleaseProjectile(i);
             }
+        }
+        // Grenade flight is shared with the presentation hold-to-aim arc, so the preview is the simulated path.
+        public static Vector3 GrenadeLaunch(Vector3 direction) => direction*WeaponCatalog.Get(WeaponKind.Grenade).Speed+Vector3.up*6;
+        public static void StepGrenade(ICombatWorld world,int owner,int ignoredMask,float dt,ref Vector3 position,ref Vector3 velocity,ref float travel)
+        {
+            velocity+=Vector3.down*(18*dt);
+            float remaining=(velocity*dt).magnitude;
+            if(remaining<=.0001f) return;
+            var direction=velocity.normalized;
+            if(!world.Sweep(position,direction*remaining,.12f,owner,ignoredMask,out var hit)) { position+=direction*remaining; travel+=remaining; return; }
+            float traveled=Math.Max(0,Math.Min(remaining,hit.Distance)); position+=direction*traveled; travel+=traveled;
+            velocity=Vector3.Reflect(velocity,hit.Normal)*.55f; position+=hit.Normal*.005f;
         }
         void ReleaseProjectile(int index)
         { freeProjectiles[freeProjectileCount++]=projectiles[index]; projectiles.RemoveAt(index); }
@@ -434,7 +474,7 @@ namespace Wildstone.Match
                 if(!CombatRules.ValidPlayer(p) || !ids.Add(p.Participant) || ++teams[p.Team]>2 || p.DiscontinuityTick>saved.Tick ||
                     p.ShieldUntil>saved.Tick+Ticks(WeaponCatalog.ShieldSeconds) || (p.Shield>0 && p.ShieldUntil<=saved.Tick) ||
                     p.StunUntil>saved.Tick+Ticks(.45f) || p.ImmunityUntil>saved.Tick+Ticks(2.2f) ||
-                    p.FireReadyTick>saved.Tick+Ticks(1.2f) || p.GrenadeReadyTick>saved.Tick+Ticks(.7f) || p.ReloadUntil>saved.Tick+Ticks(WeaponCatalog.ReloadSeconds) ||
+                    p.FireReadyTick>saved.Tick+Ticks(1.2f) || p.BloomRecoverTick>saved.Tick+Ticks(WeaponCatalog.BloomDelaySeconds) || p.GrenadeReadyTick>saved.Tick+Ticks(.7f) || p.ReloadUntil>saved.Tick+Ticks(WeaponCatalog.ReloadSeconds) ||
                     p.RespawnTick>saved.Tick+Ticks(WeaponCatalog.RespawnSeconds) || p.DisconnectUntil>saved.Tick+5*TickRate ||
                     (p.Pending!=null && (p.Pending.Action.Tick>saved.Tick || p.Pending.Action.AuthorityGeneration<1 || p.Pending.Action.AuthorityGeneration>saved.AuthorityGeneration ||
                         p.Pending.EndTick<saved.Tick || p.Pending.EndTick>saved.Tick+Ticks(.25f)))) return false;

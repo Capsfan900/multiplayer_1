@@ -163,5 +163,28 @@ namespace Wildstone.Tests
             Replay(35,Vector2.up);
             Assert.That(motor.CaptureState().Velocity.z,Is.GreaterThan(15));
         }
+        // The practice target's drill (PracticeSession.Drill) keeps moving with jumps and dashes, faces the player and
+        // stays near its spawn.
+        [Test] public void PracticeDrillStrafesJumpsDashesAndStaysNearHome()
+        {
+            for(int leg=1;leg<200;leg++) Assert.That(Game.PracticeSession.DrillLegTicks(leg),Is.InRange(60,156));
+            Settle(); var home=motor.CaptureState().Position; var player=home+new Vector3(0,0,25);
+            float farthest=0,travel=0; var events=MotorEvents.None; int current=0,start=0,end=0; var last=home;
+            for(int tick=0;tick<2400;tick++)
+            {
+                if(tick>=end) { current++; start=tick; end=tick+Game.PracticeSession.DrillLegTicks(current); }
+                var s=motor.CaptureState(); var input=Game.PracticeSession.Drill(current,tick-start,s.Position,home,player);
+                Step(input.Move,input.Pressed,input.Held,input.Yaw);
+                s=motor.CaptureState(); events|=s.Events;
+                travel+=Vector3.Distance(s.Position,last); last=s.Position;
+                farthest=Mathf.Max(farthest,new Vector2(s.Position.x-home.x,s.Position.z-home.z).magnitude);
+            }
+            TestContext.Out.WriteLine($"Drill 20 s: travel={travel:F1} m, farthest={farthest:F2} m, events={events}");
+            Assert.That(travel,Is.GreaterThan(60),"It keeps moving.");
+            Assert.That(farthest,Is.LessThan(8),"It stays near its spawn.");
+            Assert.That(events&(MotorEvents.Jump|MotorEvents.Dash),Is.EqualTo(MotorEvents.Jump|MotorEvents.Dash));
+            var final=motor.CaptureState(); var bearing=Mathf.Atan2(player.x-final.Position.x,player.z-final.Position.z)*Mathf.Rad2Deg;
+            Assert.That(Mathf.DeltaAngle(final.Yaw,bearing),Is.EqualTo(0).Within(1),"It faces the player.");
+        }
     }
 }

@@ -33,10 +33,12 @@ namespace Wildstone.Networking
         public ArenaMatch Model { get; private set; }
         public override void Spawned() { DontDestroyOnLoad(gameObject); RegisterOrbWorld(); }
 
-        public void Initialize(ArenaDefinition map, bool practice = false)
+        // A rematch after host migration starts at the session's current authority generation so checkpoints stay coherent.
+        public void Initialize(ArenaDefinition map, bool practice = false, int authorityGeneration = 1)
         {
             RequireHost();
             if (Initialized) throw new InvalidOperationException("Match is already initialized.");
+            if (authorityGeneration < 1) throw new ArgumentOutOfRangeException(nameof(authorityGeneration));
             if (map == null || map.Validate().Count != 0 || map.Pickups.Length > FusionMatchState.MaximumPickups)
                 throw new ArgumentException("Invalid or oversized match map.", nameof(map));
             FusionMatchState.ValidateText(map.Id, nameof(map.Id));
@@ -46,6 +48,7 @@ namespace Wildstone.Networking
             definition = map;
             InitializeOrbState();
             Model = new ArenaMatch(map, WeaponCatalog.DefaultTickRate, practice);
+            if (authorityGeneration > 1 && !Model.AdvanceAuthorityGeneration(authorityGeneration)) throw new InvalidOperationException("Match authority generation rejected.");
             world = new FusionCombatWorld(Runner, map);
             simulateMovement = SimulateMovement;
             FirstRunnerTick = Runner.Tick.Raw + 1;
@@ -140,6 +143,22 @@ namespace Wildstone.Networking
             return true;
         }
 
+        // Match tick a combat request sent now is stamped with. A client maps Fusion's predicted tick (advanced every
+        // simulated tick and timed to reach the host just in time) through the replicated tick pair; its 20 Hz model copy
+        // moves in six-tick steps and would quantize a held trigger (D036). It holds small drops: during RecoveryWarmup the
+        // host keeps Header.Tick but advances OrbSnapshotRunnerTick, and PracticeInput reads a drop as a reset.
+        public int NextActionTick
+        {
+            get
+            {
+                if (Runner.IsServer) return Model.Tick + 1;
+                int tick = Runner.Tick.Raw + Header.Tick - OrbSnapshotRunnerTick + 1;
+                if (tick < clientActionTick && tick > clientActionTick - WeaponCatalog.DefaultTickRate) tick = clientActionTick;
+                return clientActionTick = tick;
+            }
+        }
+        int clientActionTick;
+
         // Only the bound avatar's input-authority RPC may call this admission boundary.
         public bool SubmitAction(FusionPlayer sender, FusionCombatAction request)
         {
@@ -193,7 +212,7 @@ namespace Wildstone.Networking
                 avatar.SimulateHostTick();
                 var motor = avatar.State;
                 var aim = Quaternion.Euler(motor.Pitch, motor.Yaw, 0) * Vector3.forward;
-                if (!Model.SetPose(player.Participant, player.LifeGeneration, motor.Position, aim, motor.CapsuleHeight))
+                if (!Model.SetPose(player.Participant, player.LifeGeneration, motor.Position, aim, motor.CapsuleHeight, avatar.AimHeld))
                     throw new InvalidOperationException("Host motor produced an invalid combat pose.");
             }
             Physics.SyncTransforms();
@@ -303,5 +322,21 @@ namespace Wildstone.Networking
             if (Object == null || !HasStateAuthority || Runner == null || !Runner.IsServer)
                 throw new InvalidOperationException("Only the match host may mutate authoritative state.");
         }
+#if WILDSTONE_SMOKE
+        // Smoke-only stand-in for the 480 s clock: the winner banks a second, the first player is wounded and a pickup taken,
+        // so rematch smoke can prove the next match starts fresh. Live combat closures are moot once the match is finished.
+        internal bool SmokeFinish(int winner)
+        {
+            RequireHost();
+            if (!Initialized || Model.Phase != ArenaMatchPhase.Running || winner < 0 || winner >= FusionMatchState.TeamCount) return false;
+            var saved = Model.Capture();
+            saved.Phase = ArenaMatchPhase.Finished; saved.Winner = winner; saved.ScoreTicks[winner] = Math.Min(120 * saved.TickRate, saved.ScoreTicks[winner] + saved.TickRate);
+            if (saved.Players.Length > 0 && saved.Players[0].Alive) saved.Players[0].Health = 50;
+            if (saved.Pickups.Length > 0) { saved.Pickups[0].Generation++; saved.Pickups[0].AvailableTick = saved.Tick + 1; }
+            if (!Model.TryRestore(saved)) return false;
+            Publish();
+            return true;
+        }
+#endif
     }
 }

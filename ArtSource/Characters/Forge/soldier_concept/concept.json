@@ -1,0 +1,47 @@
+{
+  "forge_entry": "stages.concept.build (SDXL + OpenPose ControlNet + IP-Adapter), stages.preprocess.run + stages.image_to_3d.run (TripoSR, MIT)",
+  "description": "sleek armored sci-fi soldier, closed helmet with dark glossy visor, clean ivory hard-surface armor plates over charcoal undersuit, graphite trim, small cyan accent panels, athletic human proportions, minimalist",
+  "positive_template": "{desc}, full body, A-pose, plain light grey background, character concept art, flat lighting",
+  "negative": "standing on ground, ground, floor, terrain, puddle, pool of blood, cast shadow, pedestal, base, platform, rubble, dirt mound, extra arms, four arms, extra limbs, wings, feathered pauldrons, spiked shoulder plates, long cape, train, cropped, close-up, portrait, bust, headshot, out of frame, cut off",
+  "view_hints": {
+    "front": [
+      "front view, facing the camera, face visible",
+      ""
+    ],
+    "left": [
+      "strict side view, profile of the character's left side, facing left, one arm visible",
+      "front view, back view, facing the camera, both arms visible, symmetrical pose, three quarter view"
+    ],
+    "back": [
+      "back view, from directly behind, back of the head, facing away",
+      "face, eyes, nose, mouth, facial features, looking at viewer, front view, chest, three quarter view"
+    ],
+    "right": [
+      "strict side view, profile of the character's right side, facing right, one arm visible",
+      "front view, back view, facing the camera, both arms visible, symmetrical pose, three quarter view"
+    ]
+  },
+  "runs": [
+    {
+      "seed": 7,
+      "steps": 30,
+      "views": {
+        "front": "ArtSource\\Characters\\Forge\\soldier_concept\\seed7\\view_front.png",
+        "back": "ArtSource\\Characters\\Forge\\soldier_concept\\seed7\\view_back.png"
+      }
+    },
+    {
+      "seed": 21,
+      "steps": 30,
+      "views": {
+        "front": "ArtSource\\Characters\\Forge\\soldier_concept\\seed21\\view_front.png",
+        "back": "ArtSource\\Characters\\Forge\\soldier_concept\\seed21\\view_back.png"
+      }
+    }
+  ],
+  "triposr": {
+    "input": "ArtSource\\Characters\\Forge\\soldier_concept\\seed7\\view_front.png",
+    "mesh": "ArtSource\\Characters\\Forge\\soldier_concept\\triposr\\soldier_ref.raw.obj",
+    "note": "proportion reference only; normalised to 2 m by the forge; never exported"
+  }
+}

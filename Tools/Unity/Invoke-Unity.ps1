@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Compile', 'Prepare', 'PreparePresentation', 'PrepareNetworking', 'Bake', 'Test', 'BuildWindows', 'BuildSmoke')]
+    [ValidateSet('Compile', 'Prepare', 'PreparePresentation', 'PrepareNetworking', 'Bake', 'Test', 'BuildWindows', 'BuildSmoke', 'CaptureViewmodel')]
     [string]$Action,
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path,
     [string]$UnityExe = 'C:\Program Files\Unity\Hub\Editor\6000.5.10f1\Editor\Unity.exe',
@@ -29,6 +29,7 @@ $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
 $log = Join-Path $artifacts "$Action-$stamp.log"
 $buildExe = Join-Path $artifacts 'Windows/WildstoneArena.exe'
 $arguments = @('-batchmode', '-projectPath', "`"$expectedRoot`"", '-logFile', "`"$log`"")
+if ($Action -eq 'CaptureViewmodel') { $Graphics = $true }
 if ($Action -ne 'Bake' -and -not $Graphics) { $arguments += '-nographics' }
 if ($Graphics) { $arguments += '-force-d3d11' }
 switch ($Action) {
@@ -44,10 +45,13 @@ switch ($Action) {
     }
     'BuildWindows' { $arguments += @('-quit', '-executeMethod', 'Wildstone.Editor.ProjectSetup.BuildWindows') }
     'BuildSmoke' { $arguments += @('-quit', '-executeMethod', 'Wildstone.Networking.Editor.FusionSmokeBuild.Build') }
+    'CaptureViewmodel' { $arguments += @('-quit', '-executeMethod', 'Wildstone.Editor.ViewmodelCapture.Run') }
 }
 
 $startedUtc = (Get-Date).ToUniversalTime()
-$process = Start-Process -FilePath $UnityExe -ArgumentList $arguments -WorkingDirectory $expectedRoot -PassThru -WindowStyle Hidden
+# An incremental player build leaves an unchanged launcher untouched, so remove it first: only this run can recreate it.
+if ($Action -eq 'BuildWindows') { Remove-Item -LiteralPath $buildExe -ErrorAction SilentlyContinue }
+$process =Start-Process -FilePath $UnityExe -ArgumentList $arguments -WorkingDirectory $expectedRoot -PassThru -WindowStyle Hidden
 if (-not $process.WaitForExit($TimeoutMinutes * 60000)) {
     # Stop only the Editor this invocation owns; leave the user's Hub and other projects alone.
     $process.Kill()

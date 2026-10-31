@@ -22,7 +22,10 @@ namespace Wildstone.Networking
         FusionMatch match;
         FusionMatch orbWorld;
         bool predictionStarted;
-        Hitbox hitbox;
+        Hitbox hitbox, head;
+        bool aimHeld;
+        // Host-side ADS intent from the latest accepted input; held like movement for at most 100 ms of missing input.
+        public bool AimHeld => aimHeld;
 
         public void BindMatch(FusionMatch owner, int participant)
         {
@@ -34,14 +37,24 @@ namespace Wildstone.Networking
         [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority, HostMode = RpcHostMode.SourceIsHostPlayer)]
         public void RPC_Combat(FusionCombatAction action, RpcInfo info = default)
         {
-            if (match != null && info.Source == Object.InputAuthority && AcceptsCombatTick(Runner.Tick.Raw,info.Tick.Raw))
+            if (match != null && info.Source == Object.InputAuthority && AcceptsCombatTick(Runner.Tick.Raw,info.Tick.Raw,action.Kind))
                 match.SubmitAction(this, action);
+#if WILDSTONE_SMOKE
+            else if (match != null && info.Source == Object.InputAuthority)
+                Debug.Log($"WILDSTONE COMBAT RPC EXPIRED participant={Participant} kind={action.Kind} sequence={action.Sequence} age={Runner.Tick.Raw-info.Tick.Raw}");
+#endif
         }
 
-        internal static bool AcceptsCombatTick(int now,int sent)
+        // Shots, grenades, Blink and shield answer timing, so they keep the 150 ms window (18 ticks at 120 Hz). Pickups,
+        // reloads and weapon selections are judged on current host state, so one resent after packet loss still lands
+        // up to 500 ms late instead of silently vanishing.
+        internal const int AttackWindowTicks=18, InventoryWindowTicks=60;
+        internal static bool AcceptsCombatTick(int now,int sent,CombatActionKind kind=CombatActionKind.Fire)
         {
             long age=(long)now-sent;
-            return sent>=0 && age>=0 && age<=18;
+            bool inventory=kind==CombatActionKind.Pickup || kind==CombatActionKind.Reload ||
+                kind==CombatActionKind.SelectStarter || kind==CombatActionKind.SelectSpecial;
+            return sent>=0 && age>=0 && age<=(inventory?InventoryWindowTicks:AttackWindowTicks);
         }
 
         public override void Spawned()
@@ -51,6 +64,8 @@ namespace Wildstone.Networking
             motor.LaunchOrbWorld = this;
             freshState = ArenaMotor.InitialState(transform.position,transform.eulerAngles.y);
             hitbox = GetComponent<Hitbox>();
+            foreach (var candidate in GetComponentsInChildren<Hitbox>(true))
+                if (candidate != hitbox && candidate.Type == HitboxTypes.Sphere) head = candidate;
             RequireSupportedWorld();
             if (VisualRoot == transform) throw new InvalidOperationException("VisualRoot must be a child separate from the authoritative collider");
         }
@@ -155,7 +170,7 @@ namespace Wildstone.Networking
             if(!HasStateAuthority || !Runner.IsServer) throw new InvalidOperationException("Only the host can retire an input stream");
             var state=State.ToMotor(); state.Held=MotorButtons.None; state.LastMove=Vector2.zero;
             state.LastFreshInputTick=state.Tick-13;
-            motor.RestoreState(state); State=FusionMotorState.FromMotor(state); LastSampleSequence=-1;
+            motor.RestoreState(state); State=FusionMotorState.FromMotor(state); LastSampleSequence=-1; aimHeld=false;
         }
 
         public void ApplyImpulse(Vector3 impulse, int sequence, int tick)
@@ -192,11 +207,19 @@ namespace Wildstone.Networking
                 throw new InvalidOperationException("Scheduled Fusion movement input was rejected");
             State = FusionMotorState.FromMotor(motor.CaptureState());
             LastSampleSequence = consumed;
+            if (input.Present) aimHeld = (sample.Held & MotorButtons.Aim) != 0;
+            else if ((State.Tick - State.LastFreshInputTick) * (double)MotorTuning.TickDelta > .1) aimHeld = false;
             if(HasInputAuthority && !Runner.IsServer) predictionStarted=true;
             if (hitbox != null && HasStateAuthority)
             {
                 hitbox.BoxExtents = new Vector3(.35f, State.CapsuleHeight * .5f, .35f);
                 hitbox.Offset = State.CapsuleCenter;
+            }
+            if (head != null && HasStateAuthority)
+            {
+                // Same sphere as CombatRules.HeadCenter; lag compensation records the per-tick offset.
+                head.SphereRadius = CombatRules.HeadRadius;
+                head.Offset = Vector3.up * (State.CapsuleHeight - CombatRules.HeadDrop);
             }
         }
 

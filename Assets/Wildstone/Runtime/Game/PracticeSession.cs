@@ -41,6 +41,15 @@ namespace Wildstone.Game
         public string Failure { get; private set; }
         public float LoadProgress { get; private set; }
         public PracticeInput Input { get; private set; }
+        // Presentation-only local ADS prediction (zoom, sensitivity); rules use CombatState.AdsProgress.
+        public float LocalAdsProgress { get; private set; }
+        public WeaponKind LocalWeapon => LocalPlayer!=null?CombatRules.CurrentWeapon(LocalPlayer):WeaponKind.None;
+        // Hip vertical FOV derived from the horizontal setting and the current aspect.
+        public float HipVerticalFov => LocalSettings.VerticalFov(Settings?.Fov??LocalSettings.DefaultFov,Camera!=null?Camera.aspect:16f/9);
+        int adsDrops,adsLife;
+        WeaponKind adsWeapon;
+        FirstPersonView fovView;
+        float fovAspect;
         public event Action SessionStarted, SessionStopped, Stepped, ScreenChanged, SettingsChanged, BackRequested;
         readonly Dictionary<int,ArenaMotor> motors=new Dictionary<int,ArenaMotor>();
         readonly Dictionary<int,MotorState> freshStates=new Dictionary<int,MotorState>();
@@ -55,6 +64,8 @@ namespace Wildstone.Game
         double accumulator;
         Action simulateMovement;
         bool tickInputActive;
+        int drillLeg,drillLegStart,drillLegEnd;
+        Vector3 drillHome;
         void Awake()
         {
             simulateMovement=SimulateMovement;
@@ -76,7 +87,7 @@ namespace Wildstone.Game
         public void ApplySettings(LocalSettings value,bool save=true)
         {
             Settings=value.Copy(); Settings.Normalize(); Settings.Apply(Camera); if(save) Settings.Save();
-            if(View!=null) { View.ReducedMotion=Settings.ReducedMotion; View.SetBaseFieldOfView(Settings.Fov); }
+            if(View!=null) { View.ReducedMotion=Settings.ReducedMotion; View.SetBaseFieldOfView(HipVerticalFov); fovView=View; fovAspect=Camera!=null?Camera.aspect:0; }
             Input?.Dispose(); Input=new PracticeInput(Settings); SettingsChanged?.Invoke();
         }
         public void Show(MenuScreen screen)
@@ -219,12 +230,13 @@ namespace Wildstone.Game
             for(int participant=1;participant<=2;participant++)
             {
                 var spawn=Array.Find(definition.Spawns,s=>s.Team==participant-1);
-                var avatar=new GameObject(participant==1?"Local practice avatar":"Stationary practice target (fixture)");
+                var avatar=new GameObject(participant==1?"Local practice avatar":"Strafing practice target (fixture)");
                 avatar.transform.SetPositionAndRotation(spawn.Position,Quaternion.Euler(0,spawn.Yaw,0));
                 var motor=avatar.AddComponent<ArenaMotor>(); motors.Add(participant,motor); freshStates.Add(participant,motor.CaptureState());
                 Match.AddPlayer(participant,participant-1,1,1,spawn.Position);
                 int owner=participant; world.Bind(owner,motor,()=>Match!=null&&Match.Find(owner).Alive);
                 motor.Simulate(new MotorInput { Present=true,Tick=0,Sequence=0,Generation=1,Yaw=spawn.Yaw },MotorTuning.TickDelta,0);
+                if(participant==TargetParticipant) { drillHome=spawn.Position; drillLeg=drillLegStart=drillLegEnd=0; }
                 if(participant==1)
                 {
                     View=avatar.AddComponent<FirstPersonView>(); View.Motor=motor; View.ViewCamera=Camera; View.OwnsLocalView=true; View.ReducedMotion=Settings.ReducedMotion; View.ResetView(spawn.Yaw,0);
@@ -254,7 +266,11 @@ namespace Wildstone.Game
                 else BackRequested?.Invoke();
             }
             bool active=focused&&Flow.GameplayInput;
-            if(active && View!=null && Mouse.current!=null) View.SampleLook(Mouse.current.delta.ReadValue()*Settings.Sensitivity);
+            UpdateLocalAds(active);
+            if(View!=null && Camera!=null && (View!=fovView || Camera.aspect!=fovAspect))
+            { fovView=View; fovAspect=Camera.aspect; View.SetBaseFieldOfView(HipVerticalFov); }
+            if(active && View!=null && Mouse.current!=null)
+                View.SampleLook(Mouse.current.delta.ReadValue()*Settings.Sensitivity*Settings.LookScale(LocalWeapon,LocalAdsProgress,HipVerticalFov));
             Input.Sample(active);
             if(ExternalSimulation) return;
             if(Match==null || Match.Phase!=ArenaMatchPhase.Running) return;
@@ -266,6 +282,16 @@ namespace Wildstone.Game
                 catch(Exception ex) { Debug.LogException(ex,this); Failure="Practice stopped unexpectedly. Restart the arena to continue."; Show(MenuScreen.Failure); StopMatch(); break; }
                 if(Match.Phase!=ArenaMatchPhase.Running) { Show(MenuScreen.Results); break; }
             }
+        }
+        void UpdateLocalAds(bool active)
+        {
+            var p=LocalPlayer;
+            if(p==null || Input==null) { LocalAdsProgress=0; return; }
+            var weapon=CombatRules.CurrentWeapon(p);
+            if(weapon!=adsWeapon || p.LifeGeneration!=adsLife || Input.AdsDrops!=adsDrops)
+            { LocalAdsProgress=0; adsWeapon=weapon; adsLife=p.LifeGeneration; adsDrops=Input.AdsDrops; }
+            bool target=active && Input.Aiming && p.Alive && p.Connected && p.ReloadUntil==0 && WeaponCatalog.CanAim(weapon);
+            LocalAdsProgress=CombatRules.AdvanceAds(LocalAdsProgress,target,weapon,Time.unscaledDeltaTime);
         }
         void Step(bool active)
         {
@@ -308,20 +334,43 @@ namespace Wildstone.Game
                     {
                         var state=freshStates[evt.Target]; state.Position=evt.Position; state.Generation=evt.TargetLife; state.Tick=tick-1;
                         motor.RestoreState(state); if(evt.Target==1) View.ResetView(state.Yaw,0);
+                        if(evt.Target==TargetParticipant) drillHome=evt.Position;
                     }
                     else if(evt.Kind==CombatEventKind.Blink) motor.Teleport(evt.Position,View.Yaw);
                 }
                 foreach(var pair in motors)
                 {
-                    var p=Match.Find(pair.Key); pair.Value.SetSuppressed(p.Suppressed(tick)||pair.Key!=1||!tickInputActive);
-                    var input=pair.Key==1?Input.ConsumeMovement(tick,p.LifeGeneration,View.Yaw,View.Pitch):
-                        new MotorInput { Present=true,Tick=tick,Sequence=tick,Generation=p.LifeGeneration,Yaw=pair.Value.CaptureState().Yaw };
+                    var p=Match.Find(pair.Key); pair.Value.SetSuppressed(p.Suppressed(tick)||!tickInputActive);
+                    var input=pair.Key==1?Input.ConsumeMovement(tick,p.LifeGeneration,View.Yaw,View.Pitch):TargetInput(tick,p,pair.Value.CaptureState());
                     if(pair.Key==1) input.Sequence=++movementSequence;
-                    if(!pair.Value.Simulate(input,MotorTuning.TickDelta,tick)) throw new InvalidOperationException("Practice motor tick was rejected.");
+                    bool aiming=pair.Key==1 && tickInputActive && input.Aiming;
+                    if(!pair.Value.Simulate(input.ForMotor(),MotorTuning.TickDelta,tick)) throw new InvalidOperationException("Practice motor tick was rejected.");
                     var state=pair.Value.CaptureState();
-                    Match.SetPose(pair.Key,p.LifeGeneration,state.Position,pair.Key==1?Quaternion.Euler(View.Pitch,View.Yaw,0)*Vector3.forward:p.Aim,state.CapsuleHeight);
+                    Match.SetPose(pair.Key,p.LifeGeneration,state.Position,Quaternion.Euler(pair.Key==1?View.Pitch:0,pair.Key==1?View.Yaw:state.Yaw,0)*Vector3.forward,state.CapsuleHeight,aiming);
                 }
                 Physics.SyncTransforms();
+        }
+        MotorInput TargetInput(int tick,CombatState target,MotorState state)
+        {
+            if(tick>=drillLegEnd) { drillLeg++; drillLegStart=tick; drillLegEnd=tick+DrillLegTicks(drillLeg); }
+            var input=Drill(drillLeg,tick-drillLegStart,state.Position,drillHome,LocalPlayer.Feet);
+            input.Tick=input.Sequence=tick; input.Generation=target.LifeGeneration;
+            return input;
+        }
+        // Practice target drill (a fixture, not a bot: it never attacks). It faces the player and strafes in uneven legs of
+        // 0.5-1.3 s at 0.7 input, pausing every fourth, jumping into every third and dashing into every fifth, and is pulled back once
+        // it strays 3 m from its spawn, so tracking, spread and head shots can be felt against movement.
+        public static int DrillLegTicks(int leg) => 60+(int)((uint)leg*2654435761u>>24)*96/255;
+        public static MotorInput Drill(int leg,int legTick,Vector3 position,Vector3 home,Vector3 player)
+        {
+            Vector3 look=player-position; look.y=0;
+            float yaw=look.sqrMagnitude>.01f?Mathf.Atan2(look.x,look.z)*Mathf.Rad2Deg:0;
+            var move=leg%4==3?Vector2.zero:new Vector2(leg%2==0?.7f:-.7f,0);
+            Vector3 back=Quaternion.Euler(0,-yaw,0)*(home-position); back.y=0;
+            if(back.magnitude>3) move+=new Vector2(back.x,back.z).normalized*Mathf.Clamp01((back.magnitude-3)/2)*1.5f;
+            var held=legTick<30 && leg%3==1?MotorButtons.Jump:MotorButtons.None;
+            var pressed=legTick==0?held|(leg%5==2?MotorButtons.Dash:MotorButtons.None):MotorButtons.None;
+            return new MotorInput { Present=true,Move=Vector2.ClampMagnitude(move,1),Yaw=yaw,Held=held|pressed,Pressed=pressed };
         }
         void OnApplicationFocus(bool value)
         {

@@ -10,34 +10,54 @@ namespace Wildstone.Game
 {
     public sealed class PracticeInput : IDisposable
     {
+        public const int FireIndex=7, GrenadeIndex=11, AimIndex=15;
         public readonly InputAction[] Actions=new InputAction[LocalSettings.ActionNames.Length];
         readonly List<CombatActionKind> pending=new List<CombatActionKind>();
         readonly MotorInputBuffer movement=new MotorInputBuffer();
+        readonly bool adsToggle;
         MotorButtons pressed;
-        bool fireHeld,repeatBlocked;
-        int nextFireTick,lastCombatTick=-1,combatLife,combatConnection;
+        bool fireHeld,repeatBlocked,aimHeld,aimToggled;
+        int nextFireTick,nextEmptyTick,lastCombatTick=-1,combatLife,combatConnection;
+        WeaponKind combatWeapon;
         static readonly CombatActionKind[] kinds={CombatActionKind.Fire,CombatActionKind.Reload,CombatActionKind.SelectStarter,CombatActionKind.SelectSpecial,CombatActionKind.Grenade,CombatActionKind.Blink,CombatActionKind.Shield,CombatActionKind.Pickup};
+        // Held grenade key: presentation may draw the arc preview; release queues one throw (a tap still throws).
+        public bool GrenadeHeld { get; private set; }
+        // Effective local ADS request after hold/toggle; it rides the movement input's Aim bit.
+        public bool Aiming => adsToggle?aimToggled:aimHeld;
+        // Increments whenever local input requests an ADS-dropping change (reload, grenade, weapon switch, new life).
+        public int AdsDrops { get; private set; }
         public PracticeInput(LocalSettings settings)
         {
+            adsToggle=settings.AdsToggle;
             for(int i=0;i<Actions.Length;i++)
             {
                 int index=i;
                 Actions[i]=new InputAction(LocalSettings.ActionNames[i],InputActionType.Button,settings.Bindings[i]);
                 Actions[i].performed+=context=>RecordPress(index);
+                if(i==GrenadeIndex) Actions[i].canceled+=context=>ReleaseGrenade();
                 Actions[i].Enable();
             }
         }
         void RecordPress(int index)
         {
-            if(index==7) repeatBlocked=false;
+            if(index==FireIndex) repeatBlocked=false;
             // Input updates can complete a tap before the next render sample.
             if(index>=4 && index<=6) pressed|=(MotorButtons)(1<<(index-4));
-            else if(index>=7 && pending.Count<32) pending.Add(kinds[index-7]);
+            else if(index==AimIndex) { if(adsToggle) aimToggled=!aimToggled; }
+            else if(index==GrenadeIndex) GrenadeHeld=true;
+            else if(index>=FireIndex && pending.Count<32) pending.Add(kinds[index-FireIndex]);
+        }
+        void ReleaseGrenade()
+        {
+            if(!GrenadeHeld) return;
+            GrenadeHeld=false;
+            if(pending.Count<32) pending.Add(CombatActionKind.Grenade);
         }
         public void Sample(bool active)
         {
             if(!active) { Clear(); return; }
-            fireHeld=Actions[7].IsPressed();
+            fireHeld=Actions[FireIndex].IsPressed();
+            aimHeld=Actions[AimIndex].IsPressed();
             if(!fireHeld) repeatBlocked=false;
             float Held(int i) => Actions[i].IsPressed()?1:0;
             var buttons=MotorButtons.None;
@@ -48,29 +68,68 @@ namespace Wildstone.Game
             movement.Sample(move,buttons);
             pressed=MotorButtons.None;
         }
-        public MotorInput ConsumeMovement(int tick,int generation,float yaw,float pitch) => movement.Consume(tick,generation,yaw,pitch);
+        public MotorInput ConsumeMovement(int tick,int generation,float yaw,float pitch)
+        {
+            var input=movement.Consume(tick,generation,yaw,pitch);
+            if(Aiming) input.Held|=MotorButtons.Aim;
+            return input;
+        }
         public void ConsumeActions(List<CombatActionKind> destination) { destination.Clear(); destination.AddRange(pending); pending.Clear(); }
         public void ConsumeActions(List<CombatActionKind> destination,int tick,int rate,CombatState player,bool active)
         {
             if(!active || player==null) { Clear(); destination.Clear(); return; }
             bool changed=lastCombatTick>=0 && (tick<lastCombatTick || player.LifeGeneration!=combatLife || player.ConnectionGeneration!=combatConnection);
-            if(changed) { pending.Clear(); nextFireTick=0; repeatBlocked=true; }
-            lastCombatTick=tick; combatLife=player.LifeGeneration; combatConnection=player.ConnectionGeneration;
+            if(changed) { pending.Clear(); nextFireTick=nextEmptyTick=0; repeatBlocked=true; GrenadeHeld=false; }
+            var weapon=CombatRules.CurrentWeapon(player);
+            if(changed || (lastCombatTick>=0 && weapon!=combatWeapon)) DropAim();
+            lastCombatTick=tick; combatLife=player.LifeGeneration; combatConnection=player.ConnectionGeneration; combatWeapon=weapon;
             ConsumeActions(destination);
+            for(int i=0;i<destination.Count;i++)
+            {
+                var kind=destination[i];
+                if(kind==CombatActionKind.Reload || kind==CombatActionKind.Grenade || kind==CombatActionKind.SelectStarter || kind==CombatActionKind.SelectSpecial) { DropAim(); break; }
+            }
             bool pressedFire=destination.Contains(CombatActionKind.Fire);
-            bool starter=!player.SelectedSpecial;
-            int interval=WeaponCatalog.Ticks(WeaponCatalog.Get(WeaponKind.LineDriver).Interval,rate);
-            if(pressedFire && starter) nextFireTick=tick+interval;
-            if(!pressedFire && starter && fireHeld && !repeatBlocked && tick>=nextFireTick &&
-                tick>=player.FireReadyTick && player.ReloadUntil<=tick && player.Pending==null &&
-                player.StarterAmmo>0 && !player.Suppressed(tick))
+            // Any automatic weapon (Line Driver, Laser SMG) repeats while held; host cooldown/ammo checks stay final.
+            bool automatic=WeaponCatalog.IsAutomatic(weapon);
+            int interval=automatic?WeaponCatalog.Ticks(WeaponCatalog.Get(weapon).Interval,rate):0;
+            // A reload that ended at least the fire slack ago has refilled on the host (Expire runs before actions); the slack
+            // covers a client request clock running a few ticks ahead of the host stamp.
+            int slack=WeaponCatalog.Ticks(WeaponCatalog.FireSlackSeconds,rate);
+            int ammo=player.SelectedSpecial?player.SpecialAmmo:player.ReloadUntil>0 && tick>=player.ReloadUntil+slack?WeaponCatalog.StarterAmmo:player.StarterAmmo;
+            // An empty trigger asks for what comes next: a reload of the starter clip, or the starter once the special
+            // is spent. The host validates both exactly like the keys; the futile shot is not sent.
+            if((pressedFire || automatic && fireHeld && !repeatBlocked) && ammo<=0 && weapon!=WeaponKind.None &&
+                weapon!=WeaponKind.LaserSword && !player.Suppressed(tick))
+            {
+                destination.RemoveAll(kind=>kind==CombatActionKind.Fire); pressedFire=false;
+                if(tick>=nextEmptyTick)
+                {
+                    nextEmptyTick=tick+rate/4;
+                    if(player.SelectedSpecial) { destination.Add(CombatActionKind.SelectStarter); repeatBlocked=true; DropAim(); }
+                    // A started reload (ReloadUntil set until the host refills) never asks for another.
+                    else if(player.ReloadUntil==0 && player.Pending==null) { destination.Add(CombatActionKind.Reload); DropAim(); }
+                }
+            }
+            if(pressedFire && automatic) nextFireTick=tick+interval;
+            // Repeats keep their own schedule; a frame or two late carries it instead of drifting it (D036). Online the
+            // replicated FireReadyTick trails this request clock by the round trip, so it only holds back a cooldown
+            // longer than this weapon's (a slower weapon fired before a switch); the host's cooldown stays final.
+            if(!pressedFire && automatic && fireHeld && !repeatBlocked && tick>=nextFireTick &&
+                tick>=player.FireReadyTick-interval && player.ReloadUntil<=tick && player.Pending==null &&
+                ammo>0 && !player.Suppressed(tick))
             {
                 destination.Add(CombatActionKind.Fire);
-                nextFireTick=tick+interval;
+                nextFireTick=(tick-nextFireTick<=slack?nextFireTick:tick)+interval;
             }
         }
+        void DropAim() { aimToggled=false; AdsDrops++; }
         // Keep the monotonic movement sequence when a local menu clears held input.
-        public void Clear() { movement.Sample(Vector2.zero,MotorButtons.None); movement.Consume(0,1,0,0); pressed=MotorButtons.None; pending.Clear(); fireHeld=false; repeatBlocked=true; nextFireTick=0; lastCombatTick=-1; }
-        public void Dispose() { foreach(var action in Actions) action?.Dispose(); }
+        public void Clear()
+        {
+            movement.Sample(Vector2.zero,MotorButtons.None); movement.Consume(0,1,0,0); pressed=MotorButtons.None; pending.Clear();
+            fireHeld=false; repeatBlocked=true; nextFireTick=nextEmptyTick=0; lastCombatTick=-1; aimHeld=false; aimToggled=false; GrenadeHeld=false;
+        }
+        public void Dispose() { GrenadeHeld=false; foreach(var action in Actions) action?.Dispose(); }
     }
 }

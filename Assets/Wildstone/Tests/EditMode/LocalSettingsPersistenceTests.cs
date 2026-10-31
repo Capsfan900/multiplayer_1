@@ -27,6 +27,12 @@ namespace Wildstone.Tests
                 if(Screen.width!=width||Screen.height!=height||Screen.fullScreen!=fullscreen) Screen.SetResolution(width,height,fullscreen);
             }
         }
+        [Test] public void ManagedFovConversionMatchesUnityCamera()
+        {
+            foreach(float aspect in new[]{16f/9,64f/27,4f/3,1f})
+                foreach(float horizontal in new[]{LocalSettings.MinimumFov,LocalSettings.DefaultFov,LocalSettings.MaximumFov})
+                    Assert.That(LocalSettings.VerticalFov(horizontal,aspect),Is.EqualTo(Camera.HorizontalToVerticalFieldOfView(horizontal,aspect)).Within(.001f),horizontal+" @ "+aspect);
+        }
         [Test] public void SettingsRoundTripAndMalformedDataRecovery()
         {
             bool existed=PlayerPrefs.HasKey(LocalSettings.StorageKey); string previous=PlayerPrefs.GetString(LocalSettings.StorageKey);
@@ -35,7 +41,14 @@ namespace Wildstone.Tests
                 var settings=new LocalSettings { Fov=102,ReducedMotion=true,MasterVolume=.25f }; settings.Bindings[0]="<Keyboard>/upArrow"; settings.Save();
                 var restored=LocalSettings.Load(); Assert.That(restored.Fov,Is.EqualTo(102)); Assert.That(restored.ReducedMotion,Is.True);
                 Assert.That(restored.MasterVolume,Is.EqualTo(.25f)); Assert.That(restored.Bindings[0],Is.EqualTo("<Keyboard>/upArrow"));
-                PlayerPrefs.SetString(LocalSettings.StorageKey,"not json"); Assert.That(LocalSettings.Load().Fov,Is.EqualTo(90));
+                PlayerPrefs.SetString(LocalSettings.StorageKey,"not json"); Assert.That(LocalSettings.Load().Fov,Is.EqualTo(LocalSettings.DefaultFov));
+                // A version-1 payload (vertical FOV, 15 bindings, no Version field) migrates on load.
+                var legacy=new LocalSettings { Version=LocalSettings.CurrentVersion }; var json=JsonUtility.ToJson(legacy).Replace("\"Version\":"+LocalSettings.CurrentVersion+",","")
+                    .Replace(",\"<Mouse>/rightButton\"]","]").Replace("\"Fov\":"+LocalSettings.DefaultFov,"\"Fov\":70");
+                Assert.That(json,Does.Not.Contain("rightButton")); Assert.That(json,Does.Not.Contain("\"Version\""));
+                PlayerPrefs.SetString(LocalSettings.StorageKey,json); var migrated=LocalSettings.Load();
+                Assert.That(migrated.Version,Is.EqualTo(LocalSettings.CurrentVersion)); Assert.That(migrated.Fov,Is.EqualTo(LocalSettings.DefaultFov));
+                Assert.That(migrated.Bindings[LocalSettings.ActionNames.Length-1],Is.EqualTo("<Mouse>/rightButton"));
             }
             finally { if(existed) PlayerPrefs.SetString(LocalSettings.StorageKey,previous); else PlayerPrefs.DeleteKey(LocalSettings.StorageKey); PlayerPrefs.Save(); }
         }

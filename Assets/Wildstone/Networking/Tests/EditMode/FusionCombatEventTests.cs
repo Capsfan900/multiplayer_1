@@ -29,6 +29,12 @@ namespace Wildstone.Tests
             Assert.Throws<ArgumentException>(() => FusionCombatEvent.FromCombat(new CombatEvent(kind, default, 1, reason: "diagnostic"), 1, 1));
         }
 
+        [TestCase(CombatEventKind.Ricochet), TestCase(CombatEventKind.Deflected)]
+        public void ProjectileCuesReachClients(CombatEventKind kind)
+        {
+            Assert.That(FusionCombatEvent.IsPresentationEvent(kind), Is.True);
+        }
+
         [Test] public void ShotgunPelletHitIdentitiesSurviveWireAndPresentationDeduplication()
         {
             var action=new CombatAction {Participant=1,ConnectionGeneration=1,LifeGeneration=1,AuthorityGeneration=1,Tick=1,Sequence=1,Kind=CombatActionKind.Fire,Direction=Vector3.forward};

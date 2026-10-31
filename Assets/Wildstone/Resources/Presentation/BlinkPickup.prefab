@@ -44,6 +44,22 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 848a41aa233f1e1448566a71bde1b6b0, type: 2}
+    - target: {fileID: -8708639282089872736, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071067
+      objectReference: {fileID: 0}
+    - target: {fileID: -8708639282089872736, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: -8708639282089872736, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8708639282089872736, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
       propertyPath: m_LocalPosition.x
       value: -0
@@ -95,6 +111,22 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
       propertyPath: m_Name
       value: BlinkPickup
+      objectReference: {fileID: 0}
+    - target: {fileID: 4306626441399230552, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071067
+      objectReference: {fileID: 0}
+    - target: {fileID: 4306626441399230552, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 4306626441399230552, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4306626441399230552, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4386035505159537657, guid: f65091026ee8aff4195640e417bd4e77, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'

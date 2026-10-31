@@ -1,5 +1,10 @@
 .arena-root { flex-grow: 1; color: rgb(240,238,230); -unity-font-style: normal; font-size: 18px; }
-.menu-shade { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: rgba(27,30,29,0.50); }
+.menu-curtain { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: rgb(232,229,219); opacity: 0; transition-property: opacity; transition-duration: 0.6s; transition-timing-function: ease-out-quad; }
+.menu-curtain--closed { opacity: 1; transition-duration: 0.25s; transition-timing-function: ease-in-quad; }
+.menu-curtain--dive { transition-delay: 0.35s; transition-duration: 0.35s; transition-timing-function: ease-in-cubic; }
+.menu-shade { position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
+.menu-shade--over-match { background-color: rgba(27,30,29,0.35); }
+.menu-scrim { position: absolute; left: 0; top: 0; bottom: 0; width: 1000px; max-width: 100%; -unity-background-image-tint-color: rgba(22,25,24,0.9); -unity-background-scale-mode: stretch-to-fill; }
 .menu-scroll { flex-grow: 1; padding-left: 5%; padding-right: 5%; padding-top: 4%; padding-bottom: 4%; }
 .menu-scroll .unity-scroll-view__vertical-scroller { width: 16px; min-width: 16px; background-color: rgba(31,35,33,0.94); border-radius: 3px; }
 .menu-scroll .unity-scroller__low-button, .menu-scroll .unity-scroller__high-button { display: none; }
@@ -8,17 +13,30 @@
 .menu-scroll .unity-scroller__slider .unity-base-slider__dragger { background-color: rgb(181,190,180); border-width: 1px; border-color: rgb(100,111,104); border-radius: 3px; }
 .menu-scroll .unity-scroller__slider .unity-base-slider__dragger:hover { background-color: rgb(225,229,214); }
 .menu-scroll .unity-scroller__slider:focus .unity-base-slider__dragger { border-color: rgb(233,204,145); }
-.menu-card { width: 520px; max-width: 100%; padding: 30px; background-color: rgba(31,35,33,0.94); border-radius: 4px; }
-.eyebrow { color: rgb(174,190,177); font-size: 13px; letter-spacing: 3px; margin-bottom: 16px; }
+.menu-card { width: 520px; max-width: 100%; padding: 30px 30px 30px 26px; border-left-width: 1px; border-left-color: rgba(233,204,145,0.45); opacity: 1; translate: 0 0; transition-property: opacity, translate; transition-duration: 0.22s; transition-timing-function: ease-out-cubic; }
+.menu-card--enter { opacity: 0; translate: -24px 0; }
+.menu-card--exit { opacity: 0; translate: -80px 0; transition-duration: 0.15s; transition-timing-function: ease-in-quad; }
+.display, .eyebrow, .hero-title, .hero-echo, .hero-subtitle { -unity-font-definition: url("project://database/Assets/Wildstone/UI/Fonts/BarlowCondensed-Black.ttf"); }
+.eyebrow { color: rgb(233,204,145); font-size: 14px; letter-spacing: 4px; margin-bottom: 14px; }
 .title { font-size: 42px; white-space: normal; -unity-font-style: bold; margin-bottom: 16px; }
+.title.display { font-size: 50px; -unity-font-style: normal; letter-spacing: 1px; }
+.hero { margin-bottom: 2px; }
+.hero-title, .hero-echo { font-size: 80px; -unity-font-style: italic; letter-spacing: 3px; white-space: nowrap; color: rgb(244,241,233); }
+.hero-echo { position: absolute; left: 6px; top: 6px; color: rgba(233,204,145,0.85); }
+.hero-rule { flex-direction: row; align-items: center; height: 6px; margin: 2px 0 14px 0; }
+.hero-rule__slab { width: 72px; height: 5px; background-color: rgb(233,204,145); }
+.hero-rule__tail { width: 300px; height: 2px; margin-left: 10px; -unity-background-image-tint-color: rgba(233,204,145,0.6); -unity-background-scale-mode: stretch-to-fill; }
+.hero-subtitle { font-size: 16px; letter-spacing: 8px; color: rgba(240,238,230,0.85); margin-bottom: 12px; }
 .description { font-size: 18px; white-space: normal; margin-bottom: 22px; color: rgb(216,218,209); }
 .note { font-size: 14px; white-space: normal; margin-top: 14px; margin-bottom: 8px; color: rgb(181,190,180); }
 .feedback { font-size: 16px; white-space: normal; margin-top: 12px; margin-bottom: 12px; color: rgb(237,209,169); }
-Button { min-height: 44px; margin: 0 0 8px 0; padding: 10px 14px; border-width: 1px; border-color: rgb(100,111,104); border-radius: 3px; color: rgb(237,237,227); background-color: rgb(45,52,47); -unity-text-align: middle-left; font-size: 17px; transition-duration: 0.12s; transition-property: background-color, border-color; }
-Button.primary { background-color: rgb(225,229,214); color: rgb(33,40,35); border-color: rgb(225,229,214); }
-Button:hover { background-color: rgb(66,79,68); border-color: rgb(207,219,198); }
-Button.primary:hover { background-color: rgb(247,246,233); }
-Button:focus { border-width: 2px; border-color: rgb(233,204,145); }
+Button { min-height: 46px; margin: 0 0 8px 0; padding: 10px 14px 10px 16px; border-width: 1px; border-color: rgba(100,111,104,0.6); border-left-width: 4px; border-left-color: rgb(233,204,145); border-radius: 2px; color: rgb(237,237,227); background-color: rgba(38,43,40,0.88); -unity-text-align: middle-left; font-size: 17px; letter-spacing: 0.5px; translate: 0 0; scale: 1 1; transition-property: background-color, color, border-color, translate, scale; transition-duration: 0.12s, 0.12s, 0.12s, 0.16s, 0.08s; transition-timing-function: ease-out-cubic; }
+Button.primary { background-color: rgb(225,229,214); color: rgb(33,40,35); border-color: rgb(225,229,214); border-left-width: 8px; border-left-color: rgb(233,204,145); -unity-font-style: bold; }
+Button:hover { background-color: rgb(240,238,230); color: rgb(27,31,29); border-color: rgb(240,238,230); border-left-color: rgb(233,204,145); translate: 6px 0; }
+Button.primary:hover { background-color: rgb(233,204,145); border-color: rgb(233,204,145); border-left-color: rgb(33,40,35); }
+Button:active { scale: 0.985 0.985; }
+Button:focus { border-width: 2px; border-color: rgb(233,204,145); border-left-width: 8px; }
+Button:disabled { opacity: 0.5; }
 .setting { margin: 6px 0 12px 0; min-height: 32px; font-size: 16px; }
 .setting > .unity-base-field__label { min-width: 160px; color: rgb(232,232,222); }
 .arena-root .unity-base-text-field__input, .arena-root .unity-base-popup-field__input { color: rgb(240,238,230); background-color: rgb(45,52,47); border-width: 1px; border-color: rgb(100,111,104); border-radius: 3px; }
@@ -26,11 +44,51 @@ Button:focus { border-width: 2px; border-color: rgb(233,204,145); }
 .arena-root .unity-base-popup-field__arrow { -unity-background-image-tint-color: rgb(240,238,230); }
 .arena-root .unity-base-text-field__input:hover, .arena-root .unity-base-popup-field__input:hover { background-color: rgb(66,79,68); border-color: rgb(207,219,198); }
 .arena-root .unity-base-text-field__input:focus, .arena-root .unity-base-popup-field__input:focus { border-color: rgb(233,204,145); border-width: 2px; }
-.hud { position: absolute; left: 3%; right: 3%; top: 3%; bottom: 3%; }
-.hud-top { flex-direction: row; flex-wrap: wrap; justify-content: space-between; background-color: rgba(25,30,26,0.75); padding: 8px 14px; border-radius: 3px; font-size: 16px; }
-.hud-top Label { max-width: 100%; white-space: normal; }
-.hud-bottom { position: absolute; left: 0; bottom: 0; max-width: 100%; background-color: rgba(25,30,26,0.80); padding: 14px 18px; border-radius: 3px; font-size: 16px; }
-.hud-bottom Label { margin-bottom: 4px; white-space: normal; }
+.hud { position: absolute; left: 2.5%; right: 2.5%; top: 3%; bottom: 3.5%; }
+.hud-clock__time, .hud-clock__mode, .hud-chip__score, .hud-health, .hud-shield, .hud-unit, .hud-weapon__name, .hud-ammo, .hud-ammo__tag, .hud-respawn { -unity-font-definition: url("project://database/Assets/Wildstone/UI/Fonts/BarlowCondensed-Black.ttf"); }
+.hud-scoreboard { position: absolute; left: 0; right: 0; top: 0; flex-direction: row; justify-content: center; align-items: flex-start; }
+.hud-chip { width: 84px; height: 40px; margin: 0 3px; flex-direction: row; align-items: center; justify-content: center; overflow: hidden; background-color: rgba(20,24,22,0.72); border-radius: 3px; border-width: 1px; border-color: rgba(240,238,230,0); }
+.hud-chip--own { border-color: rgba(240,238,230,0.85); background-color: rgba(34,40,37,0.85); }
+.hud-chip__symbol { font-size: 19px; color: rgba(240,238,230,0.85); margin-right: 8px; }
+.hud-chip__score { font-size: 24px; color: rgb(244,241,233); }
+.hud-chip__track { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; opacity: 0.35; }
+.hud-chip__fill { position: absolute; left: 0; bottom: 0; height: 4px; }
+.hud-clock { width: 112px; height: 60px; margin: 0 6px; align-items: center; justify-content: center; background-color: rgba(20,24,22,0.80); border-radius: 3px; border-bottom-width: 2px; border-bottom-color: rgb(233,204,145); }
+.hud-clock__time { font-size: 32px; color: rgb(244,241,233); -unity-text-align: middle-center; margin: 0; }
+.hud-clock__mode { font-size: 11px; letter-spacing: 3px; color: rgb(233,204,145); -unity-text-align: middle-center; }
+.hud-zone { position: absolute; left: 0; right: 0; top: 68px; flex-direction: row; justify-content: center; align-items: center; }
+.hud-zone__arrow { width: 22px; height: 22px; font-size: 16px; -unity-text-align: middle-center; margin-right: 6px; }
+.hud-zone__text { font-size: 13px; letter-spacing: 2px; color: rgba(240,238,230,0.9); padding: 3px 10px; background-color: rgba(20,24,22,0.55); border-radius: 2px; }
+.hud-hint { margin-bottom: 6px; font-size: 11px; letter-spacing: 2px; color: rgba(240,238,230,0.5); }
+.hud-left { position: absolute; left: 0; bottom: 0; max-width: 34%; align-items: flex-start; }
+.hud-vitals { width: 280px; max-width: 100%; padding: 10px 16px 12px 14px; background-color: rgba(20,24,22,0.72); border-radius: 3px; border-left-width: 4px; border-left-color: rgb(233,204,145); }
+.hud-vitals__row { flex-direction: row; align-items: flex-end; }
+.hud-shield { font-size: 15px; letter-spacing: 2px; color: rgb(132,204,242); }
+.hud-health { font-size: 44px; color: rgb(244,241,233); margin: -6px 0 -6px 0; }
+.hud-unit { font-size: 13px; letter-spacing: 3px; color: rgba(240,238,230,0.65); margin: 0 0 6px 8px; }
+.hud-bar { height: 7px; margin-top: 4px; overflow: hidden; border-radius: 2px; background-color: rgba(240,238,230,0.14); }
+.hud-bar__fill { height: 100%; width: 100%; background-color: rgb(240,238,230); }
+.hud-bar--shield .hud-bar__fill { background-color: rgb(132,204,242); }
+.hud-bar--stamina { height: 3px; margin-top: 6px; }
+.hud-bar--stamina .hud-bar__fill { background-color: rgb(233,204,145); }
+.hud-bar--reload { height: 3px; width: 100%; }
+.hud-bar--reload .hud-bar__fill { background-color: rgb(233,204,145); }
+.hud-weapon { position: absolute; right: 0; bottom: 0; min-width: 150px; max-width: 34%; align-items: flex-end; padding: 8px 14px 10px 14px; background-color: rgba(20,24,22,0.72); border-radius: 3px; border-right-width: 4px; border-right-color: rgb(233,204,145); }
+.hud-weapon__name { font-size: 15px; letter-spacing: 3px; color: rgb(233,204,145); }
+.hud-weapon__row { flex-direction: row; align-items: flex-end; }
+.hud-ammo { font-size: 52px; color: rgb(244,241,233); margin: -8px 0 -8px 0; }
+.hud-ammo__tag { font-size: 13px; letter-spacing: 2px; color: rgba(240,238,230,0.7); margin: 0 0 8px 8px; }
+.hud-items { flex-direction: row; margin-bottom: 6px; }
+.hud-kill-banner { position: absolute; left: 50%; top: 63%; translate: -50% 0; padding: 5px 14px 5px 14px; background-color: rgba(20,24,22,0.62); border-radius: 3px; border-bottom-width: 2px; border-bottom-color: rgb(233,204,145); font-size: 15px; letter-spacing: 2px; -unity-font-style: bold; color: rgb(244,241,233); white-space: nowrap; }
+.hud-item { flex-direction: row; align-items: center; margin: 0 6px 0 0; padding: 4px 9px 4px 5px; background-color: rgba(20,24,22,0.62); border-radius: 2px; }
+.hud-item--empty { opacity: 0.4; }
+.hud-key { min-width: 18px; font-size: 12px; -unity-font-style: bold; -unity-text-align: middle-center; color: rgb(27,31,29); background-color: rgb(233,204,145); padding: 1px 4px; margin-right: 6px; border-radius: 2px; }
+.hud-item__label { font-size: 13px; letter-spacing: 1px; color: rgb(240,238,230); }
+.hud-prompt { position: absolute; left: 0; right: 0; bottom: 24%; -unity-text-align: middle-center; font-size: 17px; letter-spacing: 2px; color: rgb(244,241,233); }
+.hud-respawn { position: absolute; left: 0; right: 0; top: 36%; -unity-text-align: middle-center; font-size: 44px; letter-spacing: 4px; color: rgb(244,241,233); }
 .crosshair { position: absolute; left: 50%; top: 50%; width: 32px; height: 32px; margin-left: -16px; margin-top: -16px; -unity-text-align: middle-center; font-size: 32px; }
 .hit-cue { position: absolute; left: 40%; top: 42%; width: 20%; -unity-text-align: middle-center; font-size: 24px; color: rgb(240,211,164); }
 .reduced-motion Button { transition-duration: 0s; }
+.reduced-motion Button:hover, .reduced-motion Button:active { translate: 0 0; scale: 1 1; }
+.reduced-motion .menu-card, .reduced-motion .menu-card--enter, .reduced-motion .menu-card--exit { translate: 0 0; transition-property: opacity; }
+.reduced-motion .menu-curtain--dive { transition-delay: 0s; transition-duration: 0.2s; }

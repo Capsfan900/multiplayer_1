@@ -6,6 +6,23 @@ separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
 
+### 2026-10-29 menu backdrop, motion and music (managed only)
+
+`pwsh -File Tools/QA/Compile-Managed.ps1 -Scope All -RunManagedTests` on the
+uncommitted `mvp-2` working tree: Runtime (51 files), Editor (10) and Tests (37)
+type checks pass; **237 passed, 0 failed, 0 skipped** managed tests, including the
+seven new `MenuMusicBackdropTests` (track selection per map id, equal-power 1.5 s
+crossfade, mid-fade reversal, pause duck and invalid deltas, reduced-motion still and
+bounded drift speed, dive ease/lens widen/scrim ramp, MusicVolume across settings
+versions) and 42 `MenuSettingsTests`. Evidence:
+`Artifacts/ManagedCompile/20261029-224254-998/`. An earlier run in this pass
+(`20261029-224105-830`) had one unrelated failure in
+`PresentationEventHistoryTests.OpponentLocomotionIsMeasuredInTheFacingFrame`, fixed
+by its owning lane before the rerun. No Unity import, EditMode/PlayMode, build,
+capture or listening check was run: USS/Barlow import, backdrop composition on all
+three maps, soldier animation, dive/curtain timing, click and music playback remain
+unverified.
+
 ### 2026-10-29 grenade, disc and stun continuation
 
 Base `b33ba79` plus diagnostic changes, verified in
@@ -519,7 +536,7 @@ NUnit XML; neither a marker in a failed log nor a compile alone establishes a pa
 After a successful build, choose **Practice**, then an arena. Default controls:
 WASD move, mouse look, Space jump, Left Shift dash, Left Ctrl slide, left mouse fire,
 R reload, 1 starter, 2 special, G grenade, Q Blink, E shield, F pickup and Escape menu.
-Bindings can be changed in Settings. This mode has one stationary target fixture;
+Bindings can be changed in Settings. This mode has one strafing target fixture that never fires;
 it does not supply opponents or demonstrate multiplayer.
 
 Exercise title, settings/apply/cancel/defaults, keyboard focus/rebinding, Practice
@@ -532,7 +549,7 @@ Measure all four starts' routes to central and side pickups. Follow the entire
 zone footprint across ramps and stacked floors; verify floor-qualified occupancy,
 contesting and fixed team scoring. Record native failures and opening advantages.
 
-Use the explicitly labeled stationary target to exercise each weapon, pickup
+Use the explicitly labeled strafing target to exercise each weapon, pickup
 replacement/ammunition, reload, grenade fuse/self-damage/cover, disc ricochets,
 Push Lens displacement, stun/immunity, sword windup/coverage, blocked/clear Blink,
 shield spillover/expiry, death cleanup and respawn. Check model/weapon framing,
@@ -860,3 +877,2440 @@ endurance. The full MVP remains open; no PlayFab setup is needed.
 
 Documentation check:87 current local links resolve. `git diff --check` passes for
 this final workspace state. Prior failed/superseded runs remain preserved.
+
+## 2026-10-30 quality pass integration (D028–D031)
+
+Scope: weapon orientation and viewmodel framing, D031 map look, the two Sol art lanes
+(six special weapons, soldier team readability), slide body framing, the quality
+default and diagnostic fixes. Source HEAD `fca428e` plus uncommitted work; nothing
+was committed or published.
+
+### Native
+
+- Full suites on the final source: **EditMode 451/453** in
+  `Artifacts/Unity/EditMode-20261030-003100-031.xml` and **PlayMode 148/149** in
+  `Artifacts/Unity/PlayMode-20261030-003115-628.xml`. Skips are the three explicit-only
+  tests: content regeneration, controller regeneration and the live Photon host room.
+- The first full EditMode run of this pass failed two tests, and both were real:
+  - `ApplyingEveryActualQualityPresetPreservesIndependentVSync`: an earlier edit had turned
+    the VSync and FPS-cap statements in `LocalSettings.Apply` into a comment.
+  - `GradeOverridesSurviveReloadAndASecondBuilderRun`: the D031 grade rewrote authored
+    profiles on every build. The grade is now written once on creation.
+  Both are fixed. The focused rerun passes 11/11; see the full runs above.
+- New regressions:
+  - `FirstPersonBodyTests.SlideKneesStayClearOfTheLens`. It failed first: the nearest
+    visible vertex was 0.18 m from the lens, at eye height. After the torso fold it
+    measures 0.42 m, 0.28 m below the eye.
+  - `MenuSettingsTests`: v2 Medium migrates to High, a chosen tier is kept, and level 3 is "High".
+- `-Action PreparePresentation` imported the six rebuilt special weapons and the soldier
+  team-mark export, and rebuilt the team prefabs with the neutral ivory `SoldierMark`.
+
+### Photon (real service, separate processes)
+
+On build `Smoke-20261030-041924-609` (content `439472e9ca20d657…`). Networking code is
+unchanged in the final build.
+- `20261030-002051-091-gunplay-baseline` passed.
+- `20261030-002236-276-gunplay-adverse150` passed. This verifies the earlier profile
+  allow-list fix.
+- `20261030-002319-189-combat-baseline` passed.
+- `20261030-002418-542-reconnect-baseline` passed.
+- `20261030-002450-317-laser-moving-cover-baseline` passed.
+
+### Packaged visual and frame time
+
+Final build: `Smoke-20261030-042926-704`, content
+`06e20a24029daec674ebb64f1f56051a99c79cd3a5d062ea04105f6571301531`.
+- All four modes pass with zero render-graph errors:
+  - static, 16 captures: `Artifacts/Visual/20261030-003109-569`
+  - `-Motion`, 13 captures: `20261030-003137-086`
+  - `-Weapons`, 26 captures: `20261030-003159-582`
+  - `-Sequence`, 32 captures: `20261030-003243-733`
+- The 2026-10-29 static run `20261029-235739-643` had **failed**, which an earlier note
+  misreported as a pass. Its player logged 24 URP `ReflectionProbeManager.UpdateGpuData`
+  NREs from forced render requests during map load/unload frames. The capture driver
+  now skips render requests until every scene is loaded. Normal play submits no such
+  requests, but a windowed transition was not separately observed.
+- The `-Sequence` gate read zero hand motion because it sampled `Viewmodel` child 0. The
+  soldier arms rig now comes first, so the driver now reads `Viewmodel/Weapon pivot`.
+  Final observations: slide 0.101 m, recoil 0.040 m and reload 0.060 m, all returning
+  to rest.
+- Inspected captures:
+  - **Viewmodel:** with the guns facing the right way, they drew about twice life size
+    and too high. The Line Driver sight sat above the eye line. Fixed: guns now draw at
+    0.6 scale and sit lower-right; the measured grip, sight and muzzle positions are in
+    the character spec. Holo, red dot and iron sights read in ADS.
+  - **Slide:** before the fix, the torso armour filled a quarter of the screen. It now
+    shows the hips and legs only. Looking down mid-slide still shows the open belt ring
+    from above (known gap).
+  - **Spawn view:** spawn views in every map face the inside corner of the charcoal
+    arrival screens. This is pre-existing map design, and the 10/28 captures show the
+    same view.
+- Editor viewmodel framing tool: `Viewmodel-20261030-000917` (10 weapons, hip and ADS),
+  produced by `-Action CaptureViewmodel`.
+- Frame time: `Tools/QA/Invoke-PerfSample.ps1`, evidence in
+  `Artifacts/Visual/Perf-20261030-002944-176`. Setup: 1920x1080 offscreen through the
+  normal render loop on an RTX 4070 Ti, D3D11. The scene has eight soldiers, beams every
+  0.1 s each and a grenade blast every 1.2 s.
+
+  | Tier | Mean | p95 | p99 | Max |
+  | --- | ---: | ---: | ---: | ---: |
+  | Ultra (High pipeline) | 1.60 ms | 1.79 ms | 2.04 ms | 4.78 ms |
+  | Low | 1.52 ms | 1.69 ms | 1.97 ms | 4.44 ms |
+
+  The two tiers are nearly equal, so this scene is not GPU-bound on this card. The
+  sample is same-PC evidence only. Lower-end GPUs, the eight-machine networked load and
+  allocations are unmeasured.
+
+### Art lanes (GPT-6.1 Sol, Blender only)
+
+- **Weapons:** rebuilt LaserShotgun, PulseLobber, ReboundDisc, PushLens, StunGun and
+  LaserSword. Each has 2,888–5,132 tris with identity sockets and its named moving part.
+  Contact sheet: `ArtSource/Previews/WeaponSpecials-ContactSheet.png`. Hashes:
+  `ArtSource/weapon-specials-export-manifest.json`.
+- **Team readability:** new teal ▲, gold ■, crimson ◆ and violet ○ palette, with
+  ivory symbols on chest, back and both pauldrons.
+  - The palette has luminance separation, and symbols are 0.6–1.8 mm surface decals.
+  - Minimum greyscale pixel separation at a simulated 30 m (front / side / back):
+    palette plus symbols 4/0/1 → **55/38/48**; symbols alone 4/0/1 → 11/5/18.
+  - Simulated colour-vision-deficiency RGB minimums are ≥ 60 for every view.
+  - Evidence: `ArtSource/Previews/Soldier_Readability30m*.png` and
+    `ArtSource/Characters/soldier-export-manifest.json`.
+- Neither lane ran Unity. Integration and the checks above were done in Unity.
+
+### Remaining acceptance
+
+Human feel and balance remain open. That covers ADS, spread, headshots, the SMG, the
+viewmodel and slide feel, and 30 m team recognition in motion. External networks,
+eight machines and endurance are also open. Captures and tests are not playtests.
+Music is synthesized in-repo because the FL Studio MCP was not connected (D030).
+
+## 2026-10-30 presentation follow-up: spawn view, shot reads, HUD, slide body
+
+Scope:
+- spawn facing
+- beam taper, wall strikes and the muzzle star
+- the HUD layout
+- the Sol starter laser-kit art pass
+- Pulse Lobber hip framing
+- slide-entry and slide-sustain body fixes
+- diagnostic fixes in the capture and smoke drivers
+
+Source HEAD `fca428e` plus uncommitted work; nothing was committed or published.
+Final build: `Smoke-20261030-053238-835`, content
+`135c9b2d0af9b112509e6ce0e9960a87a6356af071536af4841065fb25baf6b8`
+(log `BuildSmoke-20261030-013230-294`). After the build, only a code comment changed.
+
+### Native
+
+- Full suites on the final source: **EditMode 454/456** in
+  `Artifacts/Unity/EditMode-20261030-013931-913.xml` and **PlayMode 150/151** in
+  `Artifacts/Unity/PlayMode-20261030-013948-744.xml`. The skips are the same three
+  explicit-only tests as before.
+- New regressions:
+  - `ArenaWorldTests.SpawnsFaceTheirShelterOpening`, one case per map.
+  - `ContentPreparationTests.ShippedArenaCatalogMatchesTheAuthoredLayouts` now also
+    compares spawn positions and yaws.
+  - `WeaponEffectsTests.BeamWidensAwayFromTheViewerAndSparksOnTheWallItStrikes`.
+  - `FirstPersonBodyTests.SlideEntryKeepsTheBodyOutOfTheLens` checks every frame
+    from a run into a slide.
+- The slide-entry test **failed first**, on frame 1: a knee was 0.08 m in front of
+  the lens. Its log measured the cause. The lens drops to 0.75 m at once, while
+  SlideEnter still holds the hips at 0.95 m. With `HipsUnderEye` the body is hidden
+  for about 0.15 s, then appears clear.
+- Settled slide, after the pelvis and thigh fold: the nearest visible vertex is
+  0.62 m from the lens (it was 0.42 m), and the highest is 0.21 m under the eye.
+
+### Packaged visual
+
+All four modes pass on the final build, with zero render-graph or null-reference
+lines in the player logs:
+- static, 16 captures: `Artifacts/Visual/20261030-014012-031`
+- `-Weapons`, 26 captures: `20261030-014039-000`
+- `-Motion`, 13 captures: `20261030-013309-904`
+- `-Sequence`, 32 captures: `20261030-014122-707`
+
+Editor viewmodel framing: `Viewmodel-20261030-005911`.
+
+Inspected:
+- **HUD:** chips, clock, zone pill, vitals, weapon panel and ability chips at 720p,
+  1080p and the largest UI scale.
+  - Two layout defects were found and fixed. The ability chips sat under the gun at
+    bottom centre; they moved above the vitals. The top-left hint ran into the score
+    chips at the largest scale.
+  - The first fix capped the hint at 20% width, which squeezed it into a one-word
+    column. Stacking the hint with the chips resolved it.
+- **Weapons:** all ten weapons now frame like the editor capture.
+  - In the first run, the disc, stun gun and sword showed as slivers at the bottom
+    edge. The fixture fired 0.035 s after switching weapons, mid way through the
+    0.3 s equip raise. `FusionVisualCheckDriver` now lets the raise finish first.
+  - Beams keep their width at range, and muzzle rings are gone. Wall strikes and the
+    star flare read.
+- **Slide:**
+  - Entry is clear; before, a large dark piece of pelvis armour covered the top half
+    of the view.
+  - The open belt "bowl" is gone, and so are the hollow thigh ends that one
+    intermediate fold showed. While sliding, the lens now sees a shin and boot
+    thrown forward. Standing and walking legs are unchanged.
+- **Spawn view:** the player looks out of the arrival screen along the exit alley,
+  instead of into its inside corner.
+
+### Photon (real service, separate processes)
+
+Final runs, on the final build, run one at a time with nothing else on the machine.
+Paths are under `Artifacts/Smoke/`; the adverse150 runs measured 161–162 ms mean SDK RTT.
+
+| Run | Seconds | Result |
+| --- | ---: | --- |
+| `20261030-013342-172-gunplay-baseline` | 37 | pass |
+| `20261030-013419-342-gunplay-adverse150` | 54 | pass |
+| `20261030-013513-782-combat-baseline` | 42 | pass |
+| `20261030-013555-885-reconnect-baseline` | 31 | pass |
+| `20261030-013627-187-laser-moving-cover-baseline` | 48 | pass |
+| `20261030-013714-916-laser-moving-cover-adverse150` | 61 | pass |
+| `20261030-013816-045-special-projectiles-adverse150` | 30 | pass |
+| `20261030-013846-337-grenade-combat-adverse150` | 29 | pass |
+
+Failed attempts during this work, and the fixes. All fixes are to diagnostics;
+gameplay and networking code did not change.
+- `20261030-010539-159-gunplay-baseline` **failed**: "verdict mismatch: LaserPistol
+  step 1 … head False". Step 1 reused sequence 6, so the host graded step 0's body
+  shot as the headshot step; the shot IDs were identical. The client read its own
+  `LastActionSequence` before replication had caught up. It now waits for the
+  replicated state to acknowledge the previous step.
+- `20261030-012344-194-gunplay-adverse150` **failed**: the scoped sniper shot
+  (sequence 3) was sent but never resolved on either peer, and the fixture timed out.
+  - Inferred cause: the host rejects fire before `FireReadyTick`, and the client's
+    predicted tick leads the host's. Rejections are not replicated, so this was not
+    observed directly.
+  - The client now waits 0.4 s past the cooldown before sending.
+- `20261030-012707-678-laser-moving-cover-adverse150` **failed** `DeadlineExceeded`.
+  - All three moving and cover verdicts had verified on both peers. The host was at
+    10.006 s of its 10 s stability window when the 120 s hang guard fired. The client
+    then attempted a host migration and could not resume, and the match aborted.
+  - That run's match lasted 118 s; the passing rerun took 61 s. The cause of the
+    slow run is not known.
+  - Injected-profile runs now get 180 s in the player and 210 s in the wrapper.
+    Baseline budgets are unchanged.
+- `20261030-010835-306-gunplay-adverse150` and
+  `20261030-010954-058-laser-moving-cover-adverse150` failed while editor test runs
+  shared the machine. Both were rerun above and are not counted.
+
+### Limits
+
+Captures and tests are not playtests. Human feel is still open for the HUD layout,
+shot reads, the slide legs and the spawn view. The slide legs fold the third-person
+pose and are not a true first-person pose. Smoke runs are same-PC, in-process
+latency injection, not external networks.
+
+## 2026-10-30 music: ACE-Step chill-house loops (D032)
+
+Scope: the four loops for the menu and the three maps were replaced by instrumental
+takes from a local ACE-Step 1.5 run, cut into loops by `Tools/Music/loop_takes.py`.
+[ASSET-PIPELINE](ASSET-PIPELINE.md#music) owns the provenance, licence, take hashes
+and per-file measurements. Before this, music playback had never been checked in a
+native player.
+
+### Generation and selection
+
+- **Generation:** 15 takes from `Tools/Music/ai_takes.py`: 3 seeds per track, plus 3
+  extra terrace-steps seeds. Each took 36–41 s on the RTX 4070 Ti, and every caption
+  was used verbatim (caption lock). Logs are `D:\WildstoneArchive\music\gen.log`
+  and `gen2.log`.
+- **Probe:** `loop_takes.py --probe` found a groove window in 13 of 15 takes. The
+  exceptions are `menu_s33` (27% of beats kicked) and `terrace_steps_s22` (48%).
+- **Vocal check:** RoFormer stems for the candidates gave vocal-stem energy relative
+  to the mix of:
+
+  | Take | Vocal stem | Notes |
+  | --- | --- | --- |
+  | menu s11 | −63.0 dB | |
+  | atrium s11 | −61.5 dB | |
+  | atrium s33 | −54.8 dB | |
+  | split gallery s33 | −53.7 dB | |
+  | terrace steps s11 | −40.0 dB | ten 2 s windows above −40 dB, peak −27 dB: rejected |
+  | terrace steps s44 | −65.6 dB | |
+  | terrace steps s55 | −64.6 dB | |
+  | terrace steps s66 | −55.2 dB | one window at −38 dB |
+
+- **Picks:**
+  - **Atrium:** s11. The s33 take opens 6 dB quieter, which would dip at every wrap.
+  - **Split Gallery:** s33, which has the lowest 2–5 kHz energy.
+  - **Terrace Steps:** s66, the longest clean window. s44 and s55 only allowed 32
+    bars.
+
+### Evidence
+
+- **Loops:** `uv run Tools/Music/loop_takes.py D:/WildstoneArchive/music/takes`.
+  - Every file passes: exact locked length, −15.0 LUFS, true peak ≤ −1.2 dBTP, and
+    seam step and curvature below each file's p99.9.
+  - A second full run reproduced all four OGG sha256 values (`ed55a66b…`, `b748bae1…`,
+    `c4357769…`, `4b8e1acf…`). `--check` passes on the committed files.
+- **Unity import:**
+  - `MusicImportTests` (4 new, Native) and `MenuMusicBackdropTests` (7) pass, 11/11:
+    `Artifacts/Unity/EditMode-20261030-071942-683.xml` after the final terrace take.
+    Each imported clip is 44.1 kHz stereo Streaming, and its sample count equals the
+    OGG granule position.
+  - Full EditMode suite: 458/460, with 2 explicit skips
+    (`Artifacts/Unity/EditMode-20261030-072643-264.xml`).
+- **Packaged player:** build `Artifacts/Unity/Smoke-20261030-112221-169` (content
+  `92dff50d6ed17c67eed95b7e84095786bb2e764edf916898ae8636ddec24abda`, log
+  `BuildSmoke-20261030-072213-221`).
+  - `Invoke-VisualCheck.ps1 -Music` passes (`Artifacts/Visual/20261030-072244-398`):
+
+    | Screen | Track | Playing at | Source RMS |
+    | --- | --- | --- | --- |
+    | Title | `MenuTheme` | 2.11 s | 0.081 |
+    | Atrium | `Level_atrium` | 2.09 s | 0.038 |
+    | Split Gallery | `Level_split-gallery` | 2.05 s | 0.047 |
+    | Terrace Steps | `Level_terrace-steps` | 2.09 s | 0.037 |
+
+    All at volume 0.40, with zero RenderGraph or NRE lines.
+  - The static mode also passes (`Artifacts/Visual/20261030-072301-230`) and records
+    music as not checked in batch mode.
+- **Failure found and fixed in the check:** the first static run with a music
+  assertion (`Artifacts/Visual/20261030-072037-888`) failed with "Music is MenuTheme
+  stopped at 0.00 s". The batch-mode player has no audio. Music is now asserted only
+  by the windowed `-Music` mode.
+
+### Limits
+
+- No one has listened to the new music. Its mix against weapon SFX, its mood and
+  any AI artefacts need the user's ears.
+- The wrap was measured offline, and Unity's import length was asserted. A full
+  in-player loop wrap (95–166 s) was not observed.
+- The terrace steps loop is 48 bars (1:35); the others are 72–80.
+- The FL Studio MCP was still not connected, so an FL rerender stays open (D030, D032).
+
+## 2026-10-30 recorded weapon and movement audio
+
+Scope: every combat cue was a synthesized sine sweep at one level, and players made
+no movement sound. `ArenaAudio` now plays recorded CC0 banks copied from `vibegame1`
+([SOURCE-REUSE](SOURCE-REUSE.md#recorded-weapon-and-movement-audio-2026-10-30)) and
+adds footsteps, jump, land, dash, slide and reload cues. The
+[character and weapon spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md#audio-2026-10-30)
+owns the behavior. Presentation only; no rule, network or input code changed.
+
+### Gain basis
+
+Loudest 50 ms RMS per bank, measured on the copied OGGs (dBFS):
+
+| Bank | Level | Bank | Level |
+| --- | --- | --- | --- |
+| Land | −7.6 | Footstep | −16.5 |
+| Swing | −10.3 | Hit | −16.7 |
+| Block | −11.7 | DeflectorOpen | −17.9 |
+| LaserFire | −12.4 | DeflectorParry | −20.2 |
+| Dash | −12.9 | Click | −21.6 |
+| SpellFireImpact | −13.3 | Stun | −21.9 |
+| LaserReload | −14.5 | Jump | −24.6 |
+
+The per-cue gains in `ArenaAudio` start from these levels. They are proposals until
+someone listens.
+
+### Evidence
+
+- **Copy:** all 70 clips are byte-identical to `vibegame1` `2cb6e576`. Every folder
+  and clip GUID matches its source, and no meta keeps `preloadAudioData: 0`.
+- **Compile:** `Artifacts/Unity/Compile-20261030-073500-204.log`, no warnings in the
+  changed files.
+- **Native tests:** the rewritten `ArenaWeaponAudioTests` pass 2/2
+  (`Artifacts/Unity/PlayMode-20261030-073523-777.xml`). Full PlayMode passes 151/152
+  with 1 explicit skip (`PlayMode-20261030-073547-190.xml`). Full EditMode passes
+  458/460 with 2 explicit skips (`EditMode-20261030-073635-970.xml`).
+- **Packaged player:** build `Artifacts/Unity/Smoke-20261030-113935-132` (content
+  `bb4764367cca11de6f147a100ce1bc47b38772db9c3f3a5a0548e098de5f6b07`, log
+  `BuildSmoke-20261030-073927-423`).
+  - `-Music` passes with its new recorded-cue step (`Artifacts/Visual/20261030-073956-890`).
+    `laserfire_02` played at pitch 1.01 and volume 0.83, with output RMS 0.143, over
+    `Level_terrace-steps`. The four music steps repeat the D032 result (RMS
+    0.082 / 0.080 / 0.030 / 0.073).
+  - Static (`20261030-074028-573`, 16 captures) and `-Weapons`
+    (`20261030-074055-551`, 26 captures) pass on the same build.
+  - All three player logs have zero exception, NRE or RenderGraph lines.
+- **Playable build:** `-Action BuildWindows` rebuilt `Artifacts/Unity/Windows/WildstoneArena.exe`
+  from the same content (log `BuildWindows-20261030-074554-523`). The first attempt
+  (`BuildWindows-20261030-074456-742`) built successfully but failed the wrapper's
+  freshness check: the incremental build left the unchanged launcher with its old
+  timestamp. The wrapper now deletes the launcher before a build, so only that run
+  can recreate it.
+
+### Limits
+
+- Nobody has listened. Levels, weapon identity by ear, the music-to-SFX balance and
+  whether positional steps help find opponents all need the user.
+- Batch-mode tests assert which clip, pitch and volume each voice gets, not the sound.
+- Footsteps were tested on a scripted straight run. Natural traversal, wall runs,
+  stairs and eight players at once were not observed.
+- No Photon run was repeated. Audio reads the same committed events and motor state
+  as the effects that the earlier runs exercised.
+
+## 2026-10-30 laser beams: barrel start and daylight contrast
+
+Scope: a review of the packaged weapon captures found two beam defects. Neither
+was recorded before. The
+[rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md) owns the
+contract. Presentation only.
+
+### Findings
+
+- **Beams started short of the barrel.** The viewmodel draws at 58° vertical FOV and
+  the world at a wider one, but beams started at the muzzle socket's raw world
+  position. The world camera projects that point nearer the screen centre, so a gap
+  opened between the drawn barrel and the beam. In the weapon fixture (a 90° world
+  camera) the visible beam began at 57 % of the barrel's screen offset (predicted
+  55 %). At the default horizontal 100° it would be about 83 %.
+- **Beams washed out in daylight.** Additive cyan on ivory stone and sky read as a
+  pale line.
+
+### Fix and evidence
+
+- `WeaponView.TryGetMuzzle` maps the socket through the viewmodel camera's viewport
+  into the world camera, keeping screen point and depth. Local beams and the world
+  muzzle flash use it.
+- `ArenaEffects` adds a dark premultiplied sheath under every laser beam and shotgun
+  pellet, queued one before the glow.
+- **Tests:**
+  - `FirstPersonWeaponMotionTests.MuzzleUsesAuthoredSocketAndFourReusedElementsExpireAndReset`
+    now checks a 90° world camera against the 58° viewmodel: same screen point within
+    0.0005 and same depth.
+  - `WeaponEffectsTests.EveryWeaponHasBoundedDistinctShotGeometry` checks one sheath
+    per laser ray, queued before its glow; the shotgun bound rises from 12 to 16 lines.
+  - `NetworkPresentationBridgeTests` follows the new burst order.
+  - Focused 40/40 (`Artifacts/Unity/PlayMode-20261030-075232-299.xml`). Full PlayMode
+    151/152 with 1 explicit skip (`PlayMode-20261030-075422-390.xml`).
+- **Packaged build:** `Artifacts/Unity/Smoke-20261030-115257-177`, built by log
+  `BuildSmoke-20261030-075251-445`.
+  - `-Weapons` passes (`Artifacts/Visual/20261030-075312-732`). In `weapon-linedriver-1`,
+    `weapon-laserpistol-1`, `weapon-lasersniper-1` and `weapon-lasershotgun-1`, the
+    beams now leave the drawn barrel. Before the fix, in `20261030-074924-212`, they
+    started about 85 px short at 1280×720.
+  - Static (`20261030-075445-574`), `-Sequence` (`20261030-075512-512`) and `-Music`
+    (`20261030-075517-662`) also pass, with zero exception lines.
+- **Playable build:** `Artifacts/Unity/Windows/WildstoneArena.exe`, rebuilt with these
+  fixes (log `BuildWindows-20261030-075641-945`, content
+  `c4d3d6b658f5097ba2f3c26d567070b84f38a42af11bcc1208a7d427fb0d3b3b`).
+- **Checked, not defects:**
+  - Sequence frames 000–024 are washed out because the ivory curtain opens over
+    0.6 s after loading, per the UI spec.
+  - The sequence fire frames show no beam because that fixture plays only the
+    viewmodel's own muzzle effects.
+
+- **Frame time:** `Invoke-PerfSample.ps1` on the same build
+  (`Artifacts/Visual/Perf-20261030-075901-998`), in the eight-soldier beam and blast
+  scene of the earlier sample, now with sheaths. Ultra: mean 1.55 ms, p95 1.72,
+  p99 2.04, max 4.45. Low: mean 1.46 ms, p95 1.63, p99 2.01, max 4.37. Both are
+  within 0.1 ms of the earlier sample. The perf scene does not drive `ArenaAudio`,
+  so the new voices are not in these numbers.
+
+### Limits
+
+- The sheath's darkness and width were judged on still frames only. Whether beams
+  read well in motion, against every map surface and at 30 m needs a human look.
+
+## 2026-10-30 maps, weapons and fire feedback
+
+Scope: the user asked for the `visual-polish` look merged into the game, and for
+better and cooler maps, weapons, effects and gunplay feel (D034). Contracts are in
+the [rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md#6-d028-quality-stack)
+and the [weapon workflow](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md#weapon-energy-pass-2026-10-30).
+Presentation only: arena geometry, rules, authority and aim are unchanged.
+
+### Maps
+
+- **Change.** `ArenaBuilder` palette, daylight and grade moved to the
+  `visual-polish` values; the three grade profiles were deleted and regenerated.
+  - Before: `Artifacts/Visual/20261030-075445-574`. Walls read as tan sandstone
+    brick (4 × 2 m) with near-black charcoal and an amber tape-like inlay.
+  - After: clean ivory and cool-grey 4 m panels under a pale haze, matching the
+    `visual-polish` captures in that worktree's
+    `Artifacts/QualityGoal/BeforePulseFeed/Quality/`.
+- **Build.** `Prepare-20261030-084253-480`, then `Bake-20261030-084308-075` (all
+  three maps).
+- **Map views.** `CaptureViewmodel` now also renders an overview and an eye-height
+  view per map (`Artifacts/Visual/Viewmodel-20261030-084710/map-*.png`). These
+  overviews were used to compare against `visual-polish`.
+
+### Weapons and fire feedback
+
+- **Models.** The weapon art pass covers all eleven weapons. It ran in a separate
+  Codex lane with Blender only; its report and measurements are in
+  [SOURCE-REUSE](SOURCE-REUSE.md) and `ArtSource/weapon-energy-export-manifest.json`.
+  - Sockets are exactly unchanged and `.meta` files are untouched.
+  - Previews: `ArtSource/Previews/FirstPerson/WeaponSpecials-ContactSheet.png`.
+- **Root cause of the flat look.** `Signal*` materials had no emission, so
+  nothing on the guns glowed or bloomed. They now emit.
+- **Tuning on captures.**
+  - At ×2 emission, and at ×1.3 with a full-colour albedo, amber rendered yellow and
+    coral pink.
+  - At ×1.2 over a 35 % albedo, with each flare capped at 1.6, the hues hold. See
+    the editor captures `Viewmodel-20261030-085104`, then `-085141`, then `-090036`.
+  - Packaged fire frames: `20261030-085411-879`, then `-090107-687`, then
+    `-090306-160`.
+- **Laser burns.** Beams that stop on cover leave a burn and a cooling ember.
+  Players are excluded.
+- **View punch.** Local shots add a cosmetic view punch.
+
+### Checks
+
+- **New tests.**
+  - `FirstPersonWeaponMotionTests.SignalPartsFlareOnShotsAndCoolBack`.
+  - `FirstPersonSlideViewTests.ShotPunchRecoversWithoutMovingAim`.
+  - `WeaponEffectsTests.LaserBurnsAreBoundedAndNeverEvictBlastScorches`.
+  - `WeaponEffectsTests.BeamWidensAwayFromTheViewerAndSparksOnTheWallItStrikes` now
+    also asserts a burn on the wall face along its normal, and none for a shot into
+    open air.
+- `PracticeSceneTests` follows the new fog end (230 m).
+- **Full suites on the final code:**
+  - EditMode 458/460 with 2 explicit skips (`Artifacts/Unity/EditMode-20261030-090706-655.xml`).
+  - PlayMode 154/155 with 1 explicit skip (`PlayMode-20261030-090721-444.xml`).
+- **Packaged build** `Artifacts/Unity/Smoke-20261030-130250-158`, log
+  `BuildSmoke-20261030-090244-603`. All five modes pass with zero exception lines:
+  - static `Artifacts/Visual/20261030-090749-424`;
+  - `-Weapons` `20261030-090306-160`;
+  - `-Sequence` `20261030-090816-576`;
+  - `-Motion` `20261030-090821-956`;
+  - `-Music` `20261030-090844-308`.
+- **Frame time** (`Artifacts/Visual/Perf-20261030-090405-054`, same scene as earlier
+  samples):
+  - Ultra: mean 1.61 ms, p95 1.78, p99 2.11, max 4.51.
+  - Low: mean 1.52 ms, p95 1.67, p99 2.01, max 3.45.
+  - Both are within 0.1 ms of the previous sample.
+- **Playable build.** `Artifacts/Unity/Windows/WildstoneArena.exe` (log
+  `BuildWindows-20261030-090442-599`). Its content hash is
+  `ad6f1841cf9aa95440594b322c4b1c81c7be1df613a9254944d6889f9f25a9fb`: SHA-256 over
+  the sorted relative path and per-file SHA-256 of the build's 200 shipped files,
+  excluding `*DoNotShip` and Burst debug folders.
+- No Photon run was repeated: no network, authority or simulation code changed.
+
+### Limits
+
+- **Captures.** The static captures still open in the walled spawn alley, so in-play
+  map views come from the editor overviews and the weapon fixture. Widening the
+  spawn exits is a layout change that waits on the user.
+- **Judged on stills only.** Glow strength, the flare and heat curve, burn size and
+  lifetime, and the view punch angles were judged on still frames, not in motion.
+  Whether firing feels better needs a human playtest.
+- **Bloom.** Bloom on the viewmodel's signal parts is subtle at the current grade
+  (threshold 1.05, intensity .6).
+- **Amber.** Amber still reads golden rather than deep orange in full sun.
+
+### Follow-up: hit flash and ceiling light strips
+
+- **Hit flash.** Remote soldiers flash white on a confirmed hit, brighter on a
+  headshot (contract in the
+  [weapon workflow](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md#weapon-energy-pass-2026-10-30)).
+- **Root cause found on the way.** The first full PlayMode run failed the new test
+  (`PlayMode-20261030-091651-600.xml`): the armour material had lost `_EMISSION`.
+  - Diffing the material across runs showed a plain editor launch keeps the keyword,
+    but `CaptureViewmodel` removes it. That run saves the arms' materials on quit.
+  - It removed the keyword with GI flags EmissiveIsBlack or None, and even with a
+    non-black colour. It keeps it with RealtimeEmissive, as on the weapons' `Signal*`
+    materials.
+  - So the team glow materials had been going dark after every capture run until
+    the next `PreparePresentation`. `SoldierBuilder` now flags every soldier
+    material realtime emissive. After a capture run the keyword is still present on
+    Armour, Suit, Trim, Accent 1 and Glow 1.
+- **Ceiling light strips.** Under each overhang that has a baked bounce light, glowing strips now show
+  where the light comes from, so the dark charcoal ceilings read as lit.
+  - `Prepare-20261030-091453-397`, then `Bake-20261030-091503-722`.
+  - Editor views: `Artifacts/Visual/Viewmodel-20261030-091618/map-*.png`. The
+    split-gallery ground view shows the strips.
+- **Full suites on the final code:**
+  - EditMode 458/460 with 2 explicit skips (`Artifacts/Unity/EditMode-20261030-092157-560.xml`).
+  - PlayMode 155/156 with 1 explicit skip (`PlayMode-20261030-092212-210.xml`).
+- **Packaged build** `Artifacts/Unity/Smoke-20261030-132249-365` (log
+  `BuildSmoke-20261030-092243-581`). All five modes pass with zero exception lines:
+  - static `Artifacts/Visual/20261030-092315-853`;
+  - `-Weapons` `20261030-092436-393`;
+  - `-Sequence` `20261030-092522-880`;
+  - `-Motion` `20261030-092528-069`;
+  - `-Music` `20261030-092550-141`.
+  - `-Weapons` then gained `weapon-remote-hit`: a remote soldier 7 m down a Line
+    Driver beam at the peak of its hit flash. It is the first packaged view of a
+    remote soldier being hit. The change touches only the smoke-only
+    (`WILDSTONE_SMOKE`) driver.
+    - Rebuilt smoke: `Artifacts/Unity/Smoke-20261030-133111-723`
+      (`BuildSmoke-20261030-093104-021`).
+    - `-Weapons` passed with 27 captures and zero exception lines
+      (`Artifacts/Visual/20261030-093134-000`).
+    - The body reads as a solid white silhouette for the flash. The ceiling strips
+      show under the far gallery in the same frame.
+    - The other four modes above ran on the previous smoke build, which differs
+      only in this driver.
+- **Frame time** (`Artifacts/Visual/Perf-20261030-092622-341`):
+  - Ultra: mean 1.62 ms, p95 1.81, p99 2.13, max 4.16.
+  - Low: mean 1.51 ms, p95 1.67, p99 2.05, max 8.47.
+  - Means and percentiles are within 0.03 ms of the previous sample. The Low max is
+    a single frame.
+- **Playable build.** `Artifacts/Unity/Windows/WildstoneArena.exe` (log
+  `BuildWindows-20261030-092652-950`). Its content hash, computed the same way as
+  above over 200 files, is
+  `3139b40aeb40a49db2429bf523e96b34dc600d99bd22e49d45ebd96959a8dad7`. It replaces
+  the earlier build. The later smoke-only driver change does not compile into it.
+- **Beams.** Beam width stops growing with distance at 6× (42 m) instead of
+  2.5× (17.5 m), so long shots keep their on-screen width. The sniper rail is heavier
+  and lingers longer (values in the
+  [rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md#6-d028-quality-stack)).
+  - `WeaponEffectsTests` 18/18 (`PlayMode-20261030-093455-283.xml`).
+  - Packaged `-Weapons` passed with 27 captures (`Artifacts/Visual/20261030-093537-307`,
+    smoke `BuildSmoke-20261030-093515-659`).
+  - Measured beam widths in the sniper and Line Driver frames barely changed (1–3 px
+    of bright core). The strip texture is bright only in its middle quarter.
+    Fixture frames are also read at least 40 ms after the shot, partway through
+    the quadratic fade. So these stills cannot show the moment of firing, and beam
+    weight needs a look in play.
+  - Full suites after the beam change: EditMode 458/460 with 2 explicit skips
+    (`EditMode-20261030-093820-087.xml`), PlayMode 155/156 with 1 explicit skip
+    (`PlayMode-20261030-093834-515.xml`).
+  - The playable build was rebuilt (`BuildWindows-20261030-093857-363`). Its
+    content hash over 200 files is
+    `51decefa611e56b73aca6ab63b4301b55c35d95e28967e41fb8e2c969cda6307`, which
+    replaces the hash above.
+- **Limit.** Flash brightness was judged on one still frame and its 0.12 s length
+  only by the test; neither has been seen in motion.
+
+## 2026-10-30 host removal reasons
+
+Scope: backlog item 1, the external player's disconnect or return to the menu after
+joining and choosing a team. The local `Requested` disconnect seen once in
+`20261029-170011-577-grenade-combat-baseline` gave no host-side cause. Contract: the
+[foundation spec](superpowers/specs/2026-10-25-multiplayer-foundation-design.md#7-sessions-seats-and-recovery).
+
+- **Change.** Every host removal of a peer now logs one reason-only warning. That
+  covers a refused admission at startup or join, and a load timeout. Previously
+  each failure path in `FusionLobbyAdmission.Admit` and `FusionLobby.Admit` returned a
+  bare `false`. No admission rule changed.
+- **Tests.**
+  - `FusionLobbyAdmissionTests` 13/13 (`Artifacts/Unity/EditMode-20261030-094155-982.xml`),
+    including the new `RefusedAdmissionsNameAFixedReason`.
+  - Full suites: EditMode 459/461 with 2 explicit skips
+    (`EditMode-20261030-094530-883.xml`), PlayMode 155/156 with 1 explicit skip
+    (`PlayMode-20261030-094545-826.xml`).
+- **Real Photon, separate processes** (smoke `BuildSmoke-20261030-094216-432`). All
+  pass with zero exception lines and no removal line in any log:
+  - `team-switch` (`Artifacts/Smoke/20261030-094247-746-team-switch-baseline`);
+  - `late-join` (`20261030-094316-108-late-join-baseline`);
+  - three `grenade-combat` baselines (`20261030-094354-194`, `-094422-126`,
+    `-094450-839`).
+  - The intermittent startup `Requested` disconnect did not recur, so its cause is
+    still unknown.
+- **Playable build.** `Artifacts/Unity/Windows/WildstoneArena.exe`
+  (`BuildWindows-20261030-094608-839`). Its content hash over 200 files is
+  `ca1a81ea1cbc67bf17c62b373edc2b20237a3ac630b041810b5bb1f15aee0a79`, which
+  replaces the earlier hashes today.
+- **Next time it happens.** Copy the host's `Player.log`. Since the D038 rename it is
+  at `%USERPROFILE%\AppData\LocalLow\Wildstone\Better Bean Battles\Player.log`;
+  builds from before the rename use `...\Wildstone\Wildstone Arena\Player.log`.
+  Search it for `WILDSTONE HOST REMOVED PEER`. A reason names the refusing rule.
+  No such line means the host did not remove the player, which points to the
+  client or the transport instead.
+
+## 2026-10-30 firefight frame sequences
+
+Scope: the user asked for continued improvement while at work. Captures had shown
+weapons only at one moment after a shot. A new packaged mode follows real shots
+frame by frame. Mode contract: [TOOLING](TOOLING.md).
+
+- **First run** (`Artifacts/Visual/20261030-100138-388`, 32 captures). At 1:1 the
+  Line Driver, SMG and shotgun beams read from muzzle to target, and the struck
+  soldier shows its white hit flash. Problems found:
+  - **Sniper rail.** It was the weakest read. Its glow (.09 m) was thinner than the
+    Line Driver's (.11 m), and its first-person flare was still violet after the art
+    pass made the sniper cyan.
+  - **Support hand on frame 0.** In every sequence, frame 0 showed the support hand
+    off the weapon or missing, often where the previous weapon had held it.
+  - **Shotgun framing.** Its twin barrels sat near the centre of view, crowding the
+    target.
+- **Causes and fixes.**
+  - Sniper: glow .15 m and core .045 m (rendering spec). Its viewmodel flare uses
+    the beam colour.
+  - Support hand: a capture artifact. Forced captures render from `LateUpdate`,
+    before the frame's skinning pass, so skinned meshes drew the previous frame's
+    bones. Fixture captures now set `forceMatrixRecalculationPerRender`, and the
+    run `20261030-101358-874` shows the hand on the grip in every frame 0.
+    `FamiliarLaserWeaponsHaveAuthoredContactsDistinctMechanismsAndBoundedFlashes`
+    now also asserts both hands keep contact at peak kick (pistol, shotgun, sniper,
+    SMG). A body reset test passed before any fix, so the first-person body was
+    ruled out.
+  - Shotgun: hip pose (.27, −.38, .50), which puts the settled muzzle where the Line
+    Driver's sits.
+  - Capture clock: `Time.captureDeltaTime` holds fast frames to 1/60 s, but the
+    unscaled effect clock advances by real time on the slow shot-setup frame.
+    Frame 1 of the first sequence landed at 25.7 ms. Each capture now records its
+    true age, and the wrapper allows one frame of error.
+- **Incoming rail** (`20261030-101538-012`, added as a fifth sequence). A remote
+  sniper rail from the right flank sweeps past the lens: a strong cyan read whose
+  white core lasts to frame 14 (about 0.23 s).
+  - Near the lens it widens to about 50 px at 720p, because the width taper stops
+    shrinking below 2.45 m. It is left as is; judge it in a playtest.
+- **Final evidence** (smoke `BuildSmoke-20261030-101639-489`):
+
+  | Mode | Run | Result |
+  |---|---|---|
+  | `-Firefight` | `Artifacts/Visual/20261030-101702-899` | 40 captures |
+  | `-Weapons` | `20261030-101713-646` | 27 captures |
+  | `-Motion` | `20261030-101939-175` | 13 captures; mean difference from `092528-069` under 0.4 grey levels, so the skinning change did not move settled poses |
+  | `-Sequence` | `20261030-102001-299` | pass |
+  | static | `20261030-102006-483` | pass |
+
+- **Tests.**
+  - Focused PlayMode 48/48 (`PlayMode-20261030-101149-049.xml`).
+  - EditMode 459/461 with 2 explicit skips (`EditMode-20261030-101826-012.xml`).
+  - PlayMode 155/156 with 1 explicit skip (`PlayMode-20261030-101840-618.xml`).
+- **Playable build.** `Artifacts/Unity/Windows/WildstoneArena.exe`
+  (`BuildWindows-20261030-101907-577`). Its content hash over 200 files is
+  `5cb1330a9675e82e83c741cbfb848b3ac53bbef04fd52a539e7cdc51e93a9d3b`, which
+  replaces `ca1a81ea…` above.
+- **Limits.**
+  - The frame-time sample was not rerun. These changes are two beam widths, a
+    flare material and a pose constant inside the existing pools
+    (`Perf-20261030-092622-341` stands).
+  - Captures are labeled fixtures with synthetic hits, not networked play.
+  - Whether the rails, flash and kick feel good needs a human playtest.
+
+## 2026-10-30 map traversal and travel distance
+
+Scope: backlog item 4, pickup reachability and route fairness. Contract and measured
+table: the [map spec](superpowers/specs/2026-10-25-wildstone-modern-map-design.md).
+
+- **Change.** `ArenaValidation.ValidateTraversal` runs inside `ValidateWorld`, so the
+  arena build and the existing world tests now fail on any pickup or zone point that
+  a start cannot reach, or cannot return from, by plain movement.
+- **Tests** (`EditMode-20261030-102724-263.xml`: 463/465, 2 explicit skips).
+  - `EveryStartReachesEveryPickupAndZonePointByPlainMovement` passes for all three
+    maps and logs the per-target distance report.
+  - `RemovingTheGalleryRampsStrandsItsPickups` deletes Atrium's two ascents and
+    must report the gallery sniper as unreachable.
+  - The saved-catalog world test now covers traversal too.
+- **Findings.**
+  - Everything is reachable on all three maps, including the 4 m gallery and
+    terrace pickups, and no start is cut off from the zone route.
+  - No boundary-wall top is reachable by plain jumps. The highest plain-reachable
+    floor is 4 m on every map. (Wrong: this grid missed most ledge jumps. See
+    [ledge jumps and outer walls](#2026-10-30-ledge-jumps-and-outer-walls).)
+  - Split Gallery's distances are balanced: mean 48-50 m to weapons and exactly 50 m
+    to zone points for every team.
+  - Terrace Steps fails the spec's comparable-travel requirement. Teams 1 and 3
+    spawn under the upper court and west terrace and must walk south before climbing.
+    Team 3 walks about 97 m to the sniper against 65 m for team 0, and its zone-point
+    mean is 73 m against 44 m.
+  - Atrium shows a smaller lean of 6-8 m against its northern teams, which spawn
+    under the north gallery.
+- **Limits.**
+  - Walking distance on a grid, not travel time. Slides, dashes, wall-runs and
+    launches shorten some routes.
+  - Exposure, escape options and the "more than one approach" property are not
+    measured.
+  - No geometry changed. A Terrace Steps fix (for example, opening the northern
+    arrival courts to a short ramp) changes spawn-area geometry and needs a rebake,
+    so it waits for the user.
+
+## 2026-10-30 ledge jumps and outer walls
+
+Scope: a review of the first traversal check. Contract: the
+[map spec](superpowers/specs/2026-10-25-wildstone-modern-map-design.md).
+
+- **Flaw.** The first grid linked jumps and drops only between neighbouring 0.5 m
+  cells. A cell within 0.38 m of a ledge face is never standable, so most ledges had
+  no jump at all. Its "no wall top reachable" result could not be trusted.
+- **Fix.**
+  - Jumps and drops now land up to 1.15 m away. A capsule sweep checks the rise and
+    the move over the ledge.
+  - A drop must land on the first surface below the ledge, not pass through a
+    lower step.
+- **Regression test.** `APickupOnACrateNeedsAJumpWithinReach` puts the pistol on a
+  crate whose faces sit 0.1 m past a grid cell.
+  - Limited to neighbouring cells (`EditMode-20261030-103316-920.xml`), the 1.6 m
+    crate failed as unreachable.
+  - With the fix, the 1.6 m crate is reachable and a 2.6 m crate is not.
+- **Finding: outer-wall escape.** With real ledge jumps, the whole top of Atrium's
+  6 m perimeter wall (1012 cells) was reachable from the 4 m gallery. The same is
+  true by arithmetic on the other maps. A jump takes off at 12 m/s (2.4 m apex under
+  30 m/s² gravity) and moves at up to 11 m/s, so the feet stay above +2 m for about
+  2.6 to 6.2 m of travel.
+  - Floors that run flush into a wall, 2 m below its top: Atrium's gallery and
+    Terrace Steps' upper court.
+  - Floors that stop 3 m short of a wall: Split Gallery's crossover and Terrace
+    Steps' north edge.
+- **Change.**
+  - A new rule in `ValidateTraversal`: no reachable floor within 8 m of an outer
+    wall may sit less than 2.8 m below its top.
+  - `SixMetreOuterWallsAreAnEscape` restores 6 m walls and expects the rule to fail
+    on each map.
+  - Map revision 4 raises all outer walls to 8 m. It ran `Prepare`,
+    `PrepareNetworking` and `Bake` (`Bake-20261030-103825-983`, GPU lightmapper,
+    all three maps).
+- **Results.**
+  - EditMode 468/470 with 2 explicit skips (`EditMode-20261030-104011-034.xml`).
+  - PlayMode 155/156 with 1 explicit skip (`PlayMode-20261030-104033-824.xml`).
+  - The highest plain-reachable floor is now Atrium's 5.4 m parapet top and Terrace
+    Steps' 5.8 m upper-court cover. Travel distances are in the map spec. With real
+    ramp-side jumps, Atrium's northern lean drops to 2-3 m. Terrace Steps' remains.
+  - A throwaway probe (`Test-20261030-104516-684.log`, test file removed) measured
+    one Terrace Steps option: northern starts on the +4 m courts. Results are in the
+    map spec. It was not adopted.
+  - Map overviews (`Artifacts/Visual/Viewmodel-20261030-104118`) show the taller
+    walls. The skyline still reads above them and nothing else moved.
+  - Smoke `BuildSmoke-20261030-104148-776`: static captures
+    `Artifacts/Visual/20261030-104218-201` (16) and `-Firefight`
+    `20261030-104249-285` (40) pass.
+  - Playable build `BuildWindows-20261030-104307-489`. Its content hash over 200
+    files is `889c10b8b581640d99b34c96648ba442073e3dabec134c198c4ba013ba45defb`,
+    which replaces `5cb1330a…` above.
+- **Limits.**
+  - Wall-run chains, dashes and launches are not modelled. They may still reach
+    places plain movement cannot.
+  - The 8 m reach and 2.8 m clearance come from motor arithmetic, not a measured
+    jump.
+  - Whether the taller walls change the feel of the arenas needs a playtest.
+- **Frame time after the rebake** (`Artifacts/Visual/Perf-20261030-105354-982`, same PC and smoke player as the blast
+  sequences):
+  - Ultra: mean 1.65 ms, p95 1.87, p99 2.20, max 4.30.
+  - Low: mean 1.52 ms, p95 1.71, p99 1.99, max 18.07 (one frame).
+  - Ultra percentiles are within 0.07 ms of `Perf-20261030-092622-341`, so the extra
+    lightmap atlases cost nothing measurable here.
+
+## 2026-10-30 blast frame sequences
+
+Scope: the requested grenade and explosion revamp had only single-frame captures.
+`-Firefight` now adds grenade and Pulse Lobber blast sequences on the court 8 m
+ahead, beside a soldier (mode contract: [TOOLING](TOOLING.md)).
+
+- **First run** (`Artifacts/Visual/20261030-104901-356`). Both blasts showed only a
+  dark full-size smoke cloud and the radius dome, with no fireball or flash on any
+  frame.
+- **Cause: a capture artifact.** The particle systems run on unscaled time. Each
+  blast fired on the frame after the previous sequence's PNG encoding, so the first
+  particle update aged it by most of a second. That killed the 0.4-0.6 s fireball and
+  the 0.12 s flash, and left the 2 s smoke at full size. The driver now fires only
+  after a normal-length frame. The hitscan sequences are unchanged, because their
+  impacts are timed line effects.
+- **Final run** (smoke `BuildSmoke-20261030-105143-140`,
+  `Artifacts/Visual/20261030-105206-234`, 56 captures, ages within a frame of
+  nominal):
+  - Grenade: a yellow-white fireball over frames 0-4 (to about 70 ms). The soldier
+    flashes white on frames 0-2. Dark smoke rises and is still a large cloud at frame
+    50 (0.83 s). The orange radius dome and ground ring read to frame 8.
+  - Pulse Lobber: an orange fireball with red ground glow, embers to frame 8, then
+    smoke. Its colour separates it from the grenade.
+- **Not changed.** The game's blast effects needed no fix. Whether the short
+  fireball pop feels strong enough is a playtest question. A real hitch of most of a
+  second just before a blast would also skip its fireball. No such hitch has been
+  measured.
+- **Playable build.** Unchanged (`889c10b8…`), because the capture driver compiles
+  only into smoke builds.
+
+## 2026-10-30 soldier outline
+
+Scope: the user asked for continued graphics and VFX improvements, with every change
+tested so it does not make the game worse. The firefight sequences showed the target
+soldier at 10-15 m as an ivory figure on ivory stone. On a confirmed hit, its white
+flash erased its edge entirely. The fix is a dark inverted-hull outline on remote
+soldiers (contract: [rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md#6-d028-quality-stack)).
+
+- **First version** (1.6 px, `Artifacts/Visual/20261030-115709-439`). The silhouette
+  read, but the hulls of overlapping armour plates left dark blotches on the chest
+  and arms. Pushing the hull 6 cm back from the camera removed most of them
+  (`20261030-115819-269`). At 720p, 1.6 px became about one pixel, so the width is
+  now 2 px at 1080p.
+- **Final** (smoke `BuildSmoke-20261030-120009-950`), compared against the baseline
+  `20261030-105206-234` at the same frames:
+  - Line Driver frame 14: the strafing soldier reads against the wall at native size.
+  - Sniper frame 2: the white hit-flash body now keeps its edge.
+  - In the `-Motion` and `-Weapons` captures, the first-person body, arms and
+    weapons are not outlined.
+  - The title backdrop squad also uses `PlayerVisual`, so it is outlined too
+    (`20261030-121549-176/title-720.png`). It reads crisper there, so this is kept.
+- **Checks:**
+  - EditMode 469/471, 2 skipped (`EditMode-20261030-115911-548`). The new
+    `RenderingTierTests.BothTiersOutlineSoldiersOnTheEnemyLayer` checks both tiers.
+  - PlayMode 155/156, 1 skipped (`PlayMode-20261030-115940-404`). `DerezTests` now
+    checks that the outline layer is left during the dissolve and restored on respawn.
+  - All five packaged capture modes pass: default `20261030-120025-237`, firefight
+    `120055-610`, motion `120104-639`, weapons `120126-661`, sequence `120211-950`.
+  - Frame time (`Perf-20261030-120241-180`): Ultra mean 1.64 ms and p99 2.09 ms
+    (previous sample 1.65 and 2.20); Low mean 1.54 ms and p99 2.08 ms (previous 1.52
+    and 1.99). That is within run-to-run noise.
+- **Limits.** Gaps can remain where hard-edged plates split their normals. Whether
+  2 px reads as clean or cartoonish in motion needs a human look.
+
+## 2026-10-30 pickup pads
+
+Scope: pickups were a floating ivory item over ivory stone, with no marker while ready
+and nothing at all during the 15 s respawn. They now get a floor pad (contract:
+[rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md#6-d028-quality-stack)).
+`-Weapons` gained a `weapon-pickups` capture: five pads on Atrium's court, the
+shotgun's 6 s into its respawn.
+
+- **Iterations**, all with packaged `-Weapons`:
+  - Additive ring plus a soft light shaft (`Artifacts/Visual/20261030-120722-539`).
+    The rings were nearly invisible, and the shafts read as hazy glass boxes. The
+    shafts were dropped. The same capture also showed the previous step's hit target
+    still standing in frame, so the fixture now hides it.
+  - Flat floor-aligned rings (`121127-422`). Fainter at grazing angles than
+    camera-facing ones, so they were dropped too.
+  - A ring painted in the item's hue over a dark track (`121319-024`, final widths in
+    `121651-268`). The pistol's blue ring reads clearly. The pale shield ring reads
+    least.
+- **Checks:**
+  - EditMode 469/471, 2 skipped (`EditMode-20261030-121437-580`).
+  - PlayMode 156/157, 1 skipped (`PlayMode-20261030-121458-239`). The new
+    `WeaponEffectsTests.PickupPadsShowReadinessAndRefillWithTheRespawn` checks the full
+    ring, the dim partial arc, that it grows as the respawn runs down, and that other
+    pads are unaffected.
+  - Smoke `BuildSmoke-20261030-121527-095`. All five packaged modes pass: default
+    `20261030-121549-176`, firefight `121620-203`, motion `121629-260`, weapons
+    `121651-268` (28 captures), sequence `121738-249`.
+  - Frame time (`Perf-20261030-121743-370`): Ultra mean 1.65 ms and p99 2.12 ms; Low
+    mean 1.55 ms and p99 1.99 ms. That is unchanged.
+- **Limits.** Readability from across a real court in motion, and whether the
+  breathing ring distracts, need a human look. The shield and blink rings use their
+  pale ability colours.
+
+## 2026-10-30 remote soldier T-pose frame
+
+Scope: frame 0 of the Line Driver firefight sequence and every `weapon-remote-hit`
+capture showed the target soldier in its T-pose, arms straight out.
+
+- **Reproduced.** The new `DerezTests.FirstFrameAndRespawnAreAlreadyPosed` failed
+  (`PlayMode-20261030-121926-070`): after the first `Present` and `PresentHandling`,
+  the left hand sat exactly at shoulder height (drop 1.2e-07 m).
+- **Wrong first fix.** Warming the animator up with `Update(0)` on creation and after
+  respawn did not help (`PlayMode-20261030-121958-778`), and was reverted.
+- **Cause.** The soldier prefab uses `AnimatorCullingMode.CullUpdateTransforms`. The
+  bones of a renderer that has not yet been drawn are not written, so in real games a
+  soldier's first frame, and its first frame after each respawn reactivates it,
+  rendered the bind pose. The same culling left off-screen shooters with a stale
+  muzzle position for their beams.
+- **Fix.** `PlayerVisual` sets remote soldiers to `AlwaysAnimate`. There are at most
+  eight of them.
+- **Checks:**
+  - The focused test passes (`PlayMode-20261030-122032-730`).
+  - EditMode 469/471, 2 skipped (`EditMode-20261030-122058-334`).
+  - PlayMode 157/158, 1 skipped (`PlayMode-20261030-122119-821`).
+  - Smoke `BuildSmoke-20261030-122143-108`, compared with `20261030-121620-203` and
+    `121651-268`: firefight frame 0 (`Artifacts/Visual/20261030-122204-497`) and
+    `weapon-remote-hit` (`122217-671`) now show the soldier posed with its rifle.
+- **Limits.** A one-frame flash was easy to miss in play. No human report connects
+  it to anything else.
+
+## 2026-10-30 shield shell and stun halo
+
+Scope: an active shield and a stun were the requested "stronger shield and stun
+reads". `-Weapons` gained `weapon-status-shield` and `weapon-status-stun`: a remote
+soldier 6 m ahead on Atrium's court (contract:
+[rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md#6-d028-quality-stack)).
+
+- **Baseline** (`Artifacts/Visual/20261030-122508-995`). The shield's 12-point ring
+  at chest height could not be found. The stun halo was a thin "W" above the helmet.
+  The fixture also left the previous step's hit flash on the soldier, so it was all
+  white. It now clears the hit before each status step.
+- **First shell** (`122836-296`). It was twice the intended size, because the scale
+  ignored the built-in sphere's 1 m diameter. It now divides by the mesh bounds.
+- **Final** (smoke `BuildSmoke-20261030-123016-857`, `123038-907`). A pale-cyan rim
+  outlines the soldier with a clear centre, from the helmet top to the boots. The
+  stun halo is a green zigzag around the helmet. It reads well against the dark
+  window band, and is fainter against bright stone.
+- **Checks:**
+  - EditMode 469/471, 2 skipped (`EditMode-20261030-123147-132`).
+  - PlayMode 158/159, 1 skipped (`PlayMode-20261030-123208-125`). The new
+    `WeaponEffectsTests.ShieldShellAndStunHaloFollowTheirPlayers` checks that only
+    the shielded player gets a shell, centred over them. It dims as the shield
+    drains, shrinks with a slide capsule and hides when the shield ends. The stun
+    halo is a closed 16-point loop around the head.
+  - All five packaged modes pass: default `20261030-123231-089`, firefight
+    `123258-019`, motion `123307-053`, weapons `123038-907` (30 captures), sequence
+    `123329-108`.
+  - Frame time (`Perf-20261030-123334-185`): Ultra mean 1.65 ms and p99 2.14 ms; Low
+    mean 1.54 ms and p99 2.02 ms. That is unchanged.
+- **Limits.** Whether the shell reads as too much of a bubble in play, and whether the
+  halo is strong enough on bright stone, need a human look. The shell's break and
+  expiry still use the existing event cues.
+
+### Shield break pop (follow-up)
+
+- A broken shield's shell now flares to strength 2 and swells 35% as it fades over
+  0.22 s. Reduced motion skips it. Before, the shell vanished on the break and only
+  the ring, sparks and flash marked it.
+- `-Weapons` gained `weapon-status-shield-break` (31 captures, smoke
+  `BuildSmoke-20261030-124304-304`, `Artifacts/Visual/20261030-124333-398`). The
+  flaring shell reads as a brighter white rim, with the soldier still clear inside.
+  The 0.1-0.18 s ring, sparks and flash had expired by capture time.
+- **Checks:**
+  - The new `WeaponEffectsTests.BrokenShieldShellPopsThenClears` checks that reduced
+    motion skips the pop, the shell flares above full-shield strength, swells, then
+    clears.
+  - EditMode 469/471, 2 skipped (`EditMode-20261030-124445-646`).
+  - PlayMode 159/160, 1 skipped (`PlayMode-20261030-124507-114`).
+  - All five packaged modes pass: default `20261030-124530-550`, firefight
+    `124557-497`, motion `124606-505`, weapons `124333-398`, sequence `124628-619`.
+  - Frame time (`Perf-20261030-124633-693`): Ultra mean 1.65 ms and p99 2.13 ms; Low
+    mean 1.55 ms and p99 2.12 ms. That is within the range of today's runs.
+- **Not in the playable build.** `d6d14b5a…` predates the pop.
+
+## 2026-10-30 movement lens and dash streaks
+
+Scope: the user put weapons, gunplay, movement and the game's vibe first. Movement
+had a slide FOV hold and wall-run/slide roll, but dashes, jumps and landings moved
+nothing in the view. The contract is the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md)
+(movement lens, dash streaks).
+
+- **Adapted from vibegame1**, read-only, with values from its `PlayerFeedback`,
+  `GameFeelSettings`, `CameraFX`, `DashFx` and `DashImpulse`:
+  - FOV kicks: dash 5, jump 2.5, wall jump 4;
+  - landing: −3·k FOV and a 0.22 m eye dip, with k = fall / 22 m/s;
+  - slide exit −2.5; wall-run hold 3.5;
+  - dash streaks: ten streaks, 0.22 s, (1−t)² fade.
+
+  The kicks were scaled to this ~68° vertical lens. No code was copied.
+- **Changed during the work.** The first version dropped the eye 0.2 m on a hard
+  landing, as vibegame1 does. The character spec requires the camera eye to stay the
+  authoritative shot origin, so it became a 2.5° downward nod instead.
+- **Sequence evidence.** `-Sequence` now dashes at frame 11 (smoke
+  `BuildSmoke-20261030-125857-778`, `Artifacts/Visual/20261030-130158-167`, compared
+  with `20261030-124628-619`):
+  - Sample 12: camera FOV 92.77 (was 90), with the streaks visible as thin cool
+    lines radiating clear of the crosshair.
+  - Sample 24: FOV 90.31, and the streaks are gone.
+  - Sample 60, the slide exit: FOV 93.24 (was 94.90), from the −2° punch.
+  - Sample 72: settled at 90.26 (was 90.44).
+  - Eye height is unchanged at every sample (1.67 standing, 0.77 sliding). The
+    wrapper's slide, recoil and reload gates pass.
+- **Checks:**
+  - New `FirstPersonSlideViewTests.MovementKicksWidenTheLensThenSettle` covers the
+    dash kick and its settle, the wall-run hold, ADS removing the lens, reduced
+    motion, and aim angles that never move.
+  - New `HardLandingsNodTheViewAndKerbStepsDoNot` covers an eye that stays exact, a
+    nod and a narrower lens on a 22 m/s landing, no response to a 1 m/s step, and
+    the settle.
+  - New `FirstPersonWeaponMotionTests.DashStreaksFlowAgainstTheTravelAndClear`
+    covers the streak count, clearance from the reticle, a strafe streaming the
+    other way, no refire, expiry and reduced motion.
+  - The muzzle-pool test now counts muzzle lines by name, and its no-growth check
+    includes the streak pool.
+  - EditMode 469/471, 2 skipped (`EditMode-20261030-125919-942`).
+  - PlayMode 162/163, 1 skipped (`PlayMode-20261030-125940-923`).
+  - All five packaged modes pass: default `20261030-130004-259`, firefight
+    `130035-287`, motion `130044-306`, weapons `130106-410`, sequence `130158-167`.
+  - Frame time (`Perf-20261030-130203-218`): Ultra mean 1.65 ms and p99 2.16 ms; Low
+    mean 1.55 ms and p99 2.04 ms. That is unchanged.
+- **Limits.** Whether the kicks feel punchy or nauseating, and whether the streaks
+  are too faint against bright ivory, can only be judged in play. Landings, jumps and
+  wall runs are covered by tests, not captures. Not in the playable build
+  `d6d14b5a…`.
+
+## 2026-10-30 crosshair rim and movement follow-ups
+
+Scope: reticle legibility, and three more movement reads. The contracts are the
+[UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md) (dynamic crosshair,
+hitmarkers) and the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md)
+(movement lens).
+
+- **Crosshair.** In default captures the ivory ticks almost disappeared on ivory
+  stone. Each tick and the dot is now a 2 px ivory core in a 1 px near-black rim at
+  0.8 alpha. The core keeps its old position, so the cone gap is unchanged. The hit
+  cue gets a 1.5 px dark text outline.
+  - A crop of the 1080p atrium and Terrace Steps captures (900,480 to 1020,600),
+    compared with `20261030-130004-259`, shows the rimmed ticks clear on the same
+    stone.
+- **Movement.**
+  - A perfect wall jump adds a +2° FOV kick. Before this, nothing showed its
+    stamina refund.
+  - A strafe dash banks 1.4° into its travel.
+  - A slide entry nods 1.2°.
+- **Checks:**
+  - New `MenuPresentationTests.ReticleAndHitmarkerKeepADarkEdge` covers a dark,
+    opaque 1 px rim on every reticle part, an ivory core, and the dark cue outline.
+  - New `FirstPersonSlideViewTests.PerfectWallJumpKicksWiderThanAPlainOne` and
+    `StrafeDashBanksAndSlideEntryNods`. These check the bank direction, the nod, the
+    settle, and that aim angles never move.
+  - Smoke `BuildSmoke-20261030-130651-741`.
+  - EditMode 470/472, 2 skipped (`EditMode-20261030-130713-883`).
+  - PlayMode 164/165, 1 skipped (`PlayMode-20261030-130735-120`).
+  - All five packaged modes pass: default `20261030-130758-726`, firefight
+    `130829-706`, motion `130838-730`, weapons `130900-847`, sequence `130952-583`.
+  - Frame time (`Perf-20261030-130957-671`): Ultra mean 1.65 ms and p99 2.17 ms; Low
+    mean 1.56 ms and p99 2.10 ms. That is unchanged.
+- **Limits.** Whether the rim looks too heavy, and how the bank and nod feel, need a
+  playtest. Wall jumps and slide entries are covered by tests, not captures.
+
+## 2026-10-30 review fixes: kill credit and pellet cues
+
+Scope: an independent read-only review of the afternoon's runtime changes:
+- `FirstPersonBody`;
+- the `ArenaHud` markers, feed and banner;
+- the `ArenaAudio` remote scrape and hit dedupe;
+- `ArenaPresentation`;
+- `FusionPlayer.AcceptsCombatTick`.
+
+Each finding was checked against the code before any change.
+- **Fixed.**
+  - **Kill credit.**
+    - `ArenaMatch.Kill` runs only at the end of the tick, so `Hit` events at
+      0 damage keep arriving for a target already at 0 health.
+    - `ArenaHud` credited the last hit, which could name the wrong killer. A trade
+      in the same tick, or a later projectile, did this, and it moved the kill
+      banner and streak to that player.
+    - It could also drop or invent `HEADSHOT` on shotgun kills.
+    - `RecordHit` now ignores hits that dealt no damage. `Killer` reads the result.
+    - The [UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md) kill feed
+      line says this.
+  - **Pellet cues.**
+    - The hit dedupe remembered only the last target, so pellets alternating
+      between two neighbours re-cued on every switch.
+    - `ArenaAudio.Play` now keeps a target bitmask per participant, sequence and
+      tick.
+  - **Knee tuck.** It now runs only while `Sliding` and not during the fold's
+    release tail, when the lens is already back up.
+  - **Kill banner.** `Confirm` no longer shows the banner itself. `Refresh` alone
+    does, so a kill landing after your own death cannot flash it for a frame.
+- **Not changed.**
+  - A weaker hit during a stronger marker's display stays silent. The UI spec
+    chooses that ("A stronger marker on display still suppresses a weaker one and
+    its tick").
+  - The streak survives your own death (respawn takes 3 s, the window is 4 s). That
+    matches the stated rule and is left for the playtest.
+  - A player who disconnects mid-slide keeps scraping until the replicated slide
+    ends.
+  - `FusionPlayer.AcceptsCombatTick` and `ArenaPresentation` were found clean.
+- **Checks.**
+  - New `MenuPresentationTests.TheLethalHitNamesTheKillerNotALaterZeroDamageHit`.
+  - `ArenaWeaponAudioTests.PelletHitsOfOneShotPlayOneCue` now alternates two
+    targets.
+  - EditMode 486/488, 2 skipped (`EditMode-20261030-155850-686`).
+  - PlayMode 176/177, 1 skipped (`PlayMode-20261030-155915-513`).
+  - Smoke `BuildSmoke-20261030-155944-639`.
+  - All six packaged modes pass, with no exception, NRE or RenderGraph lines:
+    - weapons `20261030-160007-520`
+    - default `160106-776`
+    - firefight `160133-678`
+    - motion `160142-678`
+    - sequence `160204-694`
+    - music `160209-765`
+
+    `weapon-kill-banner` and every motion and sequence frame are pixel-identical to
+    the previous run. The rest differ only by animated menu, pickup and blast noise,
+    at most 0.59 mean.
+  - Frame time (`Perf-20261030-160223-997`): Ultra mean 1.64 ms and p99 2.13 ms; Low
+    mean 1.54 ms and p99 2.02 ms.
+  - Baseline two-process gunplay `20261030-160250-589` passes.
+  - On the same smoke build, the rest of the Photon set passes too:
+    - baseline: combat `160751-169`, team switch `160836-792`, reconnect
+      `160859-772`, laser combat `160931-033`;
+    - adverse150: gunplay `161006-477`, laser moving cover `161103-017`, grenade
+      combat `161234-225`, special projectiles `161303-998`.
+- **Disk.** At the user's request, 55 stale `C:/Temp/claude` folders from other
+  sessions were deleted after checking for running sessions, Unity processes, git
+  checkouts and writes in the last 48 h. That freed about 85 GB on C:.
+- **Playable build.**
+  - `BuildWindows-20261030-160627-717` wrote `Artifacts/Unity/Windows`.
+  - Its content hash over 200 files is
+    `d838ac03ac8287760aaa83baea3ccc5b9fbbf54f5152b58d3a534b78755d8c56`.
+  - It overwrote the unplayed 15:40 `e732dfed…` build from the
+    [kill banner](#2026-10-30-kill-banner).
+  - A 15-second headless start (`Artifacts/Unity/WindowsStartup-20261030-1607.log`)
+    initialised the engine with no logged exception. That proves startup only.
+
+## 2026-10-30 SMG held-fire verdict
+
+Scope: the intermittent `SMG held fire verdict mismatch` in two-process gunplay. It
+was first seen under adverse150 and failed once at baseline at 15:42.
+- **Cause.**
+  - Baseline gunplay `20261030-154234-042` (smoke `BuildSmoke-20261030-153824-894`)
+    failed with `shots 5 hits 5 damage 50 spacing 16 ammo 27`.
+  - Both peers agree on the shot ticks 925, 941, 957, 976 and 992. The emulated
+    client sent one fire request every four to five ticks (about 25 fps), so held
+    fire was accepted only every 16 to 19 ticks rather than the SMG's 10.
+  - Bloom decays only after 0.1 s (12 ticks) without a shot. After the 19-tick gap it
+    shrank, which broke the harness's spread-grows-every-shot check.
+  - The rules behaved as specified, so this was harness timing, not a gameplay fault.
+  - The adverse failures fit the same cause: late `Fire` RPCs that are dropped
+    (D035) open gaps longer than the bloom delay.
+- **Fix.** In `FusionSmokeDriver.Combat`, bloom growth is now required only across
+  shot gaps of up to `Ticks(BloomDelaySeconds)`. Count, damage, ammo, minimum
+  spacing, first-shot spread and peer agreement are unchanged.
+- **Checks.**
+  - Before the change, two baseline reruns passed with exact 10-tick spacing
+    (`20261030-154353-031`, `154448-329`).
+  - With it (smoke `BuildSmoke-20261030-154621-427`), baseline `154651-559` and
+    adverse150 `154816-350` pass.
+  - Baseline combat `154122-454` passed on the earlier smoke build.
+  - Smoke-only harness code, so the suites and captures were not rerun.
+- **Limits.**
+  - Held fire on a slow client still fires below the SMG's rate: a shot is accepted
+    only when a request arrives after the interval.
+  - Each shot waits at most one frame for the next request: up to 2 ticks at 60 fps,
+    and none when the frame period divides the 10-tick interval. A slow frame rate
+    costs more.
+  - Fixing it would mean scheduling shots by the client's fire tick, which is a
+    combat-authority change not made here.
+
+## 2026-10-30 kill banner
+
+Scope: a kill confirmed only with the red ✕, its tone and a corner feed line. Nothing
+named the victim where you were looking, or rewarded a quick follow-up. The
+[UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md) (Kill banner) owns
+the contract. Presentation only.
+- **Change.**
+  - `ArenaHud.Confirm` runs on your own attributed kill.
+  - `KillBanner` formats the text, and the `.hud-kill-banner` style in `ArenaMenu.uss`
+    draws it.
+  - `ArenaMenu.Hud` exposes the playing HUD to the smoke-only capture driver.
+- **Rejected look.**
+  - The first capture drew red text over the floor with only an outline. It was
+    muddy on ivory.
+  - The head glyph `◎` rendered like the violet team's `●`.
+  - The capture after `weapon-kill-banner` still showed the banner fading, so the step
+    is now last.
+- **Checks.**
+  - New `MenuPresentationTests.QuickKillsCountUpUnderTheCrosshair` checks:
+    - single, double, triple and ×4 text;
+    - the headshot wording;
+    - the 4 s window boundary;
+    - the reset after a longer pause.
+  - EditMode 485/487, 2 skipped (`EditMode-20261030-153326-833`).
+  - PlayMode 176/177, 1 skipped (`PlayMode-20261030-153347-797`).
+  - Weapons capture `20261030-153839-558` (smoke `BuildSmoke-20261030-153824-894`) has
+    33 frames:
+    - `weapon-kill-banner` reads `DOUBLE · ELIMINATED ● P4 · HEADSHOT` under the
+      target;
+    - only `weapon-pickups` differs from `20261030-152148-869`, by 0.10 mean
+      (pickup animation).
+  - The other five modes were captured on smoke `BuildSmoke-20261030-153411-481`,
+    before the step reorder. They pass, with no exception, NRE or RenderGraph lines:
+    - default `20261030-153525-450`
+    - firefight `153552-340`
+    - motion `153601-311`
+    - sequence `153623-391`
+    - music `153628-454`
+
+    Against the knee-tuck runs, motion and sequence are pixel-identical. The others
+    differ only in animated menu, title and blast areas, by at most 0.84 mean.
+  - Frame time (`Perf-20261030-153642-682`): Ultra mean 1.65 ms and p99 2.21 ms; Low
+    mean 1.55 ms and p99 2.14 ms.
+- **Limits.**
+  - No online kill has shown it.
+  - Whether the streak window feels right is for the playtest.
+  - The disk filled during one smoke build (`BuildSmoke-20261030-153748-133`). Moving
+    old artifacts to `D:/WildstoneArchive` fixed it.
+- **Playable build.**
+  - `BuildWindows-20261030-154022-532` wrote `Artifacts/Unity/Windows`.
+  - Its content hash over 200 files is
+    `e732dfed9df1be38bbbeec428f82d12b1b1b2c0c231e906d5ff20ba95aa7c227`.
+  - It overwrote the unplayed 15:24 `545fe335…` build from the
+    [slide knee tuck](#2026-10-30-slide-knee-tuck).
+  - A 15-second headless start (`Artifacts/Unity/WindowsStartup-20261030-1540.log`)
+    initialised the engine with no logged exception. That proves startup only.
+
+## 2026-10-30 reconnect cycles and late peer identity
+
+Scope: the foundation spec's repeated-reconnect check, using the new
+`Invoke-ReconnectCycles.ps1` ([TOOLING](TOOLING.md)). Each cycle is a full
+`reconnect` smoke run in fresh processes: a Photon join, ten seconds of play, a
+host-forced disconnect and a credential-bound return to the held seat. Contract: the
+[foundation spec](superpowers/specs/2026-10-25-multiplayer-foundation-design.md#7-sessions-seats-and-recovery).
+- **Pre-fix run.** On `Smoke-20261030-233842-901`, summary
+  `Artifacts/Smoke/20261030-194523-041-reconnect-cycles.json`: 14 of 15
+  passed before I stopped it to test the fix. Cycle 8
+  (`20261030-194914-538-reconnect-baseline`) failed. The host logged
+  `WILDSTONE HOST REMOVED PEER reason=invalid-peer phase=Running` when the client
+  rejoined. The client's start was then cancelled, and it reported "The reconnect
+  attempt failed".
+- **Cause.** The connect token was readable, which fixes the credential at 32 bytes.
+  So `invalid-peer` there means `NetworkRunner.GetPlayerUserId` returned no ID for
+  the joining peer. The SDK documents that it returns null when no valid player is
+  found. Here it raised `PlayerJoined` before it could report that peer's ID. The
+  host refused and disconnected the peer in that same callback, with no retry.
+- **Fix.** `FusionLobby.Admit` now reports `identity-pending` for a remote peer with
+  no ID yet. The startup, join and host-recovery admission paths keep that peer
+  connected. The lobby retries it every tick for up to 5 seconds, then refuses it as
+  `invalid-peer`. The host's own identity never waits. A pending peer has no seat,
+  so its RPCs and inputs bind to nothing.
+- **Checks.**
+  - New EditMode test
+    `FusionSessionBoundaryTests.APeerWithoutAUserIdIsRetriedUntilItsDeadlineInsteadOfRemoved`.
+  - `Check-NetworkEvidence.ps1` type checks pass with and without `WILDSTONE_SMOKE`.
+  - Suites: EditMode 499/501, 2 explicit skips (`EditMode-20261030-195413-647`).
+    PlayMode 169/170, 1 explicit skip (`PlayMode-20261030-195445-247`).
+- **Fixed-build run.** On `BuildSmoke-20261030-195516-201`
+  (`Smoke-20261030-235524-341`), summary `Artifacts/Smoke/20261030-195608-398-reconnect-cycles.json`: 100 of 100 passed, with no host removal.
+  - Cycle duration 31.4–39.3 s (mean 32.8).
+  - Reconnect time, from the host's forced disconnect until the host sees the
+    client back in its seat: 1.1–1.6 s (mean 1.2). Pre-fix passing cycles:
+    1.2–2.2 s (mean 1.3).
+  - The identity wait logs nothing, so how many of these cycles hit the race and
+    were absorbed by it is unknown. The pre-fix rate was 1 in 15.
+- **Related.** The earlier unexplained startup `Requested` disconnect in
+  `20261029-170011-577-grenade-combat-baseline`
+  ([host removal reasons](#2026-10-30-host-removal-reasons)) could be this race:
+  that run predates removal logging. Its logs no longer exist, so this is
+  unconfirmed. The intermittent host-recovery `DeadlineExceeded` (`012707`,
+  `183442`) is a different failure: neither log has a removal line.
+- **Limits.**
+  - Same-PC baseline profile.
+  - Fresh processes per cycle, so this does not measure accumulation inside one
+    long-lived host.
+  - The 5-second wait is a builder value.
+
+## 2026-10-30 online rematch and night playable build
+
+Scope: the backlog's online rematch. After a normally finished match, the host's
+Results offers Rematch, which returns the same room to its lobby. Contracts: the
+[foundation spec](superpowers/specs/2026-10-25-multiplayer-foundation-design.md#7-sessions-seats-and-recovery)
+Rematch block and the UI spec's Online rematch. This build also carries the
+[late peer identity fix](#2026-10-30-reconnect-cycles-and-late-peer-identity) and
+the D038 rename to Better Bean Battles ([DECISIONS](DECISIONS.md)).
+- **Rules and menu checks.** New: `SessionRulesTests.Rematch*` (2),
+  `MenuPresentationTests.OnlineResultsOfferRematchOnlyToTheHostOfALiveFinishedMatch`
+  (4 cases), `AbortedOnlineResultsTests.FinishedRoundRematchNeedsTheHostAndPeersFollowTheLobbyInTheSameSession`
+  and an `OnlineMenuTests` bridge assert.
+- **Suites.** EditMode 506/508 with 2 explicit skips
+  (`EditMode-20261030-201127-752`). PlayMode 169/170 with 1 explicit skip
+  (`PlayMode-20261030-201200-564`).
+- **First online run.** On smoke `BuildSmoke-20261030-201232-566`
+  (`Smoke-20261031-001241-195`), the `rematch` scenario passed at its first run,
+  `20261030-201327-704-rematch-baseline`. Both peers agree on every point
+  ([TOOLING](TOOLING.md) has the full verdict):
+  - two rounds were played and finished, host team winning both;
+  - the client's own rematch press changed nothing;
+  - after the host's rematch, both peers were in the same room `7B43DEF0` with the
+    same match ID, seats, teams and generations (host 1, client 2), and ready was
+    cleared;
+  - round 2 had a new match object (1027 then 1030), zero score, no projectiles,
+    full health, 13/13 pickups and a new HUD;
+  - the host published a round-2 checkpoint (tick 1183, after 702 at the rematch).
+- **Photon regression set** on the same smoke build:
+  - rematch baseline: passed `20261030-201425-083`;
+  - rematch baseline: passed `20261030-201443-301`;
+  - combat baseline: passed `20261030-201501-311`;
+  - laser-combat baseline: **failed** `20261030-201527-020`;
+  - reconnect baseline: passed `20261030-201728-388`;
+  - team-switch baseline: passed `20261030-201800-861`;
+  - late-join baseline: passed `20261030-201825-003`;
+  - gunplay adverse150: passed `20261030-201856-290`;
+  - projectile-combat adverse150: passed `20261030-202020-251`;
+  - grenade-combat adverse150: passed `20261030-202247-378`;
+  - special-projectiles adverse150: passed `20261030-202318-163`;
+  - deflection adverse150: passed `20261030-202349-302`;
+  - laser-moving-cover regional80: passed `20261030-202429-449`.
+  - The `laser-combat` failure (`DeadlineExceeded`, every laser verdict reached)
+    overlapped the Windows build. Its cause is in the
+    [smoke harness](#2026-10-30-smoke-harness-peer-reads-stun-probe-and-late-attacks) section.
+  - Injected latency profiles do not apply to `rematch`; it runs at baseline only.
+- **Playable build.**
+  - `BuildWindows-20261030-201525-504` wrote `Artifacts/Unity/Windows`. Its content
+    hash over 200 files is
+    `058fa3ddd042e9b2f9df0d0049677e9ecac4a5628c393d80d1034b410be6f5cc`.
+  - Its `app.info` names the product "Better Bean Battles".
+  - It replaces the unplayed 19:44 `625026d1…` build.
+  - A 15-second headless start (`Artifacts/Unity/WindowsStartup-20261030-2016.log`)
+    initialised with no logged exception. That proves startup only.
+- **Limits.**
+  - The rematch has not been played by a person.
+  - Each round is shortened by `SmokeFinish`, not a 480 s match.
+  - From code reading and unmeasured:
+    - A host migration before round 2's first checkpoint should abort that round.
+    - A peer that drops while Results is showing still faces the 30-second absence
+      abort, because the session stays `Running`.
+  - The D038 rename resets each player's saved settings once, because Unity keys
+    them by product name.
+
+## 2026-10-30 smoke harness: peer reads, stun probe and late attacks
+
+Scope: why `laser-combat` hit `DeadlineExceeded` in the
+[rematch regression set](#2026-10-30-online-rematch-and-night-playable-build), plus
+the stun-probe follow-up. All changes are smoke-only (`WILDSTONE_SMOKE`); the
+playable `058fa3dd…` build has none of this code. Commands are in [TOOLING](TOOLING.md).
+- **Stage timeline.** Each peer's JSON now has `stageTimes`, every driver stage with
+  the second it began.
+- **Peer reads.** Three passing `laser-combat` runs on `Smoke-20261031-002532-909`
+  took 26, 76 and 17 s from `playing` to `verified` on the host (`202606-849`,
+  `202657-912`, `202833-393`); the stable phase needs 10 s.
+  - Cause: the peer's status file is briefly unreadable while it is rewritten. That
+    read returned no peer, the driver returned false before its completion check,
+    and the 10-second stability window started over.
+  - Fix: `ReadPeer` keeps the last valid peer status when the file is locked or
+    missing.
+  - On `BuildSmoke-20261030-202923-386` (`Smoke-20261031-002935-030`), three
+    `laser-combat` runs took 10, 10 and 10 s (`203108-760`, `203137-586`,
+    `203207-418`).
+- **Stun probe.** On the third stun shot the host holds forward input on its stunned
+  target. Both peers sampled the target 62–64 times while stunned with 0.00 m of
+  travel, then saw 3.47 m by 0.4 s after expiry: baseline `202958-661` and
+  adverse150 `203035-266`. This covers the host's own avatar only; a predicting
+  client target is still unproven.
+- **Regression set** on `Smoke-20261031-002935-030`:
+  - special-projectiles baseline: passed `202958-661`;
+  - special-projectiles adverse150: passed `203035-266`;
+  - laser-combat baseline: passed `203108-760`;
+  - laser-combat baseline: passed `203137-586`;
+  - laser-combat baseline: passed `203207-418`;
+  - combat baseline: passed `203236-806`;
+  - reconnect baseline: passed `203302-525`;
+  - rematch baseline: passed `203335-400`;
+  - team-switch baseline: passed `203353-379`;
+  - gunplay adverse150: passed `203416-976`;
+  - projectile-combat adverse150: **failed** `203450-307`;
+  - grenade-combat adverse150: **failed** `203521-671`;
+  - deflection adverse150: passed `203553-037`;
+  - laser-moving-cover adverse150: passed `203633-556`.
+- **Late attacks.** The projectile and grenade failures, and the rerun failure
+  `204035-322`, have the same cause. Each host log shows
+  `WILDSTONE COMBAT RPC EXPIRED` (`kind=Fire sequence=2 age=25`, or `kind=Grenade
+  sequence=1 age=24`).
+  - The reliable RPC was lost, resent and arrived about 200 ms late, past the
+    18-tick attack window, so the host dropped it before validation. This is the
+    known limit of the [resent inventory actions](#2026-10-30-resent-inventory-actions)
+    fix; the fixtures fired once and never re-sent.
+  - These runs overlapped the 100-cycle reconnect run, so four player processes
+    shared the CPU. That may explain why it happened in 3 of 8 runs here and in none of 11 on
+    earlier builds. Not measured.
+  - Fix (harness only): if the host has not acknowledged the fire or throw after 1 s,
+    the client sends the same sequence again, as a player would press again. The
+    host rejects a duplicate as stale, so it cannot spend twice. `resends` counts it.
+  - Not changed: the 150 ms attack window. A player whose attack RPC is lost and
+    resent under similar loss still loses that press. Widening the window together
+    with the [rewind cap](#2026-10-30-measured-rewind-age) remains the user's decision.
+- **After the fix**, `BuildSmoke-20261030-205054-770` (`Smoke-20261031-005106-182`):
+  all 10 passed. No host logged an expired RPC and no fixture re-sent, so the
+  re-send path is type-checked but not yet exercised. These runs did not overlap
+  other Photon runs.
+  - projectile-combat adverse150: passed `205129-166`;
+  - grenade-combat adverse150: passed `205203-285`;
+  - projectile-combat adverse150: passed `205233-233`;
+  - grenade-combat adverse150: passed `205301-141`;
+  - projectile-combat adverse150: passed `205331-495`;
+  - grenade-combat adverse150: passed `205359-263`;
+  - projectile-combat baseline: passed `205429-626`;
+  - grenade-combat baseline: passed `205456-875`;
+  - special-projectiles adverse150: passed `205526-203`;
+  - laser-combat baseline: passed `205557-603`.
+- **Earlier hang-guard failures.** `012707` (laser moving cover) and `183442` (D036
+  A/B) failed with `DeadlineExceeded` after every verdict had verified, the host
+  stuck in its 10 s stability window (`012707` was at 10.006 s). That matches the
+  peer-read restart above, so it is the likely cause; the old logs cannot show the
+  unreadable reads. On the same smoke build, 10 more runs all passed:
+  - laser-moving-cover adverse150: `205839-049`, `210017-050`, `210204-847`;
+  - gunplay adverse150: `205944-107`, `210131-315`;
+  - migration baseline: `205915-307`, `210240-880`;
+  - migration-crash baseline: `210053-726`, `210309-245`;
+  - late-join baseline: `210347-924`.
+
+  Every moving-cover and gunplay run held its stability phase for exactly 10 s on
+  both peers.
+
+## 2026-10-30 grenade in hand, muzzle lamp and HUD backing (not yet captured)
+
+Scope: three clear defects from the 19:20 captures (`Artifacts/Visual/20261030-192033-554`).
+The GPU was in use, so none of this has been captured yet. It must not go into a
+playable build until it has.
+- **Grenade in hand.** In `weapon-grenade-0/1` the viewmodel stayed on the Line
+  Driver with no grenade.
+  - While the throw key is held with a grenade, the support hand now leaves the gun
+    and holds the grenade, scaled to 0.08 m.
+  - The host's `Accepted` still starts the throw. The grenade leaves the hand during
+    the swing.
+  - Values are in the [character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md)
+    arms row.
+  - The capture set gains `weapon-grenade-aim`: the key held, with the arc and
+    nothing thrown.
+- **Muzzle lamp.** `weapon-pulselobber-0` and `weapon-plasma-impact` show a pink wash
+  on the floor under the Lobber. Every muzzle lamp is dimmer and shorter now; values
+  are in the [rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md)
+  effects row.
+- **HUD backing.** In `weapon-lasersniper-0` the scope lens and cyan ring showed
+  through the ammo panel and muddied the count. Both bottom panels now use the score
+  chips' 0.72 backing ([UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md)).
+- **Checks.**
+  - New `FirstPersonWeaponMotionTests.HeldGrenadeShowsInTheSupportHandAndLeavesItDuringTheThrow`:
+    - no grenade without the key;
+    - while held, a 0.08 m grenade centred on the left grip, in the lower-left of the
+      view, with the hand off the gun;
+    - still held 0.2 s after release;
+    - gone mid-swing;
+    - both hands back on the gun afterwards.
+  - The first run also failed `MuzzleUsesAuthoredSocketAndFourReusedElementsExpireAndReset`:
+    the grenade model's own `Muzzle` marker answered a lookup over the whole camera.
+    The held copy's parts are now renamed. Production lookups were already scoped to
+    the weapon.
+  - Suites: EditMode 506/508, 2 explicit skips (`EditMode-20261030-211234-651`);
+    PlayMode 170/171, 1 explicit skip (`PlayMode-20261030-211303-852`). Smoke build
+    `BuildSmoke-20261030-211333-865`.
+- **Still to do.** Capture the weapons set and compare it with `192033-554`:
+  `weapon-grenade-aim`, `weapon-grenade-0/1`, `weapon-pulselobber-0/1`,
+  `weapon-plasma-impact` and `weapon-lasersniper-0/1`. The hold pose and the hand
+  rotation are untested starting values.
+
+## 2026-10-30 evening playable build
+
+Scope: a playable build with everything since the 16:06 build the user played.
+- **Contents.**
+  - [D036 online held-fire cadence](#2026-10-30-online-held-fire-cadence-d036);
+  - [no legs in view while sliding](#2026-10-30-no-legs-in-view-while-sliding);
+  - [D037 Push Lens deflection](#2026-10-30-push-lens-deflection-d037), including its
+    pooled-projectile fix;
+  - [rewind-age recording](#2026-10-30-measured-rewind-age). It adds a few float
+    operations per host hitscan query; the smoke-only event is compiled out.
+- **Build.**
+  - `BuildWindows-20261030-194409-129` wrote `Artifacts/Unity/Windows`. Its content
+    hash over 200 files is
+    `625026d13ed875ae1ae1cc6cfe13fe244ac8be79689c6d35f197006040b576e8`.
+  - It overwrote the unplayed `BuildWindows-20261030-191835-213` build
+    (`ece027dcd32da22be07b0cc188242691c464225b6d7b2d169cbcf05bebe1bbd2`), which
+    lacked the pooled-projectile fix.
+  - The 16:06 build the user played, `d838ac03…`, is kept at
+    `D:/WildstoneArchive/mvp-2/Artifacts/Unity/Windows-d838ac03`.
+  - 15-second headless starts (`Artifacts/Unity/WindowsStartup-20261030-1920.log`,
+    `-1945.log`) initialised the engine with no logged exception. That proves
+    startup only.
+- **Suites on the final source.** EditMode 498/500, 2 explicit skips
+  (`EditMode-20261030-194304-957`). PlayMode 169/170, 1 explicit skip
+  (`PlayMode-20261030-194338-254`). PlayMode has 14 fewer tests than the D036 run
+  because the slide-leg tests went with the behaviour they covered.
+- **Captures** on smoke `BuildSmoke-20261030-191805-255`: weapons
+  `20261030-192033-554`, default `192136-972`, firefight `192204-695`, motion
+  `192214-713`, sequence `192237-274`, music `192243-060`. That build had D037
+  before its pooled-projectile fix, which is not visual.
+  - All six counts are correct and the player logs are clean.
+  - Against the D036 set (`190151-059` and the rest), the intended change is that
+    the slide frames (`sequence-060`, `-061`, `-062`, `fixture-slide-sustain`,
+    `fixture-slide-fov60`) no longer show legs.
+  - The other differences are time-driven: pickup models spin with wall-clock
+    time, plus the menu soldiers' idle phase, speed streaks and smoke puffs.
+- **Photon regression set** on that smoke build, all passing:
+  - laser moving cover at regional80 `20261030-192355-147` and adverse150
+    `192538-720`;
+  - gunplay at adverse150 `192801-045` and baseline `192836-652`;
+  - adverse150 projectile combat `192938-332`, grenade combat `193048-300` and
+    special projectiles `193119-124`;
+  - baseline combat `193150-638`, laser combat `193231-301`, reconnect
+    `193336-142` and team switch `193408-589`.
+- **Perf.** Samples `Perf-20261030-194144-818` and `194212-001` are invalid: the
+  user started Deadlock on the same GPU during them. The last valid sample is in
+  the [steep slide leg hide](#2026-10-30-steep-slide-leg-hide) section. A fresh
+  sample needs an idle GPU.
+- **Limits.** Not yet played.
+
+## 2026-10-30 Push Lens deflection (D037)
+
+Scope: the backlog's unimplemented projectile deflection. The contract is the
+combat spec's
+[Push Lens deflection (D037)](superpowers/specs/2026-10-25-arena-combat-items-zone-design.md#2026-10-30-push-lens-deflection-d037)
+section, and [DECISIONS](DECISIONS.md) records D037. Feel and balance are the
+user's to judge.
+- **Rules checks.**
+  - Managed run `Artifacts/ManagedCompile/20261030-191355-065`. New EditMode tests:
+    - `PushReflectsEnemyOrbOnceAndItsBlastCreditsThePusherAgainstTheShooter`: the
+      orb is relaunched at its own speed, keeps its fuse and transfers credit. The
+      same result holds on a replica restored from a snapshot. The blast hits the
+      original shooter once for 60.
+    - `PushReflectsOnlyAVisibleEnemyProjectileInItsConeOnce`: a grenade in the cone
+      is re-thrown along the push. Projectiles that are out of the cone, out of
+      range, behind cover, friendly or already deflected are untouched.
+    - `LatePushNeitherResurrectsNorRecreditsAConfirmedBlast`: a push resolving on or
+      after the fuse tick does nothing.
+    - `DeflectionHasItsOwnParryCue`, and the networking `ProjectileCuesReachClients`.
+  - Native suites: see the [evening playable build](#2026-10-30-evening-playable-build).
+- **Online check.** A new `deflection` scenario runs two rounds per session, host
+  pushing then client pushing (verdict in [TOOLING](TOOLING.md)).
+  - The first runs on `BuildSmoke-20261030-193452-010` (baseline
+    `20261030-193604-543`, adverse150 `193634-031`) passed round 0 and failed round 1.
+    The host threw "Duplicate/wrong original orb" at the client-push round's fire.
+  - Cause: a gameplay bug, not the harness. `ArenaMatch` reuses pooled projectile
+    objects and did not reset `Deflected` at launch. After any deflection, the next
+    orb, disc, bolt or grenade that reused that object was born deflected: it could
+    not be deflected, and it read as the pusher's catch.
+  - Fix: launch resets `Deflected`. The orb test now also launches a second orb
+    after the blast and asserts that it is the shooter's own and not deflected.
+    Without the fix that assertion fails (`EditMode-20261030-194115-444`); with it,
+    `CombatRulesTests` passes 104/104 (`EditMode-20261030-194047-432`).
+  - After the fix, on `BuildSmoke-20261030-193834-745`, both rounds pass on both
+    peers:
+
+    | Run | Round | Pusher | Lead ticks | Seen at | Resolved at | Damage (expected) |
+    | --- | --- | --- | --- | --- | --- | --- |
+    | baseline `20261030-193907-907` | 0 | host | 22 | 7.80 m | 4.50 m | 57.33 (57.33) |
+    | | 1 | client | 27 | 8.55 m | 4.65 m | 57.33 (57.33) |
+    | adverse150 `20261030-193953-875` | 0 | host | 22 | 7.80 m | 4.50 m | 57.33 (57.33) |
+    | | 1 | client | 45 | 10.80 m | 4.20 m | 57.33 (57.33) |
+
+    The deflected orb's velocity is exactly reversed (dot −1) in every round.
+- **Limits.**
+  - Each run is one stationary, scripted catch per round.
+  - Natural play, other projectile kinds online and a late-push online variant are
+    not covered.
+  - One catch per push is a builder choice, explained in the spec.
+
+## 2026-10-30 measured rewind age
+
+Scope: the foundation spec's "Record accepted shot tick, rewind age, weapon/sequence
+and hit verdict". `FusionCombatWorld` now keeps, for every host hitscan query, the
+applied rewind age and the SDK-requested view age before the
+[150 ms cap](superpowers/specs/2026-10-25-multiplayer-foundation-design.md#6-combat-lag-compensation-and-fairness).
+Smoke results report them per weapon (see [TOOLING](TOOLING.md)). The type and
+rule check is `Check-NetworkEvidence.ps1`.
+
+| Run | Profile | Queries | Clamped | Requested mean / max | Applied |
+| --- | --- | --- | --- | --- | --- |
+| gunplay `20261030-192836-652` | baseline (same PC) | 11 | 0 | 77 / 85 ms | as requested |
+| laser combat `20261030-193231-301` | baseline | 10 | 0 | 81 / 86 ms | as requested |
+| laser moving cover `20261030-192355-147` | regional80 | 20 | 20 | 184 / 239 ms | 150 ms |
+| laser moving cover `20261030-192538-720` | adverse150 | 20 | 20 | 283 / 289 ms | 150 ms |
+| gunplay `20261030-192801-045` | adverse150 | 11 | 11 | 285 / 337 ms | 150 ms |
+
+- **Finding.** With no added latency the view age is already about 80 ms
+  (interpolation and tick delay). At the regional80 profile (80 ms RTT with jitter)
+  every query was clamped, 34 ms short on average. The cap therefore
+  under-compensates moving targets for an ordinary regional ping, not only for
+  high ping. That is consistent with the earlier
+  [laser moving-cover investigation](#laser-moving-cover-investigation).
+- **Not changed.** The 150 ms cap is the foundation spec's accepted initial value.
+  Raising it (for example to about 250 ms, which covers the regional80 maximum) is
+  a fairness trade-off for the user to decide.
+- **Limits.** Same-PC SDK-injected profiles, a handful of scripted shots per run.
+
+## 2026-10-30 no legs in view while sliding
+
+Scope: the user's report, "when you slide, the new full body gets in the fov we need
+to make it so when we slide that does not happen". The fresh capture review found the
+same thing in the current build: `sequence-060` (smoke `BuildSmoke-20261030-185422-057`,
+run `20261030-190345-950`) shows a loose shin and boot mid-screen during a slide. It
+supersedes the [slide knee tuck](#2026-10-30-slide-knee-tuck) and the
+[steep slide leg hide](#2026-10-30-steep-slide-leg-hide). The contract is the character
+spec's Local body row (section 6).
+- **Change.** `FirstPersonBody` hides the visible body from the first slide frame
+  until the slide spring has settled after the slide ends, at every look pitch. The
+  shadow-only copy keeps rendering. The knee tuck, steep-glance hide, pelvis/shin fold,
+  spine fold, slide hip offset and hips-under-eye gate are removed, since nothing they
+  shaped is visible any more. `Present` no longer takes the lens.
+- **Checks.**
+  - PlayMode `FirstPersonBodyTests` 5/5 (`PlayMode-20261030-191217-835`).
+  - New `SlideHidesTheVisibleBodyAndKeepsItsShadow` (normal and reduced motion). It
+    asserts that running shows the legs. On every one of 120 slide frames, from the
+    run into the slide, the visible body is hidden and the shadow renders. The motor
+    state is unchanged, the legs stay hidden on the first frame after the slide ends,
+    and they show again once the slide has settled.
+  - `DeathTeleportAndNewLifeClearTheSlideHide` replaces the slide-pose reset check.
+  - The slide boot, knee-tuck, steep-glance, knee-clearance, slide-entry and
+    reduced-motion offset tests are removed with the behaviour they covered.
+- **Captures.** Sequence `20261030-192237-274` and motion `20261030-192214-713`
+  (smoke `BuildSmoke-20261030-191805-255`): `sequence-060`, `-061`, `-062`,
+  `fixture-slide-sustain` and `fixture-slide-fov60` no longer show a shin or boot.
+  The slide shows only the weapon, the view and the world.
+- **Limits.** The user has not judged the change.
+
+## 2026-10-30 online held-fire cadence (D036)
+
+Scope: the limit left by the [SMG held-fire verdict](#2026-10-30-smg-held-fire-verdict).
+Online, held automatic fire (Laser SMG, Line Driver) waited up to one client frame per
+shot after each interval. The client asked again only after it saw the replicated
+cooldown, and the host rejected a request that arrived a tick early. The contract is
+the combat spec's
+[held automatic cadence online (D036)](superpowers/specs/2026-10-25-arena-combat-items-zone-design.md#2026-10-30-held-automatic-cadence-online-d036)
+section, which owns the timing values.
+- **Change.**
+  - `WeaponCatalog.FireSlackSeconds` is a fire slack for automatic weapons only. The
+    pistol and the other non-automatic weapons get none.
+  - Host: `ArenaMatch.Reserve` accepts an automatic shot up to the slack early and
+    keeps the schedule. Within the slack, `FireReadyTick` advances from the previous
+    ready tick; otherwise it advances from now.
+  - Client: `PracticeInput.ConsumeActions` keeps its own held-repeat schedule against
+    the replicated cooldown. It predicts the clip refilled only once the reload end
+    plus the slack has passed. It sends the empty-trigger Reload only when no reload
+    is running.
+  - `FusionMatch.NextActionTick` stamps client requests with the client's predicted
+    next action tick. It holds through backward steps smaller than one second of
+    ticks, which warm-up recovery produces.
+- **Harness.**
+  - `FusionSmokeDriver.Combat.cs` gunplay auto-fire now drives a real `PracticeInput`
+    through a synthetic keyboard (`SmokeTrigger`, J bound to Fire). The input
+    background behaviour is set to IgnoreFocus and restored afterwards.
+  - Verdict over a 0.6 s hold: 7–8 shots, every shot hits, minimum spacing at least
+    interval − 2·slack, span at least (shots − 1)·interval − slack, and mean spacing
+    at most interval + 1 tick.
+- **Before.** The new harness on the old code (smoke build `180607`) fired 4 SMG
+  shots in the 0.6 s hold:
+  - baseline `20261030-180638-455`: mean spacing 17.3 ticks;
+  - adverse150 `20261030-180658-658`: mean 19.7 ticks, with 1 of 5 requests rejected.
+- **After.**
+  - Baseline `20261030-180756-196`: 7 of 7 shots at exactly 10-tick spacing.
+  - Adverse150 `20261030-180830-881`: 7 of 7 shots, mean 9.83 ticks, no expired
+    requests.
+  - Final smoke `BuildSmoke-20261030-184357-026`, with the review fixes: gunplay 7 of 7
+    at baseline and adverse150, mean 10.0 ticks. `autoStampOffset=-1`: the host stamp
+    lands one tick before the client's requested tick.
+- **Review.** An independent review of the change:
+  - Fixed:
+    - `NextActionTick` stepped backwards during warm-up recovery;
+    - the client could send a Fire the host would reject while predicting a reload
+      end;
+    - the harness did not restore the input background setting.
+  - Documented, not changed: after a weapon switch an automatic weapon can borrow the
+    slack once (at most 25 ms). The previous weapon's ready tick is not replicated per
+    weapon.
+- **Checks.**
+  - Compile `Compile-20261030-180221-859`.
+  - Rewritten EditMode `CombatRulesTests.StarterCadenceClipReloadAndRevisionStayConsistent`
+    at 60 Hz, where the slack is 2 ticks:
+    - an early shot is rejected at tick 11 and accepted at 12, with ready tick 23;
+    - a late shot carries 25 → 32;
+    - a later one resets 40 → 49;
+    - the pistol has no slack at 17 ticks.
+  - New PlayMode `PracticeInputTests.HeldRepeatsKeepTheirScheduleAgainstReplicatedCooldown`,
+    including a reload ending at 300: still empty at 302, fires at 303.
+  - EditMode 486/488, 2 skipped (`EditMode-20261030-184259-685`).
+  - PlayMode 183/184, 1 skipped (`PlayMode-20261030-184325-629`).
+  - The Photon regression set on the final smoke build:
+    - baseline: combat `20261030-184641-194`, team switch `184732-170`, reconnect
+      `184755-339`, laser combat `184827-700`;
+    - adverse150: grenade combat `184957-625`, special projectiles `185027-446`.
+
+    All pass. Adverse150 laser moving cover `184921-657` failed with shotgun 5/8. That
+    run used an experimental fixture aim; see the investigation below.
+  - Captures on the reverted-fixture smoke `BuildSmoke-20261030-185422-057`: weapons
+    `20261030-190151-059`, default `190247-926`, firefight `190314-860`, motion
+    `190323-874`, sequence `190345-950`, music `190351-089`. All six counts are
+    correct and the player logs are clean. Against the steep-slide set below, the
+    only pixel differences are soldiers' idle phase (menus and `weapon-pickups`) and
+    the randomised smoke puffs in `firefight-grenade-blast-50`.
+- **Limits.**
+  - Same-PC Photon with SDK-injected latency, not an external network.
+  - Nobody has judged held fire by feel.
+
+### Laser moving-cover investigation
+
+- **Misses.** Adverse150 laser moving cover missed shotgun pellets (7/8, then 6/8)
+  between 18:11 and 18:32.
+- **D036 is not implicated.** An interleaved A/B from 18:33 to 18:42 compared the
+  D036-reverted smoke `Smoke-20261030-221728-328` with the D036 smoke
+  `Smoke-20261030-222214-089`. All 8 runs, on both builds, landed shotgun 8/8.
+  - One D036 run (`20261030-183442-770`) failed with DeadlineExceeded `Host recovery
+    failed` after all lasers had verified. That is a known intermittent, also seen at
+    `012707`.
+- **Cause.**
+  - The fixture aims at the 20 Hz model position. The host rewinds to the client's
+    SDK view, capped at 150 ms (`FusionCombatWorld.MaximumRewindSeconds`).
+  - The shotgun pellet ring is about 0.187 m in radius at 2.14 m, against a 0.35 m
+    hitbox half-width. A strafing target therefore leaves edge pellets outside.
+- **Experiment.** The fixture aimed at the rendered (interpolated) target instead:
+  - adverse150 landed 5, 5, 8 and 5 of 8, which is worse;
+  - regional80 passed 8/8 twice (`20261030-185132-449`, `185316-997`).
+
+  So lag compensation matches the rendered view within the cap. At 150 ms RTT the
+  view age (RTT plus interpolation, about 190–230 ms) exceeds the 150 ms cap that the
+  [foundation spec](superpowers/specs/2026-10-25-multiplayer-foundation-design.md#6-combat-lag-compensation-and-fairness)
+  accepts ("High ping does not earn unlimited historical hits"). Strafing targets are
+  under-compensated at that latency by design. That trade-off is the user's to
+  revisit; it is not changed.
+- **Reverted.** The fixture is back to the model aim. On the rebuilt smoke
+  `BuildSmoke-20261030-185422-057`, adverse150 laser moving cover passed twice
+  (`20261030-185447-836`, `185543-965`): pistol 1, shotgun 8/8, sniper 1.
+
+## 2026-10-30 steep slide leg hide
+
+*Historical: superseded the same day by [no legs in view while sliding](#2026-10-30-no-legs-in-view-while-sliding).*
+
+Scope: the limit left by the [slide knee tuck](#2026-10-30-slide-knee-tuck), which
+covers glances down to about 20°. Looking down further mid-slide showed a shin cut
+off at the knee mid-screen (the 40° capture). The contract is in the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md)
+("Local body" row and the "Slide legs" limit).
+- **Change** (`Assets/Wildstone/Runtime/Presentation/FirstPersonBody.cs`).
+  - `TuckKnees` now returns the knee's remaining overshoot into the frame once the
+    tuck has faded. The tuck still fades out between 20° and 35° pitch.
+  - While sliding, the visible legs hide when that overshoot exceeds 0.04 m and show
+    again below 0.01 m. The shadow-only body stays, so the player's shadow is whole.
+  - The legs show at 20° and hide from 25°.
+- **Rejected values.** Widening the tuck to 30°/45° failed lens clearance: the nearest
+  visible vertex was 0.26 m from the eye at 25°. It was not kept.
+- **Checks.**
+  - New `FirstPersonBodyTests.SteepSlideGlanceShowsNoKneeCut` runs at 25°, 30°, 40°
+    and 70°.
+  - `SlideKneesStayClearOfTheLens` now also runs at 25° and 30°.
+  - Both are in the PlayMode 183/184 run of the
+    [online held-fire cadence](#2026-10-30-online-held-fire-cadence-d036).
+  - All six packaged modes pass on smoke `Smoke-20261030-222214-089`, with the
+    expected frame counts and no exception, NRE or RenderGraph lines in the player
+    logs:
+    - weapons `20261030-182528-272` (34 frames)
+    - default `182625-178` (16)
+    - firefight `182652-020` (56)
+    - motion `182701-042` (13)
+    - sequence `182723-147` (32)
+    - music `182728-238` (5)
+  - Against the [remote strafe](#2026-10-30-remote-strafe-and-backpedal-cadence) runs,
+    the pixel diff shows only intended changes:
+    - `fixture-slide-down`, `sequence-042` and `sequence-054` lose the floating cut
+      shin;
+    - `weapon-remote-wallrun` shows the `Stone-Charcoal` wall;
+    - default and music differ only by the spawn alternation.
+  - Frame time (`Perf-20261030-182822-933` and `182849-555`): Ultra mean 1.77/1.86 ms
+    and p99 2.62/3.15 ms; Low mean 1.61/1.66 ms and p99 2.19/2.35 ms. Chrome and MSI
+    Afterburner were busy in the background, so treat it as an upper-bound sample.
+- **Limits.** These are offscreen captures and tests. A steep slide glance shows no
+  legs, only their shadow. Nobody has judged it in motion.
+
+## 2026-10-30 remote strafe and backpedal cadence
+
+Scope: other players' back and side runs, from the game plan's remote-animation
+item. The contract is the "Controller" row and the "Back and side runs" limit in the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md).
+- **Cause.**
+  - Every direction moves at the 11 m/s ground speed.
+  - RunB and RunL/R were authored at 5.48 and 5.81 m/s, so `LocomotionScale` played
+    them at 2.0× and 1.9×. That is about 6 steps/s, against 4.2 for the forward run.
+  - The wall-run state had no rate at all. At its 13.75 m/s top speed its 7.94 m/s
+    stride slid.
+- **Change.**
+  - `soldier_clips.py`: RunB contact (duty) .17 → .12 and RunL/R .145 → .105, with
+    the hips 3 cm lower. The stance sweep is unchanged.
+  - Measured speeds: RunB 7.83 and RunL/R 8.02 m/s, so 11 m/s plays at 1.40× and
+    1.37×, about 4.2 and 4.1 steps/s.
+  - `SoldierRig` speed constants follow the sidecar.
+  - `SoldierBuilder` drives the WallRun state with `LocomotionRate`.
+- **Rejected.** Longer strides at the original contact overextended the legs. At
+  1.1–1.3× sweep, the ankle IK missed by 1.5–6.4 cm and the clips failed the gate.
+- **Checks.**
+  - `soldier_clips.py build`, `verify` (`VERIFY OK`, forge quality gates, 52/52 rest
+    bones) and `previews` pass. The RunB and RunR contact sheets read as bounding runs.
+  - `PresentationImportTests.LocomotionBlendPositionsMatchTheAuthoredStrideSpeeds` now
+    also requires the WallRun state's rate parameter. It passes, and the tree positions
+    and runtime constants match the new sidecar speeds.
+  - `PreparePresentation-20261030-171256-319`.
+  - EditMode 486/488, 2 skipped (`EditMode-20261030-171329-976`).
+  - PlayMode 176/177, 1 skipped (`PlayMode-20261030-171356-160`).
+  - Smoke `BuildSmoke-20261030-171421-037`.
+  - All six packaged modes pass, with no exception, NRE or RenderGraph lines in the
+    player logs:
+    - weapons `20261030-171502-480`
+    - default `171603-479`
+    - firefight `171630-868`
+    - motion `171641-005`
+    - sequence `171703-377`
+    - music `171709-047`
+  - Against the [wall-run lean](#2026-10-30-remote-wall-run-lean) runs:
+    - The firefight target's strafe pose changed (grenade-blast and incoming-sniper
+      frames, 0.4–0.6 mean).
+    - `weapon-remote-wallrun` caught a later stride phase from the new rate. Its walls
+      also drew another stone tone, because the fixture took whichever stone material
+      it found first; it now takes `Stone-Charcoal`.
+    - Motion frames are pixel-identical. Menu frames differ by the idle soldiers'
+      timing (1.1–2.3 mean), and sequence frame 12 by the random dash streaks.
+  - Frame time was not measured. Deadlock started on the same GPU during these runs.
+    `Perf-20261030-171723-572` and `171750-456` read Ultra means of 9.8 and 14.6 ms,
+    which reflect that load rather than this change.
+  - The later samples `Perf-20261030-182822-933` and `182849-555` include this change
+    and supersede them: Ultra mean 1.77/1.86 ms and p99 2.62/3.15 ms; Low mean
+    1.61/1.66 ms and p99 2.19/2.35 ms. See the
+    [steep slide leg hide](#2026-10-30-steep-slide-leg-hide) for their limits.
+- **Limits.** Cadence is judged from numbers and contact sheets. Nobody has watched a
+  remote strafe or backpedal in motion online.
+
+## 2026-10-30 remote wall-run lean
+
+Scope: other players' wall runs (WallRunL/R), from the game plan's remote-animation
+item. The contract is the "Wall runs" limit in the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md).
+- **New capture.** `weapon-remote-wallrun` (smoke builds only) shows two remote
+  soldiers wall-running toward the lens beside diagnostic walls 0.4 m off their
+  capsules. The left-wall run is on the right of the frame. The weapons count is now 34.
+- **Before.** Weapons run `20261030-165905-542`.
+  - Both runners floated in the corridor with a mild lean.
+  - The clip rolled the run cycle 24° about the root. Measured over the cycle in the
+    clip model, the wall-side boot stayed 0.31 m off the wall, the hips sat 0.37 m and
+    the head 0.60 m from the capsule axis.
+- **Change.** `soldier_clips.py wall_run` rolls the cycle 30° and slides it 0.285 m
+  toward the wall.
+  - The pivot is the point whose pure roll lands that shift, so the clip gates still
+    measure foot contact in the rolled frame.
+  - The wall-side boot centreline is now 0.36 m out, so the boot edge meets the wall.
+    The hips are 0.18 m and the head 0.46 m from the capsule axis.
+  - WallRunR mirrors WallRunL exactly.
+  - A 35° roll was rejected because it put the head 0.57 m out.
+- **Checks.**
+  - `soldier_clips.py build`, `verify` and `previews` pass. `verify` includes the forge
+    animation-quality gates, the `VERIFY OK` result and 52/52 rest-compatible bones.
+    Both wall runs show no gate failures and 0.45 cm slip.
+  - `PreparePresentation-20261030-170153-001` reimported `SoldierAnimations.fbx` and
+    regenerated `Soldier.controller`.
+  - Smoke `BuildSmoke-20261030-170202-230`.
+  - EditMode 486/488, 2 skipped (`EditMode-20261030-170345-903`).
+  - PlayMode 176/177, 1 skipped (`PlayMode-20261030-170409-804`).
+  - All six packaged modes pass, with no exception, NRE or RenderGraph lines in the
+    player logs:
+    - weapons `20261030-170224-013`
+    - default `170437-783`
+    - firefight `170504-889`
+    - motion `170513-981`
+    - sequence `170536-099`
+    - music `170541-344`
+  - Weapons after: both runners' boots meet their walls and the lean reads stronger.
+    The other weapons frames differ only by pickup bob and shield-break spark timing,
+    with means of 0.6 or less.
+  - Motion frames are pixel-identical to the 16:01 runs. Firefight differs only in
+    three Pulse Lobber blast frames, by 0.1 mean (blast debris). In the default
+    and music modes, the spawn view alternates between two spawns from run to run.
+    These runs match the 15:35 run exactly.
+  - Sequence frame 12 differs only in the randomly placed dash streaks.
+  - Frame time: the first three samples read Ultra mean 1.75–2.02 ms while the machine
+    settled. `Perf-20261030-170735-743` and `Perf-20261030-170802-251` read Ultra mean
+    1.68 ms and p99 2.22–2.27 ms, and Low mean 1.55–1.56 ms and p99 2.03–2.14 ms.
+    That is within run-to-run noise of the 16:02 sample. The perf scene plays no wall
+    runs.
+- **Limits.**
+  - The soles do not plant flat on the wall.
+  - The upper body still comes from the stance hold layer.
+  - The capture is a static frame of a scripted fixture. Nobody has judged it
+    online in motion.
+
+## 2026-10-30 slide knee tuck
+
+*Historical: superseded by [no legs in view while sliding](#2026-10-30-no-legs-in-view-while-sliding).*
+
+Scope: the shin cut off at the knee that floated mid-screen when you glanced down
+during a slide. The contract is in the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md)
+("Local body" row and the "Slide legs" limit).
+- **Change.**
+  - `FirstPersonBody.Present` takes the lens camera, from `ArenaPresentation` and from
+    the smoke-only pose fixture in `FusionVisualCheckDriver`.
+  - While sliding, `TuckKnees` draws the visible legs back along the lens heading
+    until both knees sit below the bottom frame edge.
+  - It applies fully up to 20° below level and fades out by 35°.
+- **Rejected values.**
+  - A full tuck at every pitch passed the knee-cut check. The packaged
+    `fixture-slide-down` (40°) capture then showed a large knee pad over the crosshair,
+    and the nearest visible vertex was 0.22 m from the eye.
+  - A rule keeping each knee 0.3 m ahead of the eye could not hide the cut even at 15°.
+- **Checks.**
+  - `FirstPersonBodyTests.SlideGlanceDownKeepsTheKneeCutsBelowTheFrame` runs at 10° and
+    20°. Both knees are below the frame, the lead boot shows, the boots stay above the
+    floor, and the lead boot shows looking straight ahead.
+  - `SlideKneesStayClearOfTheLens` now also runs with the lens at 40° and 70°. The
+    nearest visible vertex stays more than 0.35 m from the eye.
+  - PlayMode 176/177, 1 skipped (`PlayMode-20261030-152049-411`).
+  - EditMode 484/486, 2 skipped (`EditMode-20261030-152028-171`).
+  - Smoke `BuildSmoke-20261030-151913-110`.
+  - All six packaged modes pass, with no exception, NRE or RenderGraph lines in the
+    player logs:
+    - motion `20261030-151935-443`
+    - sequence `152001-679`
+    - default `152112-784`
+    - firefight `152139-799`
+    - weapons `152148-869`
+    - music `152242-261`
+  - Compared with the [resent inventory actions](#2026-10-30-resent-inventory-actions)
+    runs:
+    - Only `fixture-slide-sustain` and `fixture-slide-fov60` changed among the motion
+      and sequence frames. Both now show the boots rising from the bottom edge with no
+      cut top.
+    - `fixture-slide-down` and every sequence frame are pixel-identical.
+    - The other modes differ only by small animated menu, pickup and blast
+      differences under 0.7 mean.
+  - Frame time (`Perf-20261030-152256-414`): Ultra mean 1.64 ms and p99 2.10 ms; Low
+    mean 1.54 ms and p99 2.13 ms.
+- **Playable build.**
+  - `BuildWindows-20261030-152412-335` wrote `Artifacts/Unity/Windows`.
+  - Its content hash over 200 files is
+    `545fe33516e7b39ea1b05d8763aa70fe8bcf26a40b2891d70d3178c3bebb914c`.
+  - It replaces `76f03229…`, which is kept at
+    `D:/WildstoneArchive/mvp-2/Artifacts/Unity/Windows-76f03229`.
+  - A 15-second headless start (`Artifacts/Unity/WindowsStartup-20261030-1524.log`)
+    initialised the engine and was still running at 15 s, with no logged exception.
+    That proves startup only, not play.
+- **Limits.** A steep look down mid-slide still shows the cut. Nobody has judged the
+  tuck in motion.
+
+## 2026-10-30 second playable build refresh
+
+Scope: a fresh playable build with the afternoon's work, for the user's playtest.
+
+- `BuildWindows-20261030-150840-215` wrote `Artifacts/Unity/Windows`.
+  - Its content hash over 200 files is
+    `76f0322925b1807d13864d19e54c3cd2810354e0963dbfa2a062d4b8fb2566c5`.
+  - It replaces `d6d14b5a…`, which is kept at
+    `D:/WildstoneArchive/mvp-2/Artifacts/Unity/Windows-d6d14b5a`.
+  - Four interim builds were overwritten before anyone played them:
+    - 14:07 `a51aebc4…` (`BuildWindows-20261030-140753-040`, start log
+      `WindowsStartup-20261030-1410.log`), without the pistol beam;
+    - 14:14 `72a99a9e…` (`BuildWindows-20261030-141444-525`, start log
+      `WindowsStartup-20261030-1416.log`), without the remote scrape;
+    - 14:30 `8d2446a2…` (`BuildWindows-20261030-143051-409`, start log
+      `WindowsStartup-20261030-1432.log`), without the shotgun hit sound fix;
+    - 14:39 `8d5aa8c7…` (`BuildWindows-20261030-143927-078`, start log
+      `WindowsStartup-20261030-1440.log`), without the D035 pickup fix.
+- It adds everything since the 12:39 build:
+  - shield break pop, movement lens and dash streaks, crosshair rim;
+  - weapon voices and empty-trigger reload, strafing target;
+  - speed wind, hit tick, slide scrape, near-miss zip, the low-ammo warning, the
+    pistol beam, the remote slide scrape, the shotgun hit sound fix and the D035
+    resent-pickup fix.
+- After `BuildSmoke-20261030-150420-863`, only docs changed.
+  - That build adds just the smoke-only `weapon-low-ammo` capture to the
+    [resent inventory actions](#2026-10-30-resent-inventory-actions) source.
+  - Its six-mode cycle and both suites pass. The Photon runs used
+    `BuildSmoke-20261030-144825-883`.
+- A 15-second headless start (`Artifacts/Unity/WindowsStartup-20261030-1510.log`)
+  initialised the engine and was still running at 15 s, with no logged exception.
+  That proves startup only, not play.
+
+## 2026-10-30 resent inventory actions
+
+Scope: the unexplained sniper-pickup timeout in the
+[Photon regression runs](#2026-10-30-photon-regression-runs).
+- **Logging.** Smoke builds now log `WILDSTONE COMBAT RPC EXPIRED` whenever the host
+  drops a combat RPC for age. It is compiled only under `WILDSTONE_SMOKE`.
+- **Cause.** Smoke `BuildSmoke-20261030-144217-804` ran four adverse150 gunplay runs.
+  - `20261030-144247-819` failed at `gunplay_pickup_LaserSMG`.
+  - Its host log shows `kind=Pickup sequence=8 age=21`: the reliable RPC arrived 21
+    ticks (175 ms) old, past the 18-tick window, and was dropped.
+  - The other three runs passed.
+- **Fix (D035).**
+  - `FusionPlayer.AcceptsCombatTick` gives Pickup, Reload, SelectStarter and
+    SelectSpecial 60 ticks (500 ms).
+  - The other actions keep 18. The host already judges these four on current state.
+  - The contract is the
+    [foundation spec](superpowers/specs/2026-10-25-multiplayer-foundation-design.md).
+- **Checks:**
+  - New `FusionCombatTickTests.InventoryActionsSurviveAResendButAttacksKeepTheirWindow`
+    covers:
+    - pickups accepted at 60 ticks and rejected at 61;
+    - reload and both selections accepted at 21 or 60 ticks;
+    - fire, grenade, Blink and shield rejected at 19 ticks, and shield accepted at 18;
+    - future ticks rejected.
+  - The original cases are unchanged.
+  - EditMode 484/486, 2 skipped (`EditMode-20261030-144740-937`).
+  - PlayMode 172/173, 1 skipped (`PlayMode-20261030-144802-040`).
+  - Smoke `BuildSmoke-20261030-144825-883`.
+  - Adverse150 gunplay passes 5 of 5 (`20261030-144853-798`, `144953-476`, `145041-917`,
+    `145145-143`, `145239-570`).
+    - Run `145041-917` still dropped six late SMG `Fire` RPCs (ages 19–23) as
+      intended, and passed.
+  - The other Photon scenarios all pass:
+    - baseline combat `145329-051`
+    - baseline gunplay `145508-353`
+    - baseline team switch `145557-657`
+    - baseline reconnect `145620-242`
+    - baseline laser combat `145651-590`
+    - adverse150 laser moving cover `145816-263`
+    - adverse150 grenade combat `145928-626`
+    - adverse150 special projectiles `145957-426`
+  - All six packaged modes pass, with no exception, NRE or RenderGraph lines in the
+    player logs:
+    - default `20261030-150034-424`
+    - firefight `150101-373`
+    - motion `150110-386`
+    - weapons `150132-524`
+    - sequence `150224-279`
+    - music `150229-343`
+  - Frame time (`Perf-20261030-150243-530`): Ultra mean 1.65 ms and p99 2.13 ms; Low
+    mean 1.55 ms and p99 2.07 ms.
+- **Limits.**
+  - Late attacks are still dropped. Under loss, held SMG fire can lose shots, which
+    may explain the intermittent SMG verdict.
+  - The fault profile is in-process injection, not an external network.
+
+## 2026-10-30 shotgun hit sounds
+
+Scope: `ArenaMatch` emits one Hit event per shotgun pellet. A full blast therefore
+played up to eight identical HUD ticks (or head dings) in one frame, which sum
+coherently and clip. It also played eight target cues, which took half of the 16
+round-robin cue voices and could cut other tails.
+
+The contracts are the [UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md)
+(hitmarkers) and the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md#audio-2026-10-30)
+(mix). Damage and events are unchanged; only sound playback changed.
+
+- **Checks:**
+  - New `MenuPresentationTests.PelletHitsInOneFrameSoundOnce`: eight body marks in
+    one frame sound once, a kill in that frame still sounds, and the next shot
+    sounds again.
+  - New `ArenaWeaponAudioTests.PelletHitsOfOneShotPlayOneCue`: eight pellet hits on
+    one target play one `Block` cue. A second target and the next shot each get
+    their own.
+  - Smoke `BuildSmoke-20261030-143415-140`.
+  - EditMode 473/475, 2 skipped (`EditMode-20261030-143314-396`).
+  - PlayMode 172/173, 1 skipped (`PlayMode-20261030-143335-485`).
+  - All six packaged modes pass, with no exception, NRE or RenderGraph lines in the
+    player logs:
+    - default `20261030-143444-397`
+    - firefight `143515-381`
+    - motion `143524-426`
+    - weapons `143546-494`
+    - sequence `143638-216`
+    - music `143643-293`
+  - Frame time (`Perf-20261030-143657-445`): Ultra mean 1.65 ms and p99 2.16 ms; Low
+    mean 1.56 ms and p99 2.12 ms. That is unchanged.
+  - Real Photon combat and gunplay at baseline pass:
+    `Artifacts/Smoke/20261030-143724-036-combat-baseline` and
+    `20261030-143811-790-gunplay-baseline`.
+  - Superseded capture runs from earlier cycles were moved to
+    `D:/WildstoneArchive/mvp-2/Artifacts/Visual/` under the same names.
+- **Limits.**
+  - One frame is the dedupe window. Pellets reported by two simulation steps in
+    different frames would still sound twice, but one shot resolves in one step.
+  - Nobody has heard it.
+
+## 2026-10-30 remote slide scrape
+
+Scope: an opponent's slide played only its entry whoosh. The contract is the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md#audio-2026-10-30)
+(slide scrape). `ArenaAudio` shares one gain law between the centred local scrape and
+the positional remote loops. `ArenaPresentation` cuts a remote loop when that player
+dies or leaves.
+
+- **Checks:**
+  - New `ArenaWeaponAudioTests.RemoteSlidesScrapeFromTheSlider` covers:
+    - no voice before a slide;
+    - one looping positional voice at the slider's feet, at the local law's gain;
+    - the cut from `StopScrape` and from a zero dt;
+    - no remote voice for the local player.
+  - `FootstepsFollowDistanceAndMovementEdgesPlayOnce` now expects 31 voices: the
+    fixed 30 plus the loop for the one remote that slid. Its first run failed at
+    30 before that update.
+  - Smoke `BuildSmoke-20261030-142639-125`.
+  - EditMode 472/474, 2 skipped (`EditMode-20261030-142506-021`).
+  - PlayMode 171/172, 1 skipped (`PlayMode-20261030-142605-113`).
+  - All six packaged modes pass, with no exception, NRE or RenderGraph lines in the
+    player logs:
+    - default `20261030-142708-374`
+    - firefight `142739-400`
+    - motion `142748-418`
+    - weapons `142810-474`
+    - sequence `142902-214`
+    - music `142907-288`
+  - Motion captures are pixel-identical to the pistol cycle. Weapons differ only in
+    grenade particles and pickup spin.
+  - Frame time (`Perf-20261030-142921-457`): Ultra mean 1.64 ms and p99 2.12 ms; Low
+    mean 1.54 ms and p99 2.08 ms. That is unchanged.
+  - Real Photon combat at baseline passes:
+    `Artifacts/Smoke/20261030-142948-048-combat-baseline`.
+- **Limits.**
+  - The practice target never slides, so only online play makes the sound.
+  - No packaged run plays it, and nobody has heard it.
+
+## 2026-10-30 Photon regression runs
+
+Scope: the afternoon changes touched production input (empty-trigger reload and
+special drop), so real Photon runs were repeated. The smoke build was
+`BuildSmoke-20261030-140950-472`, the same source as the playable build.
+
+- **Baseline, all passed:**
+  - combat `Artifacts/Smoke/20261030-141632-498-combat-baseline`;
+  - gunplay `141724-529`;
+  - team switch `141814-375`;
+  - reconnect `141836-966`;
+  - laser combat `141949-900`.
+- **Adverse150 gunplay passed one of three runs.**
+  - `20261030-141913-747`: the client timed out after 30 s at
+    `gunplay_pickup_LaserSniper`.
+    - The client sent its pickup RPC with sequence 0, the same first sequence a
+      passing baseline uses.
+    - The host never observed the sniper in the shooter's inventory.
+    - The host log records no rejection reason, so the cause is unknown.
+    - The empty-trigger change cannot take that sequence: it needs an empty
+      magazine, and the starter holds 24 rounds at that step.
+  - `20261030-142151-368`: `SMG held fire verdict mismatch: shots 5 hits 5 damage 50
+    spacing 10 ammo 27`.
+    - The same check failed at 01:08 (`20261030-010835-306`), before this
+      afternoon's changes.
+    - The counts, damage and ammunition agree. A remaining condition is the
+      spread-grows-every-shot check, which an injected input loss can break by
+      letting bloom decay.
+    - This was confirmed later and the check was narrowed; see
+      [SMG held-fire verdict](#2026-10-30-smg-held-fire-verdict).
+  - `20261030-142207-999`: passed.
+- **Limits.** Adverse gunplay is intermittent: the five earlier runs since 2026-10-29
+  23:22 include two passes. These runs neither prove nor exclude a network fault. The pickup
+  timeout was later traced to the RPC age window and fixed; see
+  [resent inventory actions](#2026-10-30-resent-inventory-actions).
+
+## 2026-10-30 pistol beam
+
+Scope: the pistol's beam (.045 m glow, .014 m core, .11 s) nearly vanished on ivory
+stone in `weapon-laserpistol-0/1`. That is weak for a 32-damage shot. The
+[rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md) (shot reads)
+now records .075 m, .022 m and .13 s. The dark sheath scales with the glow.
+
+- **Checks:**
+  - Weapons capture `20261030-141021-152` against `140040-956`: the beam is visibly
+    wider and darker-edged in both pistol frames, but still the slimmest hitscan
+    beam.
+  - Smoke `BuildSmoke-20261030-140950-472`.
+  - EditMode 472/474, 2 skipped (`EditMode-20261030-141145-701`).
+  - PlayMode 170/171, 1 skipped (`PlayMode-20261030-141206-949`).
+  - All six packaged modes pass, with no exception, NRE or RenderGraph lines in the
+    player logs:
+    - default `20261030-141230-428`
+    - firefight `141257-377`
+    - motion `141306-410`
+    - weapons `141021-152`
+    - sequence `141328-477`
+    - music `141333-573`
+  - Firefight differences are at most 0.19 mean, within grenade-blast frames.
+  - Frame time (`Perf-20261030-141347-698`): Ultra mean 1.65 ms and p99 2.16 ms; Low
+    mean 1.55 ms and p99 2.05 ms. That is unchanged.
+- **Limits.** The pistol beam still brightens rather than darkens ivory, so its
+  contrast rests on the sheath. Nobody has judged it in motion.
+
+## 2026-10-30 low-ammo warning
+
+Scope:
+- Running dry mid-fight had no warning before the empty trigger.
+- The practice menu and HUD hint still called the target stationary after it began
+  strafing.
+- A slide-leg trial was reverted.
+
+The contract is the [UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md)
+(weapon panel). `ArenaHud.LowAmmo` decides the range. `ArenaAudio.MakeDry` builds the
+click, which plays on the existing HUD feedback voice, so no voice was added.
+
+- **Checks:**
+  - New `MenuPresentationTests.LastQuarterOfAMagazineWarnsWithADryClickUnderTheHitTick`
+    covers:
+    - range edges for the Line Driver (6 low, 7 not), sniper (1 / 2) and an empty
+      SMG;
+    - no warning for the sword or an empty hand;
+    - a 0.85-normalised click of at most 0.06 s that decays without a click;
+    - a zero-crossing rate under 0.7 of the hit tick's;
+    - a playback scale under the tick's.
+  - Smoke `BuildSmoke-20261030-135912-056`.
+  - EditMode 472/474, 2 skipped (`EditMode-20261030-135819-484`).
+  - PlayMode 170/171, 1 skipped (`PlayMode-20261030-135843-543`).
+  - All six packaged modes pass, with no exception, NRE or RenderGraph lines in the
+    player logs:
+    - default `20261030-135935-096`
+    - firefight `140009-693`
+    - motion `140018-845`
+    - weapons `140040-956`
+    - sequence `140132-722`
+    - music `140137-808`
+  - Against the near-miss cycle, pixel differences sit on the HUD hint line, apart
+    from the practice menu.
+    - The first menu text wrapped to a third line and moved the arena buttons down.
+    - It was shortened. Smoke `BuildSmoke-20261030-140232-260` and default capture
+      `20261030-140255-853` show the original two-line layout.
+  - Frame time (`Perf-20261030-140643-436`): Ultra mean 1.66 ms and p99 2.10 ms; Low
+    mean 1.56 ms and p99 2.07 ms. That is unchanged.
+    - The first attempt, `Perf-20261030-140326-958`, exited 1 because drive C: had
+      0 MB free.
+    - Older capture runs from this session were moved to
+      `D:/WildstoneArchive/mvp-2/Artifacts/Visual/`, which freed 0.9 GB.
+- **Slide legs.** Restoring the thighs in place of the shins removed the floating shin.
+  - The open thigh tops then faced the lens as dark tubes in `fixture-slide-down`,
+    `slide-sustain` and `slide-fov60`.
+  - Motion run `20261030-135413-067` is the trial and `135008-549` the baseline. The
+    trial looked worse and was reverted. The limit stays in the
+    [character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md).
+- **Low-ammo capture (added later the same day).** `-Weapons` now ends with
+  `weapon-low-ammo` (32 captures).
+  - Run `20261030-150444-257` (smoke `BuildSmoke-20261030-150420-863`) shows the
+    Line Driver's count as a red `5` beside the ivory `24` of `weapon-linedriver-0`.
+  - EditMode 484/486 (`EditMode-20261030-150557-488`) and PlayMode 172/173
+    (`PlayMode-20261030-150618-538`).
+  - The other five modes pass: default `150641-938`, firefight `150708-897`, motion
+    `150717-912`, sequence `150739-951`, music `150744-992`.
+  - `Perf-20261030-150759-225`: Ultra 1.65/2.14 ms, Low 1.55/2.09 ms.
+- **Limits.** Nobody has heard the click; batch players have no audio.
+
+## 2026-10-30 near-miss zip
+
+Scope: being shot at made no sound unless the shot hit. The contract is the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md#audio-2026-10-30)
+(near miss). `ArenaPresentation` passes each enemy shot to
+`ArenaAudio.PlayNearMiss` with the camera position. The segment is the one the beam
+effect draws, so sound and picture agree. It reuses the `Swing` bank, so no new
+asset was added.
+
+- **Checks:**
+  - New `ArenaWeaponAudioTests.NearMissZipsOnlyWhenTheBeamPassesTheEar`. A beam 0.8 m
+    from the ear zips once, from the passing point, at 0.5 × (1 − 0.8/1.6). Nothing
+    plays for a beam 3 m wide, a listener behind the shooter, muted effects, a beam
+    whose Hit event ends at the listener, or a wall cube between shooter and
+    listener.
+  - Smoke `BuildSmoke-20261030-134821-978`.
+  - EditMode 471/473, 2 skipped (`EditMode-20261030-134844-033`).
+  - PlayMode 170/171, 1 skipped (`PlayMode-20261030-134905-227`).
+  - All six packaged modes pass: default `20261030-134928-454`, firefight
+    `134959-541`, motion `135008-549`, weapons `135030-598`, sequence `135122-340`,
+    music `135127-411`. The player logs have no exception, NRE or RenderGraph lines.
+  - Frame time (`Perf-20261030-135141-558`): Ultra mean 1.65 ms and p99 2.15 ms; Low
+    mean 1.55 ms and p99 2.07 ms. That is unchanged.
+- **Limits.**
+  - Only online play has enemies who fire; the practice target never shoots. No
+    packaged or Photon run exercised it, and nobody has heard it.
+  - Shotgun pellets zip once per shot, along the centre pellet.
+
+## 2026-10-30 hit tick and slide scrape
+
+Scope: two missing sounds in the gunplay and movement loop.
+- A body hit had a hitmarker but no sound unless it was a head hit or a kill. The
+  positional "Block" cue at the target is inaudible at range.
+- A slide had only its entry whoosh.
+
+The contracts are the [UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md)
+(hitmarkers) and the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md#audio-2026-10-30)
+(slide scrape). The scrape ports vibegame1's `SlideFx` law and noise recipe, with no
+code copied ([SOURCE-REUSE](SOURCE-REUSE.md)). Both games use the same 8/22 m/s
+slide speeds.
+
+- **Checks:**
+  - New `MenuPresentationTests.BodyHitTickIsShorterAndQuieterThanTheHeadConfirm`
+    checks the tick is at most 0.06 s and under half the head ding, normalised to
+    0.85, decays without a click, and plays at a scale below 0.6.
+  - New `ArenaWeaponAudioTests.SlideScrapeRidesSlideSpeedAndReleases` covers silence
+    off a slide, full gain and 1.32 pitch at 22 m/s, 0.78 pitch at 8 m/s, a ramped
+    release that ends by 0.18 s, the immediate cut on mute or pause, and a loop seam
+    no larger than any sample step.
+  - Voice totals rise from 29 to 30.
+  - Smoke `BuildSmoke-20261030-134220-557`.
+  - EditMode 471/473, 2 skipped (`EditMode-20261030-134242-654`).
+  - PlayMode 169/170, 1 skipped (`PlayMode-20261030-134303-695`).
+  - All six packaged modes pass: default `20261030-134327-013`, firefight
+    `134358-072`, motion `134407-114`, weapons `134429-123`, sequence `134520-917`,
+    music `134525-998`. The player logs have no exception, NRE or RenderGraph lines.
+  - Frame time (`Perf-20261030-134540-158`): Ultra mean 1.64 ms and p99 2.11 ms; Low
+    mean 1.55 ms and p99 2.09 ms. That is unchanged.
+- **Limits.** Nobody has heard either sound. The tick's wiring in `ArenaHud.Mark` has
+  no packaged check, because batch players have no audio and the `-Music` mode fires
+  no hits. Other players' slides make no scrape.
+
+## 2026-10-30 speed wind
+
+Scope: fast movement had footsteps and edge cues but no sense of speed by ear. The
+contract is the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md#audio-2026-10-30)
+(speed wind). It ports vibegame1's `CameraBeats` wind law (concepts and values; no
+code copied) with that game's CC0 `SpeedWind` loop
+([SOURCE-REUSE](SOURCE-REUSE.md#recorded-weapon-and-movement-audio-2026-10-30)). Both
+games use the same motor tuning (`MotorTuning.Source`: 11 m/s ground, 22 m/s dash),
+so the 14–24 m/s range carries over unchanged.
+
+- **Checks:**
+  - New `ArenaWeaponAudioTests.SpeedWindRisesWithSpeedOnOneLoopingVoice` covers one
+    looping centred voice, silence at an 11 m/s run and in a straight fall, a level
+    between 0.1 and 0.3 at 19 m/s, the cap times effects volume, pitch 1.1 at full
+    speed, and mute.
+  - The voice totals in the two existing audio tests rise from 28 to 29.
+  - Smoke `BuildSmoke-20261030-133459-099`.
+  - EditMode 470/472, 2 skipped (`EditMode-20261030-133521-516`).
+  - PlayMode 168/169, 1 skipped (`PlayMode-20261030-133542-444`).
+  - All six packaged modes pass: default `20261030-133605-893`, firefight
+    `133636-881`, motion `133645-929`, weapons `133707-986`, sequence `133759-754`,
+    music `133804-868`. The player logs have no exception, NRE or RenderGraph lines.
+  - `-Music` now also requires the wind voice. It recorded "laserfire_00 at pitch
+    0.99, volume 0.83, output RMS 0.1219; lasercellnova_01 at pitch 0.98, volume 0.44,
+    output RMS 0.0466; wind speedwind_00 looping".
+  - Frame time (`Perf-20261030-133818-997`): Ultra mean 1.64 ms and p99 2.12 ms; Low
+    mean 1.54 ms and p99 2.05 ms. That is unchanged.
+- **Limits.** Nobody has heard it. The packaged check proves the loop ships and
+  plays, not its level at speed or its balance with the music.
+
+## 2026-10-30 strafing practice target
+
+Scope: Practice had one frozen target, so gunplay could only be judged against a
+still body. The contract is the
+[UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md) (Practice).
+`PracticeSession` now drives participant 2's motor with `PracticeSession.Drill`, a
+pure function of the leg index, the tick within the leg, the target's position, its
+spawn and the player. Its aim follows its yaw. Online play is unaffected.
+
+- **Checks:**
+  - New `MotorCollisionTests.PracticeDrillStrafesJumpsDashesAndStaysNearHome` runs
+    20 s of the drill on a real motor. It travelled 111.7 m and never went more than
+    5.26 m from its spawn. Jump and Dash both fired, it faced the player, and every
+    leg was 60–156 ticks.
+  - New `NetworkPresentationBridgeTests.PracticeTargetFixtureStrafesFacingThePlayer`
+    steps a real offline practice match for 3 s. The target leaves its spawn and its
+    combat aim faces the player.
+  - Smoke `BuildSmoke-20261030-132720-657`.
+  - EditMode 470/472, 2 skipped (`EditMode-20261030-132742-721`).
+  - PlayMode 167/168, 1 skipped (`PlayMode-20261030-133218-096`, rerun after the
+    second test was added).
+  - All five packaged modes pass: default `20261030-132826-907`, firefight
+    `132857-977`, motion `132907-012`, weapons `132929-069`, sequence `133020-867`.
+  - Against the previous run, pixel differences are only the animated title and
+    settings backdrop, one blast's particles, and the pickups' bob and spin. The
+    target is not in any still.
+  - Frame time (`Perf-20261030-133025-965`): Ultra mean 1.64 ms and p99 2.09 ms; Low
+    mean 1.54 ms and p99 2.06 ms. That is unchanged.
+- **Limits.**
+  - No packaged capture shows the target moving.
+  - Whether its speed and rhythm make good practice needs the playtest.
+  - Nothing stops it stepping off a ledge near its spawn. It would then stay below
+    until it dies. This has not been observed.
+
+## 2026-10-30 weapon voices and empty-trigger reload
+
+Scope: the user put weapons and gunplay first.
+- Six guns shared four `LaserFire` clips and differed only by pitch. The Line Driver
+  and pistol were 12% apart.
+- An empty trigger did nothing until R or 1 was pressed. The host rejected the shot,
+  and nothing else was sent.
+
+The contracts are the
+[character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md#audio-2026-10-30)
+(audio) and the
+[combat spec](superpowers/specs/2026-10-25-arena-combat-items-zone-design.md)
+(default controls).
+
+- **Banks.** `TurretAnswer` (3 clips) and `LaserCellNova` (2) were copied
+  byte-identical from `vibegame1` `2cb6e57` (clean), with GUIDs preserved
+  ([SOURCE-REUSE](SOURCE-REUSE.md#recorded-weapon-and-movement-audio-2026-10-30)).
+  They were chosen by measurement over the other unused shot-like banks:
+  - `TurretAnswer` has an instant attack, about 120 ms long, with 60–70% of its
+    energy at 250 Hz–2 kHz. `LaserFire` puts 75% of its energy under 250 Hz.
+  - `LaserCellNova` has an instant attack and a 0.5 s low tail.
+  - `SpellFireCast` and `SpellVoidCast` were rejected because they swell 60–500 ms
+    after the trigger, which would sound late on a shot.
+- **Levels.** Gains match each weapon's previous K-weighted (BS.1770) loudest-50 ms
+  level at its playback pitch:
+  - pistol 0.78 becomes 0.80, and SMG 0.62 becomes 0.64;
+  - the nova tail sits 6 dB under the sniper's shot (0.44) and 8 dB under the
+    shotgun's (0.28, at 1.5 pitch).
+- **Empty trigger.** `PracticeInput` replaces a shot on an empty starter clip with a
+  reload request, retried at most every 0.25 s. On a spent special it sends a starter
+  select and blocks the held trigger. The sword is unaffected. The host rules are
+  unchanged, and online play uses the same `ConsumeActions` path.
+- **Checks:**
+  - `ArenaWeaponAudioTests` now checks the tail voice's bank, pitch and volume, that
+    guns sharing a bank are at least 20% apart in pitch, and that the guns use at
+    least three banks.
+  - New `PracticeInputTests.EmptyTriggerReloadsTheStarterOrDropsASpentSpecial` covers
+    no futile shot, the retry throttle, no request mid-reload, the special swap with
+    the held trigger blocked, and the sword.
+  - The repeat-stop test now expects one reload request on an empty clip.
+  - Smoke `BuildSmoke-20261030-131802-772`.
+  - EditMode 470/472, 2 skipped (`EditMode-20261030-131826-402`).
+  - PlayMode 165/166, 1 skipped (`PlayMode-20261030-131847-414`).
+  - All six packaged modes pass: default `20261030-131910-724`, firefight
+    `131941-742`, motion `131950-755`, weapons `132012-849`, sequence `132104-553`,
+    music `132109-634`. The player logs have no exception, NRE or RenderGraph lines.
+  - `-Music` now also requires the nova tail. It recorded `laserfire_01` at pitch
+    1.00, volume 0.83, output RMS 0.1251, and `lasercellnova_01` at pitch 1.01,
+    volume 0.44, output RMS 0.0513.
+  - Frame time (`Perf-20261030-132123-730`): Ultra mean 1.64 ms and p99 2.13 ms; Low
+    mean 1.54 ms and p99 2.06 ms. That is unchanged.
+- **Limits.** Nobody has listened. The timbres and levels are measured, not heard.
+  No Photon run was repeated: the reload and select requests use the existing,
+  network-tested actions, and the host rules are unchanged.
+
+## 2026-10-30 playable build refresh
+
+Scope: a fresh playable build with the day's presentation work, for the user's
+playtest.
+
+- `BuildWindows-20261030-123946-374` wrote `Artifacts/Unity/Windows`. Its content
+  hash over 200 files is
+  `d6d14b5af7c3a3735a58a555f274fa4ede761801b31a3b7f7274c77774646fcd`, which replaces
+  `889c10b8…`. The previous build is kept at
+  `D:/WildstoneArchive/mvp-2/Artifacts/Unity/Windows-889c10b8`.
+- It includes the soldier outline, pickup pads, the T-pose fix, the shield shell and
+  the stun halo. The smoke build that passed every capture mode for them is
+  `BuildSmoke-20261030-123016-857`, from the same source.
+- A 15-second headless start (`Artifacts/Unity/WindowsStartup-20261030-1243.log`)
+  initialised the engine with no logged exception. That proves startup only, not play.

@@ -1,0 +1,713 @@
+{
+ "generator": "Tools/Assets/soldier_clips.py",
+ "generator_sha256": "2ef358c4008097e5af43f07d1e6aad6893b241aa4041b9f6a89c05ba7dcd6279",
+ "skeleton_sha256": "645520012eb620d6eb0e8596245b33522ba7c425f50ee5f50e8873065f6641d9",
+ "blender": "4.2.0",
+ "fps": 30,
+ "forge": {
+  "path": "C:\\Users\\tyler\\Main Storage\\ai_skelly_tool",
+  "commit": "450fce5c8e5510131ddf680e5e389e68a8a7319c",
+  "dirty_entries": 188,
+  "files": {
+   "stages/anim.py": "1e48a0d47508c1c8f53dc7ad5758997274fe45c0435ffd3938b273882ab4eb7a",
+   "tests/test_anim_quality.py": "d6bd9343706c1d454cdd359e5506a99b355f290c89c94c3844a43b51a3c3bf3c",
+   "tests/asset_checks.py": "61fd11482bf7bd8faac4854ad91bf1dc69030e004d2a9320236dc25c46831b93"
+  },
+  "reused": {
+   "stages/anim.py": [
+    "_sway (every periodic channel via wv)",
+    "_yaw (pelvis/torso/head counter-rotation)",
+    "WALK_HIP/WALK_KNEE/WALK_ANKLE and RUN_HIP/RUN_KNEE/RUN_ANKLE clinical gait curves (swing-foot arc and foot pitch as FK on this leg)",
+    "_declared (C1 quaternion spline for key-pose rotation channels)",
+    "OVERLAP idea (interior-key shift per channel)",
+    "twist (arm twist report via the test)"
+   ],
+   "tests/test_anim_quality.py": [
+    "_pose",
+    "_hidden_roll",
+    "_loop_hitch",
+    "arm_twist",
+    "twist_issues",
+    "SEAM_TOL",
+    "JERK_TOL",
+    "HITCH_TOL",
+    "HIDDEN_ROLL_TOL"
+   ],
+   "tests/asset_checks.py": [
+    "loop_seam_distance",
+    "max_point_distance"
+   ]
+  },
+  "written_here": [
+   "bake(): forge bake() is one-timeline/forge-rig specific (A62/T90 arm references, local-Euler tables); here every clip is its own action keyed per frame as quaternions from world deltas",
+   "two-bone IK with pole, clavicle reach, forearm pronation split (after forge _plant_feet's solver math)",
+   "exact ground-locked stance with heel/ball roll; swing = forge FK arc with C1 endpoint/tangent fixes",
+   "ballistic run hip bounce, finger curl presets, weapon-socket hand targets, tilted wall-run contact frame",
+   "speed measurement from planted sole points (forge _stride_travel idea, in-place)"
+  ]
+ },
+ "provenance": "Original procedural keyframes; forge curve helpers are the user's own tooling; no mocap, no generated motion, no third-party animation data",
+ "export": {
+  "axis_forward": "-Z",
+  "axis_up": "Y",
+  "apply_scale_options": "FBX_SCALE_ALL",
+  "add_leaf_bones": false,
+  "primary_bone_axis": "Y",
+  "secondary_bone_axis": "X",
+  "bake_anim_use_all_actions": true,
+  "bake_anim_simplify_factor": 0,
+  "take_names": "SoldierRig|<Clip>"
+ },
+ "clips": [
+  {
+   "name": "Idle",
+   "loop": true,
+   "duration": 3.6,
+   "frames": 108,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.948,
+   "max_leg_reach": 0.979,
+   "max_forearm_pronation_deg": 87.7
+  },
+  {
+   "name": "WalkF",
+   "loop": true,
+   "duration": 0.933333,
+   "frames": 28,
+   "speed": 1.643,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.4667,
+     "name": "FootR"
+    }
+   ],
+   "stride_m": 1.533,
+   "slip_cm": 1.26,
+   "min_floor_m": -0.0034,
+   "min_hips_m": 0.895,
+   "max_leg_reach": 0.968,
+   "max_forearm_pronation_deg": 87.6
+  },
+  {
+   "name": "WalkB",
+   "loop": true,
+   "duration": 0.933333,
+   "frames": 28,
+   "speed": 1.313,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.4667,
+     "name": "FootR"
+    }
+   ],
+   "stride_m": 1.226,
+   "slip_cm": 0.84,
+   "min_floor_m": -0.0011,
+   "min_hips_m": 0.894,
+   "max_leg_reach": 0.961,
+   "max_forearm_pronation_deg": 87.6
+  },
+  {
+   "name": "WalkL",
+   "loop": true,
+   "duration": 0.533333,
+   "frames": 16,
+   "speed": 1.05,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.2667,
+     "name": "FootR"
+    }
+   ],
+   "stride_m": 0.56,
+   "slip_cm": 0.59,
+   "min_floor_m": -0.0003,
+   "min_hips_m": 0.915,
+   "max_leg_reach": 0.956,
+   "max_forearm_pronation_deg": 87.6
+  },
+  {
+   "name": "WalkR",
+   "loop": true,
+   "duration": 0.533333,
+   "frames": 16,
+   "speed": 1.05,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootR"
+    },
+    {
+     "time": 0.2667,
+     "name": "FootL"
+    }
+   ],
+   "stride_m": 0.56,
+   "slip_cm": 0.59,
+   "min_floor_m": -0.0003,
+   "min_hips_m": 0.915,
+   "max_leg_reach": 0.955,
+   "max_forearm_pronation_deg": 87.6
+  },
+  {
+   "name": "RunF",
+   "loop": true,
+   "duration": 0.666667,
+   "frames": 20,
+   "speed": 7.94,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootR"
+    }
+   ],
+   "stride_m": 5.324,
+   "slip_cm": 0.45,
+   "min_floor_m": -0.0004,
+   "min_hips_m": 0.895,
+   "max_leg_reach": 1.007,
+   "max_forearm_pronation_deg": 87.0
+  },
+  {
+   "name": "RunB",
+   "loop": true,
+   "duration": 0.666667,
+   "frames": 20,
+   "speed": 7.832,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootR"
+    }
+   ],
+   "stride_m": 5.167,
+   "slip_cm": 0.58,
+   "min_floor_m": -0.0007,
+   "min_hips_m": 0.846,
+   "max_leg_reach": 0.983,
+   "max_forearm_pronation_deg": 87.8
+  },
+  {
+   "name": "RunL",
+   "loop": true,
+   "duration": 0.666667,
+   "frames": 20,
+   "speed": 8.018,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootR"
+    }
+   ],
+   "stride_m": 5.333,
+   "slip_cm": 0.6,
+   "min_floor_m": -0.0023,
+   "min_hips_m": 0.831,
+   "max_leg_reach": 0.989,
+   "max_forearm_pronation_deg": 87.9
+  },
+  {
+   "name": "RunR",
+   "loop": true,
+   "duration": 0.666667,
+   "frames": 20,
+   "speed": 8.018,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootR"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootL"
+    }
+   ],
+   "stride_m": 5.333,
+   "slip_cm": 0.6,
+   "min_floor_m": -0.0023,
+   "min_hips_m": 0.831,
+   "max_leg_reach": 0.992,
+   "max_forearm_pronation_deg": 87.9
+  },
+  {
+   "name": "JumpStart",
+   "loop": false,
+   "duration": 0.266667,
+   "frames": 8,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.25,
+     "name": "Takeoff"
+    }
+   ],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0072,
+   "min_hips_m": 0.82,
+   "max_leg_reach": 0.985,
+   "max_forearm_pronation_deg": 89.5
+  },
+  {
+   "name": "Fall",
+   "loop": true,
+   "duration": 1.2,
+   "frames": 36,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": 0.0085,
+   "min_hips_m": 1.067,
+   "max_leg_reach": 0.966,
+   "max_forearm_pronation_deg": 78.6
+  },
+  {
+   "name": "Land",
+   "loop": false,
+   "duration": 0.3,
+   "frames": 9,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "Land"
+    }
+   ],
+   "stride_m": null,
+   "slip_cm": 0.36,
+   "min_floor_m": -0.0004,
+   "min_hips_m": 0.79,
+   "max_leg_reach": 0.979,
+   "max_forearm_pronation_deg": 91.5
+  },
+  {
+   "name": "Dash",
+   "loop": false,
+   "duration": 0.3,
+   "frames": 9,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": 0.01,
+   "min_hips_m": 1.031,
+   "max_leg_reach": 0.991,
+   "max_forearm_pronation_deg": 80.7
+  },
+  {
+   "name": "SlideEnter",
+   "loop": false,
+   "duration": 0.2,
+   "frames": 6,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.431,
+   "max_leg_reach": 0.999,
+   "max_forearm_pronation_deg": 80.7
+  },
+  {
+   "name": "Slide",
+   "loop": true,
+   "duration": 1.0,
+   "frames": 30,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.424,
+   "max_leg_reach": 0.998,
+   "max_forearm_pronation_deg": 71.9
+  },
+  {
+   "name": "WallRunL",
+   "loop": true,
+   "duration": 0.666667,
+   "frames": 20,
+   "speed": 7.94,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootR"
+    }
+   ],
+   "stride_m": 5.324,
+   "slip_cm": 0.45,
+   "min_floor_m": -0.0004,
+   "min_hips_m": 0.895,
+   "max_leg_reach": 1.006,
+   "max_forearm_pronation_deg": 87.0
+  },
+  {
+   "name": "WallRunR",
+   "loop": true,
+   "duration": 0.666667,
+   "frames": 20,
+   "speed": 7.94,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootR"
+    }
+   ],
+   "stride_m": 5.324,
+   "slip_cm": 0.45,
+   "min_floor_m": -0.0004,
+   "min_hips_m": 0.895,
+   "max_leg_reach": 1.006,
+   "max_forearm_pronation_deg": 87.0
+  },
+  {
+   "name": "WallJump",
+   "loop": false,
+   "duration": 0.333333,
+   "frames": 10,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.1,
+     "name": "Push"
+    }
+   ],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": 0.01,
+   "min_hips_m": 0.941,
+   "max_leg_reach": 0.996,
+   "max_forearm_pronation_deg": 80.7
+  },
+  {
+   "name": "DeathF",
+   "loop": false,
+   "duration": 1.333333,
+   "frames": 40,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.125,
+   "max_leg_reach": 0.98,
+   "max_forearm_pronation_deg": 87.4
+  },
+  {
+   "name": "DeathB",
+   "loop": false,
+   "duration": 1.333333,
+   "frames": 40,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0062,
+   "min_hips_m": 0.13,
+   "max_leg_reach": 1.024,
+   "max_forearm_pronation_deg": 112.7
+  },
+  {
+   "name": "HoldRifle",
+   "loop": true,
+   "duration": 2.4,
+   "frames": 72,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.953,
+   "max_leg_reach": 0.978,
+   "max_forearm_pronation_deg": 81.0
+  },
+  {
+   "name": "HoldPistol",
+   "loop": true,
+   "duration": 2.4,
+   "frames": 72,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.953,
+   "max_leg_reach": 0.978,
+   "max_forearm_pronation_deg": 29.7
+  },
+  {
+   "name": "HoldSword",
+   "loop": true,
+   "duration": 2.4,
+   "frames": 72,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.953,
+   "max_leg_reach": 0.978,
+   "max_forearm_pronation_deg": 51.2
+  },
+  {
+   "name": "AimRifle",
+   "loop": true,
+   "duration": 2.0,
+   "frames": 60,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": 0.0,
+   "min_hips_m": 0.95,
+   "max_leg_reach": 0.97,
+   "max_forearm_pronation_deg": 71.7
+  },
+  {
+   "name": "AimPistol",
+   "loop": true,
+   "duration": 2.0,
+   "frames": 60,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.95,
+   "max_leg_reach": 0.966,
+   "max_forearm_pronation_deg": 50.3
+  },
+  {
+   "name": "Reload",
+   "loop": false,
+   "duration": 1.2,
+   "frames": 36,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.3,
+     "name": "MagOut"
+    },
+    {
+     "time": 0.7,
+     "name": "ReloadInsert"
+    }
+   ],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.955,
+   "max_leg_reach": 0.975,
+   "max_forearm_pronation_deg": 96.2
+  },
+  {
+   "name": "Throw",
+   "loop": false,
+   "duration": 0.466667,
+   "frames": 14,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.2,
+     "name": "Release"
+    }
+   ],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.955,
+   "max_leg_reach": 0.976,
+   "max_forearm_pronation_deg": 126.1
+  },
+  {
+   "name": "SwordSwing",
+   "loop": false,
+   "duration": 0.4,
+   "frames": 12,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.12,
+     "name": "SlashStart"
+    },
+    {
+     "time": 0.185,
+     "name": "Slash"
+    },
+    {
+     "time": 0.25,
+     "name": "SlashEnd"
+    }
+   ],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.955,
+   "max_leg_reach": 0.978,
+   "max_forearm_pronation_deg": 92.6
+  },
+  {
+   "name": "Equip",
+   "loop": false,
+   "duration": 0.3,
+   "frames": 9,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.955,
+   "max_leg_reach": 0.975,
+   "max_forearm_pronation_deg": 80.7
+  },
+  {
+   "name": "Recoil",
+   "loop": false,
+   "duration": 0.2,
+   "frames": 6,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": true,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.955,
+   "max_leg_reach": 0.975,
+   "max_forearm_pronation_deg": 80.7
+  },
+  {
+   "name": "HitF",
+   "loop": false,
+   "duration": 0.3,
+   "frames": 9,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": true,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.955,
+   "max_leg_reach": 0.975,
+   "max_forearm_pronation_deg": 80.7
+  },
+  {
+   "name": "HitB",
+   "loop": false,
+   "duration": 0.3,
+   "frames": 9,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": true,
+   "events": [],
+   "stride_m": null,
+   "slip_cm": 0.0,
+   "min_floor_m": -0.0,
+   "min_hips_m": 0.955,
+   "max_leg_reach": 0.977,
+   "max_forearm_pronation_deg": 82.1
+  }
+ ],
+ "hashes": {
+  "blend": "b4877286d6f60aea64679dba04b46511dab825902cc65f294b32ec505dc3b240",
+  "fbx": "49ee387586c7bdcff8e4f6e6c5c0362391943e758cd1a87502c1e9bd349d17ac",
+  "sidecar": "33b28b54424af911a103509759accdd45bbfc72066ee5de755288ef8e313e54d"
+ },
+ "gate_failures": {}
+}

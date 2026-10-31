@@ -1,5 +1,8 @@
 # multiplayer_1
 
+The game is **Better Bean Battles** (renamed from Wildstone Arena on 2026-10-30, [D038](docs/DECISIONS.md)).
+Code namespaces, asset folders and the `WildstoneArena.exe` build name keep the original identifier.
+
 Public GitHub repository: [Capsfan900/multiplayer_1](https://github.com/Capsfan900/multiplayer_1).
 Download Windows development previews from [Releases](https://github.com/Capsfan900/multiplayer_1/releases).
 Current snapshot: [Laser arsenal and first-person polish / e9e091f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-e9e091f).

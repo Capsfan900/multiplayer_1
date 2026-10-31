@@ -126,6 +126,10 @@ namespace Wildstone.Networking
         public int DiscontinuityTick;
         public FusionPendingAttack Pending;
         public NetworkBool HasPending;
+        public NetworkBool AimHeld;
+        public float AdsProgress;
+        public float Bloom;
+        public int BloomRecoverTick;
 
         public static FusionCombatState FromCombat(CombatState state)
         {
@@ -165,6 +169,10 @@ namespace Wildstone.Networking
                 DiscontinuityTick = state.DiscontinuityTick,
                 HasPending = state.Pending != null,
                 Pending = state.Pending == null ? default : FusionPendingAttack.FromCombat(state.Pending),
+                AimHeld = state.AimHeld,
+                AdsProgress = state.AdsProgress,
+                Bloom = state.Bloom,
+                BloomRecoverTick = state.BloomRecoverTick,
             };
         }
 
@@ -202,6 +210,10 @@ namespace Wildstone.Networking
             Supported = Supported,
             DiscontinuityTick = DiscontinuityTick,
             Pending = HasPending ? Pending.ToCombat() : null,
+            AimHeld = AimHeld,
+            AdsProgress = AdsProgress,
+            Bloom = Bloom,
+            BloomRecoverTick = BloomRecoverTick,
         };
     }
 
@@ -216,6 +228,7 @@ namespace Wildstone.Networking
         public Vector3 Position;
         public Vector3 Velocity;
         public float Travel;
+        public NetworkBool Deflected;
 
         public static FusionProjectileState FromProjectile(ArenaProjectile state)
         {
@@ -231,6 +244,7 @@ namespace Wildstone.Networking
                 Position = state.Position,
                 Velocity = state.Velocity,
                 Travel = state.Travel,
+                Deflected = state.Deflected,
             };
         }
 
@@ -245,6 +259,7 @@ namespace Wildstone.Networking
             Position = Position,
             Velocity = Velocity,
             Travel = Travel,
+            Deflected = Deflected,
         };
     }
 

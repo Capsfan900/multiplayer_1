@@ -55,12 +55,11 @@ namespace Wildstone.Editor
                 pipeline = UniversalRenderPipelineAsset.Create(renderer);
                 AssetDatabase.CreateAsset(pipeline, pipelinePath);
             }
-            GraphicsSettings.defaultRenderPipeline = pipeline;
-            QualitySettings.renderPipeline = pipeline;
+            RenderingSetup.Configure(renderer, pipeline);
             PlayerSettings.colorSpace = ColorSpace.Linear;
             EditorSettings.serializationMode = SerializationMode.ForceText;
             PlayerSettings.companyName = "Wildstone";
-            PlayerSettings.productName = "Wildstone Arena";
+            PlayerSettings.productName = "Better Bean Battles"; // D038; the WildstoneArena.exe build name stays for QA/release scripts
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Standalone, "com.wildstone.arena");
             ConfigureInput();
 

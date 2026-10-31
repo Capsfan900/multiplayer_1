@@ -60,6 +60,13 @@ namespace Wildstone.Combat
                 if(candidate.distance<nearest || (candidate.distance==nearest && participant<nearestParticipant))
                 { found=true; nearest=candidate.distance; nearestParticipant=participant; hit=new CombatHit(participant,candidate.point,candidate.normal,candidate.distance); }
             }
+            // Rays classify head hits with the same sphere the Fusion head hitbox uses; the head lies inside the capsule.
+            if(found && radius<=0 && hit.Participant!=0 && motors.TryGetValue(hit.Participant,out var target))
+            {
+                var state=target.CaptureState();
+                if(CombatRules.RayHitsHead(origin,direction,distance,state.Position,state.CapsuleHeight))
+                    hit=new CombatHit(hit.Participant,hit.Point,hit.Normal,hit.Distance,true);
+            }
             return found;
         }
         public bool Visible(Vector3 from,Vector3 to)

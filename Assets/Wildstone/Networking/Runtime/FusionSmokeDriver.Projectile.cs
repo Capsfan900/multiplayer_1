@@ -19,14 +19,14 @@ namespace Wildstone.Networking
         [Serializable] sealed class ProjectileVerdict
         {
             public bool placed,ready,fireSent,observed,verified,despawned,coverBlocks;
-            public int connection,authority,sequence,shooter,life,target,targetLife,ammo,samples,firstTick=-1,lastTick=-1,shotCount,explosions,hits;
+            public int connection,authority,sequence,resends,shooter,life,target,targetLife,ammo,samples,firstTick=-1,lastTick=-1,shotCount,explosions,hits;
             public float baselineHealth,health,damage,eventDamage,firstTravel,lastTravel,expectedDamage,blastDistance;
             public string identity="",shotId="",explosionId="",hitId="";
             public Vector3 explosion,targetEye;
         }
         int projectileIndex;
         GameObject projectileCover;
-        double projectileBegan=-1,projectileStable=-1,projectileAck=-1;
+        double projectileBegan=-1,projectileStable=-1,projectileAck=-1,projectileFired=-1;
         bool DriveProjectileCombat(ArenaMatch model,NetworkRunner runner,Status peer,double now)
         {
             const WeaponKind weapon=WeaponKind.PulseLobber;
@@ -109,8 +109,14 @@ namespace Wildstone.Networking
             if(status.role=="client" && !m.fireSent)
             {
                 if(model.Tick<shooter.FireReadyTick) return false;
-                m.sequence=shooter.LastActionSequence+1; m.fireSent=true; WriteOutput();
+                m.sequence=shooter.LastActionSequence+1; m.fireSent=true; projectileFired=now; WriteOutput();
                 SendLaserAction(model,shooter,m.sequence,CombatActionKind.Fire,(target.Eye-shooter.Eye).normalized);
+            }
+            else if(status.role=="client" && shooter.LastActionSequence<m.sequence && now-projectileFired>1)
+            {
+                // A loss-resent RPC can reach the host past the 150 ms attack window and is dropped unseen
+                // (FusionPlayer.AcceptsCombatTick); press again with the same sequence, which the host dedups.
+                m.resends++; projectileFired=now; SendLaserAction(model,shooter,m.sequence,CombatActionKind.Fire,(target.Eye-shooter.Eye).normalized);
             }
             if(!firing.fireSent) return false;
             m.sequence=firing.sequence; m.ammo=shooter.SpecialAmmo; m.health=target.Health; m.damage=m.baselineHealth-m.health;

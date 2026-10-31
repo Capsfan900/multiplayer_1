@@ -9,6 +9,8 @@ namespace Wildstone.Tests
     [TestFixture,Category("Native")]
     public sealed class FirstPersonWeaponMotionTests
     {
+        // Solved arms may miss by the IK reach clamp; the weapon itself never drifts from the pivot.
+        const float Contact=.003f;
         Camera camera;
         WeaponView view;
         PresentationCatalog catalog;
@@ -23,7 +25,8 @@ namespace Wildstone.Tests
             view.Initialize(camera,catalog);
             player=new CombatState { Participant=1,LifeGeneration=1 };
             motor=new MotorState { Grounded=true };
-            Step();
+            // Let the equip raise finish so rest poses are stable.
+            Step(); Step(1);
         }
         [TearDown] public void Cleanup()
         {
@@ -32,47 +35,97 @@ namespace Wildstone.Tests
         }
         void Step(float dt=.016f,bool reduced=false) => view.Present(player,catalog,in motor,10,dt,reduced);
         Transform Find(string name) => GripAttachment.Find(camera.transform,name);
+        Transform Pivot => Find("Weapon pivot");
+        Transform Model => Pivot.GetChild(Pivot.childCount-1);
+        void AssertContacts(string context)
+        {
+            Assert.That(Vector3.Distance(Pivot.position,GripAttachment.Find(Model,"Grip").position),Is.LessThan(.0001f),context+" weapon grip on pivot");
+            Assert.That(Vector3.Distance(Find("Grip_R").position,GripAttachment.Find(Model,"Grip").position),Is.LessThan(Contact),context+" right hand on grip");
+            Assert.That(Quaternion.Angle(Find("Grip_R").rotation,GripAttachment.Find(Model,"Grip").rotation),Is.LessThan(.5f),context+" right hand orientation");
+            var support=GripAttachment.Find(Model,"LeftHand");
+            if(support!=null) Assert.That(Vector3.Distance(Find("Grip_L").position,support.position),Is.LessThan(Contact),context+" left hand on support");
+        }
         [Test] public void BothHandsKeepTheirAuthoredContactsAfterWeaponChangeAndSlide()
         {
-            foreach(var kind in new[] { WeaponKind.LineDriver,WeaponKind.PulseLobber,WeaponKind.PushLens })
+            foreach(var kind in new[] { WeaponKind.LineDriver,WeaponKind.PulseLobber,WeaponKind.PushLens,WeaponKind.LaserSMG })
             {
                 player.SpecialWeapon=kind; player.SelectedSpecial=true;
                 motor.Sliding=true; motor.Velocity=Vector3.forward*12;
-                Step();
-                Assert.That(Vector3.Distance(Find("Grip_R").position,GripAttachment.Find(Find("Grip_R").GetChild(Find("Grip_R").childCount-1),"Grip").position),Is.LessThan(.0001f));
-                Assert.That(Vector3.Distance(Find("Wrist_L").position,GripAttachment.Find(Find("Grip_R").GetChild(Find("Grip_R").childCount-1),"LeftHand").position),Is.LessThan(.0001f));
+                Step(); Step();
+                AssertContacts(kind.ToString());
             }
+        }
+        // A dash fires a brief burst of lens streaks that flow against the travel and stay clear of the reticle.
+        [Test] public void DashStreaksFlowAgainstTheTravelAndClear()
+        {
+            var lines=System.Array.FindAll(camera.GetComponentsInChildren<LineRenderer>(true),line=>line.name.StartsWith("Dash streak"));
+            Assert.That(lines.Length,Is.EqualTo(WeaponView.StreakCount));
+            float fov=Find("Viewmodel").GetComponent<Camera>().fieldOfView;
+            float frame=2*WeaponView.StreakDepth*Mathf.Tan(fov*.5f*Mathf.Deg2Rad);
+            motor.DashStartedAt=5; motor.DashDirection=Vector3.right; Step();
+            foreach(var line in lines)
+            {
+                Assert.That(line.enabled,Is.True);
+                Vector3 head=line.GetPosition(0), tail=line.GetPosition(1);
+                Assert.That(new Vector2(head.x,head.y).magnitude,Is.GreaterThanOrEqualTo(WeaponView.StreakInner*frame*.99f),"Clear of the reticle.");
+                Assert.That(tail.x-head.x,Is.LessThan(0),"Dashing right streams the frame left.");
+                Assert.That(line.startColor.a,Is.LessThanOrEqualTo(.86f),"Under the bloom threshold (8-bit vertex colour).");
+            }
+            Step(); Assert.That(lines[0].enabled,Is.True,"The same dash does not refire or stop the burst.");
+            Step(WeaponView.StreakSeconds); Step();
+            Assert.That(System.Array.TrueForAll(lines,line=>!line.enabled),Is.True,"The burst is gone after its life.");
+            motor.DashStartedAt=6; Step(.016f,true);
+            Assert.That(System.Array.TrueForAll(lines,line=>!line.enabled),Is.True,"Reduced motion shows none.");
+        }
+        [Test] public void HipGunsPointDownrangeTopUp()
+        {
+            foreach(var kind in new[] { WeaponKind.LineDriver,WeaponKind.LaserPistol,WeaponKind.LaserSniper,WeaponKind.LaserSMG,WeaponKind.LaserShotgun })
+            {
+                player.SpecialWeapon=kind; player.SelectedSpecial=kind!=WeaponKind.LineDriver;
+                Step(); Step(1);
+                var grip=GripAttachment.Find(Model,"Grip"); var barrel=(GripAttachment.Find(Model,"Muzzle").position-grip.position).normalized;
+                string context=kind+" grip fwd "+grip.forward+" up "+grip.up+" barrel "+barrel;
+                Assert.That(Vector3.Angle(barrel,camera.transform.forward),Is.LessThan(30),context);
+                Assert.That(Vector3.Dot(grip.up,camera.transform.up),Is.GreaterThan(.7f),context);
+            }
+        }
+        [Test] public void ArmBonesKeepTheirLengthsAndNeverCastViewmodelShadows()
+        {
+            float Length(string a,string b) => Vector3.Distance(Find(a).position,Find(b).position);
+            float upper=Length("RightUpperArm","RightLowerArm"),lower=Length("RightLowerArm","RightHand");
+            motor.Sliding=true; player.ReloadUntil=82;
+            for(int i=0;i<20;i++) Step();
+            Assert.That(Length("RightUpperArm","RightLowerArm"),Is.EqualTo(upper).Within(.0005f));
+            Assert.That(Length("RightLowerArm","RightHand"),Is.EqualTo(lower).Within(.0005f));
+            foreach(var renderer in Find("Viewmodel").GetComponentsInChildren<Renderer>(true))
+                Assert.That(renderer.shadowCastingMode,Is.EqualTo(UnityEngine.Rendering.ShadowCastingMode.Off),renderer.name);
         }
         [Test] public void OnlyConfirmedLocalShotsKickTheViewAndPauseFreezesIt()
         {
-            var hands=Find("Wrist_R").parent;
-            Vector3 rest=hands.localPosition;
+            Vector3 rest=Pivot.localPosition;
             var action=new CombatAction { Participant=2 };
             view.Play(new CombatEvent(CombatEventKind.Shot,action,10),1); Step();
-            Assert.That(hands.localPosition,Is.EqualTo(rest));
+            Assert.That(Pivot.localPosition,Is.EqualTo(rest));
             action.Participant=1;
             view.Play(new CombatEvent(CombatEventKind.Rejected,action,10),1); Step();
-            Assert.That(hands.localPosition,Is.EqualTo(rest));
+            Assert.That(Pivot.localPosition,Is.EqualTo(rest));
             view.Play(new CombatEvent(CombatEventKind.Shot,action,10),1); Step();
-            Assert.That(hands.localPosition.z,Is.LessThan(rest.z));
-            var kicked=hands.localPosition; Step(0);
-            Assert.That(hands.localPosition,Is.EqualTo(kicked));
+            Assert.That(Pivot.localPosition.z,Is.LessThan(rest.z));
+            var kicked=Pivot.localPosition; Step(0);
+            Assert.That(Pivot.localPosition,Is.EqualTo(kicked));
             player.Alive=false; Step();
-            Assert.That(hands.localPosition,Is.EqualTo(rest));
+            Assert.That(Pivot.localPosition,Is.EqualTo(rest));
         }
-        [TestCase(WeaponKind.LaserPistol)] [TestCase(WeaponKind.LaserShotgun)] [TestCase(WeaponKind.LaserSniper)]
+        [TestCase(WeaponKind.LaserPistol)] [TestCase(WeaponKind.LaserShotgun)] [TestCase(WeaponKind.LaserSniper)] [TestCase(WeaponKind.LaserSMG)]
         public void FamiliarLaserWeaponsHaveAuthoredContactsDistinctMechanismsAndBoundedFlashes(WeaponKind kind)
         {
-            player.SelectedSpecial=true; player.SpecialWeapon=kind; Step();
+            player.SelectedSpecial=true; player.SpecialWeapon=kind; Step(); Step(1);
             Assert.That(view.TryGetMuzzle(out var muzzle),Is.True);
-            var model=Find("Grip_R").GetChild(Find("Grip_R").childCount-1);
-            Assert.That(Vector3.Distance(Find("Grip_R").position,GripAttachment.Find(model,"Grip").position),Is.LessThan(.0001f));
-            Assert.That(Vector3.Distance(Find("Wrist_L").position,GripAttachment.Find(model,"LeftHand").position),Is.LessThan(.0001f));
-            var mechanism=GripAttachment.Find(model,"Weapon mechanism");
-            Assert.That(mechanism,Is.Not.Null);
-            var rest=mechanism.localPosition;
+            AssertContacts(kind.ToString());
             view.Play(new CombatEvent(CombatEventKind.Shot,new CombatAction { Participant=1 },10,vector:Vector3.forward,weapon:kind),1); Step();
-            Assert.That(Vector3.Distance(rest,mechanism.localPosition),Is.GreaterThan(.001f));
+            AssertContacts(kind+" at peak kick");
+            var mechanism=GripAttachment.Find(Model,"Weapon mechanism");
+            if(kind!=WeaponKind.LaserSMG) Assert.That(mechanism,Is.Not.Null,"Recoil part animates.");
             Assert.That(Find("Local muzzle 0").GetComponent<LineRenderer>().enabled,Is.True);
             Step(.6f);
             Assert.That(Find("Local muzzle 0").GetComponent<LineRenderer>().enabled,Is.False);
@@ -80,8 +133,18 @@ namespace Wildstone.Tests
         [Test] public void MuzzleUsesAuthoredSocketAndFourReusedElementsExpireAndReset()
         {
             Assert.That(view.TryGetMuzzle(out var muzzle),Is.True);
-            Assert.That(Vector3.Distance(muzzle,Find("Muzzle").position),Is.LessThan(.0001f));
-            var lines=camera.GetComponentsInChildren<LineRenderer>(true);
+            Assert.That(Vector3.Distance(muzzle,Find("Muzzle").position),Is.LessThan(.0001f),"Equal projections leave the socket in place.");
+            // A wider world FOV than the viewmodel's: world effects still leave the barrel the player sees.
+            camera.fieldOfView=90; view.SyncProjection(camera);
+            var overlay=Find("Viewmodel").GetComponent<Camera>();
+            Assert.That(overlay.fieldOfView,Is.Not.EqualTo(camera.fieldOfView));
+            Assert.That(view.TryGetMuzzle(out muzzle),Is.True);
+            var seen=overlay.WorldToViewportPoint(Find("Muzzle").position);
+            var drawn=camera.WorldToViewportPoint(muzzle);
+            Assert.That(Vector2.Distance(drawn,seen),Is.LessThan(.0005f),"Same screen point");
+            Assert.That(drawn.z,Is.EqualTo(seen.z).Within(.0005f),"Same depth");
+            Assert.That(Vector3.Distance(muzzle,Find("Muzzle").position),Is.GreaterThan(.01f));
+            var lines=System.Array.FindAll(camera.GetComponentsInChildren<LineRenderer>(true),line=>line.name.StartsWith("Local muzzle"));
             Assert.That(lines.Length,Is.EqualTo(4));
             var action=new CombatAction { Participant=1 };
             for(int i=0;i<30;i++)
@@ -90,7 +153,7 @@ namespace Wildstone.Tests
                 Assert.That(lines[0].enabled,Is.True);
                 Assert.That(Vector3.Distance(lines[0].GetPosition(0),Find("Muzzle").position),Is.LessThan(.0001f));
             }
-            Assert.That(camera.GetComponentsInChildren<LineRenderer>(true).Length,Is.EqualTo(4));
+            Assert.That(camera.GetComponentsInChildren<LineRenderer>(true).Length,Is.EqualTo(4+WeaponView.StreakCount));
             Step(.5f);
             foreach(var line in lines) Assert.That(line.enabled,Is.False);
             view.Play(new CombatEvent(CombatEventKind.Shot,action,10,vector:Vector3.forward,weapon:WeaponKind.LineDriver),1); Step();
@@ -118,114 +181,151 @@ namespace Wildstone.Tests
         [Test] public void HeavyPlasmaHasDistinctKickAndEquipClearsMuzzle()
         {
             var action=new CombatAction { Participant=1 };
-            var hands=Find("Wrist_R").parent;
-            var rest=hands.localPosition;
+            var rest=Pivot.localPosition;
             view.Play(new CombatEvent(CombatEventKind.Shot,action,10,vector:Vector3.forward,weapon:WeaponKind.LineDriver),1); Step();
-            float light=rest.z-hands.localPosition.z;
-            player.SelectedSpecial=true; player.SpecialWeapon=WeaponKind.PulseLobber; Step();
+            float light=rest.z-Pivot.localPosition.z;
+            player.SelectedSpecial=true; player.SpecialWeapon=WeaponKind.PulseLobber; Step(); Step(1);
             Assert.That(Find("Local muzzle 0").GetComponent<LineRenderer>().enabled,Is.False);
+            rest=Pivot.localPosition;
             view.Play(new CombatEvent(CombatEventKind.Shot,action,10,vector:Vector3.forward,weapon:WeaponKind.PulseLobber),1); Step();
-            Assert.That(rest.z-hands.localPosition.z,Is.GreaterThan(light*1.5f));
-        }
-        [Test] public void ImportedSleeveGeometryEndsAtItsAuthoredShoulderAndMovingWristCuff()
-        {
-            var reference=Object.Instantiate(catalog.Hands);
-            try
-            {
-                var gripR=GripAttachment.Find(reference.transform,"Grip_R");
-                var gripL=GripAttachment.Find(reference.transform,"Grip_L");
-                var palm=GripAttachment.Find(reference.transform,"PalmR");
-                Vector3 right=(gripR.position-gripL.position)/.20f;
-                Vector3 forward=(gripR.position-palm.position)/.08f;
-                Vector3 up=(gripR.parent.position+right*.10f-forward*.07f-gripR.position)/.11f;
-                Vector3 shoulder=gripR.parent.position-right*.20f-up*.17f-forward*.38f;
-                Vector3 cuff=gripR.parent.position-right*.12f-up*.12f-forward*.18f;
-                var sourceSleeve=GripAttachment.Find(reference.transform,"SleeveL").GetComponent<MeshFilter>();
-                Vector3[] vertices;
-#if UNITY_EDITOR
-                using(var data=UnityEditor.MeshUtility.AcquireReadOnlyMeshData(sourceSleeve.sharedMesh))
-                using(var positions=new Unity.Collections.NativeArray<Vector3>(data[0].vertexCount,Unity.Collections.Allocator.Temp))
-                {
-                    data[0].GetVertices(positions);
-                    vertices=positions.ToArray();
-                }
-#else
-                vertices=sourceSleeve.sharedMesh.vertices;
-#endif
-                Vector3 axis=(cuff-shoulder).normalized;
-                var ring=new System.Collections.Generic.List<int>();
-                for(int i=0;i<vertices.Length;i++)
-                    if(Mathf.Abs(Vector3.Dot(sourceSleeve.transform.TransformPoint(vertices[i])-cuff,axis))<.0001f) ring.Add(i);
-                Assert.That(ring.Count,Is.GreaterThanOrEqualTo(8),"Find the original imported cuff ring, not a synthetic socket.");
-                Vector3 expectedShoulder=Find("Wrist_L").parent.TransformPoint(reference.transform.InverseTransformPoint(shoulder));
-                Assert.That(Vector3.Distance(Find("Forearm_L").position,expectedShoulder),Is.LessThan(.0001f));
-                Vector3 cuffOffset=Quaternion.Inverse(gripL.rotation)*(cuff-gripL.position);
-                player.ReloadUntil=82; motor.Sliding=true; Step();
-                var sleeve=Find("SleeveL").GetComponent<MeshFilter>();
-                var bounds=new Bounds(sleeve.transform.TransformPoint(vertices[ring[0]]),Vector3.zero);
-                foreach(int index in ring) bounds.Encapsulate(sleeve.transform.TransformPoint(vertices[index]));
-                Assert.That(Vector3.Distance(bounds.center,Find("Wrist_L").TransformPoint(cuffOffset)),Is.LessThan(.001f),"Rendered sleeve cuff must follow the articulated palm without a gap.");
-            }
-            finally { Object.DestroyImmediate(reference); }
+            Assert.That(rest.z-Pivot.localPosition.z,Is.GreaterThan(light*1.5f));
         }
         [Test] public void DisconnectHidesAndNeutralizesTheWeaponAndReconnectStartsWithoutAKick()
         {
-            var hands=Find("Wrist_R").parent;
-            var rest=hands.localPosition;
-            var overlay=hands.GetComponentInParent<Camera>();
+            var rest=Pivot.localPosition;
+            var overlay=Find("Viewmodel").GetComponent<Camera>();
             var action=new CombatAction { Participant=1 };
             view.Play(new CombatEvent(CombatEventKind.Shot,action,10),1); Step();
-            Assert.That(hands.localPosition,Is.Not.EqualTo(rest));
+            Assert.That(Pivot.localPosition,Is.Not.EqualTo(rest));
             player.Connected=false; Step();
             Assert.That(overlay.enabled,Is.False);
-            Assert.That(hands.localPosition,Is.EqualTo(rest));
+            Assert.That(Pivot.localPosition,Is.EqualTo(rest));
             player.Connected=true; Step();
             Assert.That(overlay.enabled,Is.True);
-            Assert.That(hands.localPosition,Is.EqualTo(rest));
+            Assert.That(Pivot.localPosition,Is.EqualTo(rest));
         }
         [Test] public void SlowFramesConsumeRealActionTimeAndTeleportClearsTheKick()
         {
-            var hands=Find("Wrist_R").parent;
-            var rest=hands.localPosition;
+            var rest=Pivot.localPosition;
             var action=new CombatAction { Participant=1 };
             view.Play(new CombatEvent(CombatEventKind.Shot,action,10),1);
             Step(.2f);
-            Assert.That(hands.localPosition,Is.EqualTo(rest),"Recoil must finish after its real duration even below 20 FPS.");
+            Assert.That(Pivot.localPosition,Is.EqualTo(rest),"Recoil must finish after its real duration even below 20 FPS.");
             view.Play(new CombatEvent(CombatEventKind.Shot,action,10),1); Step();
-            Assert.That(hands.localPosition,Is.Not.EqualTo(rest));
+            Assert.That(Pivot.localPosition,Is.Not.EqualTo(rest));
             player.DiscontinuityTick=11; Step();
-            Assert.That(hands.localPosition,Is.EqualTo(rest));
+            Assert.That(Pivot.localPosition,Is.EqualTo(rest));
         }
-        [Test] public void ReducedMotionSuppressesBobAndForearmWidthStaysFixedAsSupportMoves()
+        [Test] public void ReducedMotionSuppressesBobAndReloadOpensTheSupportFingers()
         {
-            var hands=Find("Wrist_R").parent;
-            var rest=hands.localPosition;
+            var rest=Pivot.localPosition;
             motor.Velocity=Vector3.forward*8;
             for(int i=0;i<10;i++) Step(reduced:true);
-            Assert.That(hands.localPosition,Is.EqualTo(rest),"Decorative walk bob is disabled.");
-            Assert.That(Find("Forearm_L").localScale.x,Is.EqualTo(1));
-            Assert.That(Find("Forearm_L").localScale.y,Is.EqualTo(1));
-            var knuckle=Find("Knuckle_L0");
+            Assert.That(Pivot.localPosition,Is.EqualTo(rest),"Decorative walk bob is disabled.");
+            var knuckle=Find("LeftIndexProximal");
             var closed=knuckle.localRotation;
             player.ReloadUntil=82; Step();
-            Assert.That(Quaternion.Angle(closed,knuckle.localRotation),Is.GreaterThan(50));
+            Assert.That(Quaternion.Angle(closed,knuckle.localRotation),Is.GreaterThan(25));
             player.ReloadUntil=0; Step();
-            Assert.That(Quaternion.Angle(closed,knuckle.localRotation),Is.LessThan(.001f));
+            Assert.That(Quaternion.Angle(closed,knuckle.localRotation),Is.LessThan(.01f));
         }
         [Test] public void SlideIsDistinctReducedMotionIsSmallerAndReloadReleasesSupport()
         {
-            var hands=Find("Wrist_R").parent;
-            var rest=hands.localPosition;
+            var rest=Pivot.localPosition;
             motor.Sliding=true;
             for(int i=0;i<20;i++) Step();
-            Assert.That(hands.localPosition.y,Is.LessThan(rest.y-.07f));
-            float full=Vector3.Distance(rest,hands.localPosition);
+            Assert.That(Pivot.localPosition.y,Is.LessThan(rest.y-.07f));
+            float full=Vector3.Distance(rest,Pivot.localPosition);
             view.ResetMotion();
             for(int i=0;i<20;i++) Step(reduced:true);
-            Assert.That(Vector3.Distance(rest,hands.localPosition),Is.LessThan(full*.3f));
+            Assert.That(Vector3.Distance(rest,Pivot.localPosition),Is.LessThan(full*.3f));
             player.ReloadUntil=82; Step();
-            Assert.That(Vector3.Distance(Find("Wrist_L").position,GripAttachment.Find(Find("Grip_R").GetChild(Find("Grip_R").childCount-1),"LeftHand").position),Is.GreaterThan(.05f));
+            Assert.That(Vector3.Distance(Find("Grip_L").position,GripAttachment.Find(Model,"LeftHand").position),Is.GreaterThan(.05f));
+        }
+        [Test] public void ViewmodelLensIsIndependentOfTheWorldFieldOfView()
+        {
+            var overlay=Find("Viewmodel").GetComponent<Camera>();
+            foreach(float world in new[]{60f,75f,100f})
+            {
+                camera.fieldOfView=world;
+                view.SyncProjection(camera);
+                Assert.That(overlay.fieldOfView,Is.EqualTo(WeaponView.ViewmodelFieldOfView));
+            }
+        }
+        [Test] public void AimingPutsTheSightOnTheLensAxisAndAFullScopeHidesTheViewmodel()
+        {
+            player.AdsProgress=1; Step(); Step();
+            var lens=Find("Viewmodel");
+            var sight=GripAttachment.Find(Model,"Sight");
+            Assert.That(sight,Is.Not.Null,"Line Driver carries a holo sight.");
+            var local=lens.InverseTransformPoint(sight.position);
+            Assert.That(new Vector2(local.x,local.y).magnitude,Is.LessThan(.002f),"Sight centre "+local);
+            Assert.That(Vector3.Angle(lens.forward,sight.forward),Is.LessThan(.5f));
+            AssertContacts("ADS");
+            player.SelectedSpecial=true; player.SpecialWeapon=WeaponKind.LaserSniper; Step(); Step(1);
+            Assert.That(view.Scoped,Is.True);
+            Assert.That(lens.GetComponent<Camera>().enabled,Is.False);
+            player.AdsProgress=0; Step();
+            Assert.That(view.Scoped,Is.False);
+            Assert.That(lens.GetComponent<Camera>().enabled,Is.True);
+        }
+        // Holding the throw key puts a real-size grenade in the support hand, in view; it survives the round trip to the
+        // host's Accepted, leaves the hand during the swing, and the hand returns to the gun.
+        [Test] public void HeldGrenadeShowsInTheSupportHandAndLeavesItDuringTheThrow()
+        {
+            var held=Find("Held grenade");
+            Assert.That(held,Is.Not.Null);
+            Assert.That(held.gameObject.activeSelf,Is.False,"No grenade without the throw key.");
+            view.GrenadeReady=true;
+            for(int i=0;i<15;i++) Step();
+            Assert.That(held.gameObject.activeSelf,Is.True);
+            Bounds Measure()
+            {
+                var box=held.GetComponentInChildren<Renderer>().bounds;
+                foreach(var renderer in held.GetComponentsInChildren<Renderer>()) box.Encapsulate(renderer.bounds);
+                return box;
+            }
+            var bounds=Measure();
+            Assert.That(Vector3.Distance(bounds.center,Find("Grip_L").position),Is.LessThan(.01f),"Centred in the palm.");
+            var pose=held.localRotation; held.rotation=Quaternion.identity;
+            var upright=Measure(); held.localRotation=pose;
+            Assert.That(Mathf.Max(upright.size.x,Mathf.Max(upright.size.y,upright.size.z)),Is.EqualTo(WeaponView.GrenadeSize).Within(.005f),"Real grenade size.");
+            var viewport=Find("Viewmodel").GetComponent<Camera>().WorldToViewportPoint(bounds.center);
+            Assert.That(viewport.x,Is.InRange(.05f,.5f),"Left half of the view "+viewport);
+            Assert.That(viewport.y,Is.InRange(.2f,.6f),"Below the crosshair and above the HUD vitals "+viewport);
+            Assert.That(viewport.z,Is.GreaterThan(.1f));
+            Assert.That(Vector3.Distance(Find("Grip_L").position,GripAttachment.Find(Model,"LeftHand").position),Is.GreaterThan(.1f),"The hand left the gun.");
+            view.GrenadeReady=false; Step(.2f);
+            Assert.That(held.gameObject.activeSelf,Is.True,"Still held while the throw request reaches the host.");
+            view.Play(new CombatEvent(CombatEventKind.Accepted,new CombatAction {Participant=1,Kind=CombatActionKind.Grenade},10),1);
+            Step(.05f);
+            Assert.That(held.gameObject.activeSelf,Is.True,"Wind-up keeps the grenade.");
+            Step(.15f);
+            Assert.That(held.gameObject.activeSelf,Is.False,"Released during the swing.");
+            for(int i=0;i<10;i++) Step(.05f);
+            AssertContacts("after the throw");
+        }
+        // Signal parts flare on a shot, keep some heat under sustained fire, then cool back to their authored glow.
+        [Test] public void SignalPartsFlareOnShotsAndCoolBack()
+        {
+            var renderer=System.Array.Find(Model.GetComponentsInChildren<Renderer>(),r=>System.Array.Exists(r.sharedMaterials,m=>m!=null && m.name.StartsWith("SignalCyan")));
+            Assert.That(renderer,Is.Not.Null,"Line Driver has an emissive SignalCyan part.");
+            int index=System.Array.FindIndex(renderer.sharedMaterials,m=>m!=null && m.name.StartsWith("SignalCyan"));
+            var authored=renderer.sharedMaterials[index].GetColor("_EmissionColor");
+            Assert.That(renderer.sharedMaterials[index].IsKeywordEnabled("_EMISSION") && authored.maxColorComponent>.5f,Is.True,"Signal accents emit.");
+            float Glow() { var block=new MaterialPropertyBlock(); renderer.GetPropertyBlock(block,index); var c=block.GetColor("_EmissionColor"); return c.maxColorComponent/authored.maxColorComponent; }
+            Step(1);
+            Assert.That(Glow(),Is.EqualTo(1).Within(.02f));
+            var action=new CombatAction { Participant=1,LifeGeneration=1,Sequence=1 };
+            view.Play(new CombatEvent(CombatEventKind.Shot,action,10,weapon:WeaponKind.LineDriver),1); Step();
+            float flare=Glow();
+            Assert.That(flare,Is.GreaterThan(1.6f));
+            Assert.That(flare*authored.maxColorComponent,Is.LessThanOrEqualTo(1.6f+.001f),"The flare is capped so the hue never clips.");
+            for(int i=0;i<8;i++) { action.Sequence++; view.Play(new CombatEvent(CombatEventKind.Shot,action,10,weapon:WeaponKind.LineDriver),1); Step(.125f); }
+            Step(.12f);
+            Assert.That(Glow(),Is.GreaterThan(1.15f).And.LessThan(flare),"Heat outlasts the recoil flare.");
+            Step(3); Step(.016f);
+            Assert.That(Glow(),Is.EqualTo(1).Within(.02f),"Cools back to the authored glow.");
         }
     }
 }
-

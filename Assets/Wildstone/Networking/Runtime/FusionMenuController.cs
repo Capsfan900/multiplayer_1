@@ -47,7 +47,9 @@ namespace Wildstone.Networking
             menu.HostMatch+=Host; menu.Join+=Join; menu.Leave+=Leave;
             menu.Team+=Team; menu.SetReady+=Ready; menu.StartMatch+=StartMatch;
             menu.ReconnectRequested+=Reconnect;
+            menu.RematchRequested+=Rematch;
         }
+        void Rematch() { var coordinator=GetComponent<FusionGameCoordinator>(); if(coordinator!=null) coordinator.Rematch(); }
         internal static AuthenticationValues NewGuestAuthentication() => new AuthenticationValues(Guid.NewGuid().ToString("N")) {AuthType=CustomAuthenticationType.None};
         async Task Run(Func<CancellationToken,Task> action,string status)
         {

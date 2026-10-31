@@ -1,8 +1,10 @@
 #if WILDSTONE_SMOKE
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Globalization;
 using Fusion;
+using Fusion.Statistics;
 using Wildstone.Match;
 
 namespace Wildstone.Networking
@@ -10,14 +12,15 @@ namespace Wildstone.Networking
     public sealed partial class FusionSmokeDriver
     {
         NetworkRunner capacityRunner;
+        FusionStatisticsManager capacityStats;
         int capacityAuthority,capacityLastSdkTick;
         double capacityObservedAt,capacitySdkProgressAt;
 
         internal static int ParseCapacitySoakSeconds(string value)
         {
             if(value==null) return 10;
-            if(!int.TryParse(value,NumberStyles.None,CultureInfo.InvariantCulture,out int seconds) || seconds<10 || seconds>600)
-                throw new ArgumentException("Capacity soak duration must be an integer from 10 to 600 seconds.");
+            if(!int.TryParse(value,NumberStyles.None,CultureInfo.InvariantCulture,out int seconds) || seconds<10 || seconds>1800)
+                throw new ArgumentException("Capacity soak duration must be an integer from 10 to 1800 seconds.");
             return seconds;
         }
         static int CapacityRoleIndex(string role)
@@ -87,20 +90,35 @@ namespace Wildstone.Networking
                     stableAt=capacityObservedAt=capacitySdkProgressAt=now; firstMatchTick=model.Tick;
                     capacityRunner=runner; capacityAuthority=model.AuthorityGeneration; capacityLastSdkTick=runner.Tick.Raw;
                     status.capacityHoldStartElapsed=(float)(now-began);
+                    // Release DLLs compile statistics out; the hold still verifies, with traffic reported unavailable.
+                    status.capacityStatsAvailable=runner.TryGetFusionStatistics(out capacityStats);
                 }
                 if(!ReferenceEquals(capacityRunner,runner) || capacityAuthority!=model.AuthorityGeneration || runner.Tick.Raw<capacityLastSdkTick)
                     throw new InvalidOperationException("Capacity soak runner or authority changed.");
                 int advanced=runner.Tick.Raw-capacityLastSdkTick;
                 if(advanced>0) capacitySdkProgressAt=now;
                 if(now-capacitySdkProgressAt>2) throw new InvalidOperationException("Capacity soak SDK ticks stopped advancing.");
+                // The default updater runs one Fusion loop before each script Update, so each completed snapshot is read once.
+                float bytesIn=0,bytesOut=0;
+                if(now>capacityObservedAt && capacityStats?.SimulationSnapshot?.Stats is Dictionary<FusionStatType,float> stats)
+                {
+                    stats.TryGetValue(FusionStatType.InBandwidth,out bytesIn); stats.TryGetValue(FusionStatType.OutBandwidth,out bytesOut);
+                    if(stats.TryGetValue(FusionStatType.ForwardTicks,out float forward)) status.capacityStatsForwardTicks+=(int)forward;
+                }
                 if(running)
                 {
                     status.capacityRunningSeconds+=(float)(now-capacityObservedAt); status.capacityRunningSdkTicks+=advanced;
+                    status.capacityRunningInBytes+=bytesIn; status.capacityRunningOutBytes+=bytesOut;
+                    status.capacityRunningInBytesPerSecond=(float)(status.capacityRunningInBytes/Math.Max(.001,status.capacityRunningSeconds));
+                    status.capacityRunningOutBytesPerSecond=(float)(status.capacityRunningOutBytes/Math.Max(.001,status.capacityRunningSeconds));
                 }
                 else
                 {
                     status.capacityFinishedSeconds+=(float)(now-capacityObservedAt); status.capacityFinishedSdkTicks+=advanced;
                     status.capacityMatchFinished=true;
+                    status.capacityFinishedInBytes+=bytesIn; status.capacityFinishedOutBytes+=bytesOut;
+                    status.capacityFinishedInBytesPerSecond=(float)(status.capacityFinishedInBytes/Math.Max(.001,status.capacityFinishedSeconds));
+                    status.capacityFinishedOutBytesPerSecond=(float)(status.capacityFinishedOutBytes/Math.Max(.001,status.capacityFinishedSeconds));
                 }
                 capacityLastSdkTick=runner.Tick.Raw; capacityObservedAt=now;
                 status.stableSeconds=(float)(now-stableAt);

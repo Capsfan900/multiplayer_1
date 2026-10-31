@@ -104,5 +104,59 @@ namespace Wildstone.Tests
                 Object.DestroyImmediate(owner); Object.DestroyImmediate(local); Object.DestroyImmediate(camera); Object.DestroyImmediate(catalog);
             }
         }
+
+        // A finished round stays in its session: only a running host runner may rematch, and every peer follows the lobby.
+        [UnityTest] public IEnumerator FinishedRoundRematchNeedsTheHostAndPeersFollowTheLobbyInTheSameSession()
+        {
+            var owner=new GameObject("Finished online rematch"); owner.SetActive(false);
+            var local=new GameObject("Finished network avatar",typeof(ArenaMotor));
+            var camera=new GameObject("Results camera",typeof(Camera));
+            var catalog=ScriptableObject.CreateInstance<ArenaCatalog>();
+            var retained=new FusionSession(new ContentVersion("1","test","atrium-1","rules"),"ROOM1");
+            try
+            {
+                var bridge=owner.AddComponent<OnlineMenuBridge>();
+                var coordinator=owner.AddComponent<FusionGameCoordinator>();
+                var controller=owner.GetComponent<FusionMenuController>();
+                var practice=owner.GetComponent<PracticeSession>(); practice.Camera=camera.GetComponent<Camera>();
+                var map=new ArenaDefinition { Id="atrium",Spawns=System.Array.Empty<ArenaSpawn>(),Pickups=System.Array.Empty<ArenaPickup>(),
+                    ZoneRoute=new[]{Vector3.zero,Vector3.right*8,Vector3.forward*8} };
+                catalog.Maps=new[]{map}; practice.Catalog=catalog;
+                var source=new ArenaMatch(map);
+                Assert.That(source.AddPlayer(1,0,1,1,Vector3.zero),Is.True);
+                Assert.That(source.AddPlayer(2,1,2,1,Vector3.forward*6),Is.True);
+                var state=source.Capture(); state.Phase=ArenaMatchPhase.Finished; state.Winner=0; state.ScoreTicks[0]=1200;
+                Assert.That(source.TryRestore(state),Is.True);
+                Set(practice,"<Settings>k__BackingField",new LocalSettings());
+                Set(practice,"<Input>k__BackingField",new PracticeInput(new LocalSettings()));
+                practice.AttachNetworkMatch(source,1,new Dictionary<int,ArenaMotor>{{1,local.GetComponent<ArenaMotor>()}});
+                practice.Show(MenuScreen.Results);
+                Set(controller,"menu",bridge); Set(controller,"<Session>k__BackingField",retained);
+                Set(coordinator,"menu",controller); Set(coordinator,"presentation",practice); Set(coordinator,"session",retained);
+                Set(coordinator,"loading",true); Set(coordinator,"loaded",true); Set(coordinator,"attached",true);
+                bridge.ActiveSession=true;
+                int retired=0; practice.SessionStopped+=()=>retired++;
+
+                Assert.That(coordinator.Rematch(),Is.False,"Without a running host runner nothing returns the session to its lobby.");
+                Assert.That(practice.Flow.Screen,Is.EqualTo(MenuScreen.Results)); Assert.That(practice.Match,Is.SameAs(source)); Assert.That(retired,Is.Zero);
+
+                Call(coordinator,"FollowRematch");
+                Assert.That(practice.Flow.Screen,Is.EqualTo(MenuScreen.Online),"Peers land in the lobby, not on the title or a failure.");
+                Assert.That(practice.Match,Is.Null); Assert.That(practice.ExternalSimulation,Is.False);
+                Assert.That(practice.Motors.Count,Is.Zero); Assert.That(practice.View,Is.Null); Assert.That(practice.CombatEvents,Is.Empty);
+                Assert.That(retired,Is.EqualTo(1),"The finished round's presentation history is retired.");
+                Assert.That(controller.Session,Is.SameAs(retained),"Following a rematch keeps the session, room and seat.");
+                Assert.That(bridge.ActiveSession,Is.True); Assert.That(bridge.Status,Does.Not.Contain("could not continue"));
+                Assert.That(typeof(FusionGameCoordinator).GetField("loading",Private).GetValue(coordinator),Is.False,"The next Start loads a new match.");
+                yield return null;
+                Assert.That(controller.Session,Is.SameAs(retained));
+            }
+            finally
+            {
+                var controller=owner.GetComponent<FusionMenuController>();
+                if(controller!=null) Set(controller,"<Session>k__BackingField",null);
+                Object.DestroyImmediate(owner); Object.DestroyImmediate(local); Object.DestroyImmediate(camera); Object.DestroyImmediate(catalog);
+            }
+        }
     }
 }

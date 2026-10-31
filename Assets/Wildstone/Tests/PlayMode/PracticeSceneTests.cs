@@ -26,8 +26,9 @@ namespace Wildstone.Tests
                 Assert.That(session.Flow.Screen,Is.EqualTo(MenuScreen.Title));
                 Assert.That(SceneManager.GetActiveScene().path,Is.EqualTo(PracticeSession.MapScenePath("atrium")));
                 Assert.That(RenderSettings.ambientMode,Is.EqualTo(AmbientMode.Trilight)); Assert.That(RenderSettings.fog,Is.True);
-                Assert.That(RenderSettings.ambientSkyColor.r,Is.EqualTo(.66f).Within(.001f));
-                Assert.That(RenderSettings.fogEndDistance,Is.EqualTo(180));
+                Assert.That(RenderSettings.ambientSkyColor.r,Is.EqualTo(.62f).Within(.001f));
+                Assert.That(RenderSettings.skybox!=null && RenderSettings.skybox.shader.name=="Wildstone/Day Sky",Is.True,"D028 day sky");
+                Assert.That(RenderSettings.fogEndDistance,Is.EqualTo(230));
                 typeof(PracticeSession).GetMethod("RestoreBootstrapScene",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(session,null);
                 Assert.That(SceneManager.GetActiveScene(),Is.EqualTo(owner.scene));
             }

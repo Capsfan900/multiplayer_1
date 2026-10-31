@@ -157,10 +157,10 @@ namespace Wildstone.Networking
                     Lobby = spawned.GetComponent<FusionLobby>();
                     if (Lobby == null) throw new InvalidOperationException("Registered lobby component is missing.");
                     foreach (var player in owned.ActivePlayers)
-                        if (!Lobby.Admit(player))
+                        if (!Lobby.Admit(player) && Lobby.Rejection != FusionLobby.IdentityPending)
                         {
                             if (player == owned.LocalPlayer) throw new InvalidOperationException("Host guest admission failed.");
-                            owned.Disconnect(player);
+                            LogRemoval(Lobby.Rejection, Lobby.Phase); owned.Disconnect(player);
                         }
                 }
                 return true;
@@ -419,6 +419,9 @@ namespace Wildstone.Networking
             if (!Current(r) || SimulationFrozen || !TryReadCredential(token, content, out _)) { request.Refuse(); return; }
             request.Accept();
         }
+        // Host-side reason for removing a peer, written to the player log. Fixed codes only: no player, user or session IDs.
+        internal static void LogRemoval(string reason, SessionPhase phase) =>
+            Debug.LogWarning("WILDSTONE HOST REMOVED PEER reason=" + (reason ?? "unknown") + " phase=" + phase);
         public void OnShutdown(NetworkRunner r, ShutdownReason reason)
         {
             if(!Current(r)) return;
@@ -478,7 +481,7 @@ namespace Wildstone.Networking
         {
             // Startup callbacks can precede EnterLobby/spawn; StartCore admits all current players afterward.
             if (!Current(r) || !r.IsServer || Lobby == null) return;
-            if (SimulationFrozen || !Lobby.Admit(player)) r.Disconnect(player);
+            if (SimulationFrozen || !Lobby.Admit(player) && Lobby.Rejection != FusionLobby.IdentityPending) { LogRemoval(SimulationFrozen ? "simulation-frozen" : Lobby.Rejection, Lobby.Phase); r.Disconnect(player); }
             Changed?.Invoke();
         }
         public void OnPlayerLeft(NetworkRunner r, PlayerRef player)

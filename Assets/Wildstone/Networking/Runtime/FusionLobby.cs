@@ -27,6 +27,13 @@ namespace Wildstone.Networking
         double nextHoldExpiry = double.PositiveInfinity;
         readonly Dictionary<string,double> loadDeadlines = new Dictionary<string,double>(StringComparer.Ordinal);
         readonly List<PlayerRef> expiredLoads = new List<PlayerRef>(SeatTable.Capacity);
+        // The SDK can raise PlayerJoined before it knows the peer's user ID; that peer is retried briefly instead of removed.
+        public const string IdentityPending = "identity-pending";
+        internal const double IdentityWaitSeconds = 5;
+        readonly Dictionary<PlayerRef,double> identityWait = new Dictionary<PlayerRef,double>();
+        readonly List<PlayerRef> identityRetry = new List<PlayerRef>(SeatTable.Capacity);
+        internal static bool AwaitIdentity(string subject, bool local, double now, double deadline) =>
+            string.IsNullOrEmpty(subject) && !local && now < deadline;
         public override void Spawned()
         {
             DontDestroyOnLoad(gameObject);
@@ -39,16 +46,24 @@ namespace Wildstone.Networking
             }
             owner.AttachLobby(this);
         }
+        // Reason-only code for the last refused Admit (see FusionLobbyAdmission.Rejection).
+        public string Rejection { get; private set; }
         public bool Admit(PlayerRef player)
         {
-            if (!HasStateAuthority || Admission == null) return false;
+            Rejection = null;
+            if (!HasStateAuthority || Admission == null) { Rejection = "lobby-not-ready"; return false; }
             double now = owner.Now;
             string subject = Runner.GetPlayerUserId(player);
-            if (!string.IsNullOrEmpty(subject) && loadDeadlines.TryGetValue(subject, out double originalDeadline) && now >= originalDeadline) return false;
+            if (!identityWait.TryGetValue(player, out double identityDeadline)) identityDeadline = now + IdentityWaitSeconds;
+            if (AwaitIdentity(subject, player == Runner.LocalPlayer, now, identityDeadline))
+            { identityWait[player] = identityDeadline; Rejection = IdentityPending; return false; }
+            identityWait.Remove(player);
+            if (!string.IsNullOrEmpty(subject) && loadDeadlines.TryGetValue(subject, out double originalDeadline) && now >= originalDeadline)
+            { Rejection = "load-timeout"; return false; }
             bool alreadyBound = Admission.TryGetBinding(player, out _);
             var token = player == Runner.LocalPlayer ? owner.ConnectionToken : Runner.GetPlayerConnectionToken(player);
-            if (!FusionSession.TryReadCredential(token, owner.Content, out var credential) ||
-                !Admission.Admit(player, subject, credential, now)) return false;
+            if (!FusionSession.TryReadCredential(token, owner.Content, out var credential)) { Rejection = "credential-unreadable"; return false; }
+            if (!Admission.Admit(player, subject, credential, now)) { Rejection = Admission.Rejection; return false; }
             if (alreadyBound) return true;
             if ((HostRules.Phase == SessionPhase.Running || HostRules.Phase == SessionPhase.Warmup) && !loadDeadlines.ContainsKey(subject))
                 loadDeadlines[subject] = now + SessionState.OperationTimeoutSeconds;
@@ -116,6 +131,13 @@ namespace Wildstone.Networking
         public void RequestReady(bool ready) => RPC_Ready(ready);
         public void RequestStart() => RPC_Start();
         public void RequestLoaded() => RPC_Loaded();
+        // Host-only rematch. Deliberately not an RPC: no client message can return the session to its lobby.
+        public bool ReturnToLobby()
+        {
+            if (!HasStateAuthority || !Runner.IsServer || Admission == null || owner.SimulationFrozen || !HostRules.ReturnToLobby(owner.Now)) return false;
+            loadDeadlines.Clear(); Publish();
+            return true;
+        }
         [Rpc(RpcSources.All, RpcTargets.StateAuthority, HostMode = RpcHostMode.SourceIsHostPlayer)]
         void RPC_Team(int team, RpcInfo info = default)
         {
@@ -139,7 +161,7 @@ namespace Wildstone.Networking
         {
             if (!Binding(info.Source, out var seat)) return;
             if (loadDeadlines.TryGetValue(seat.VerifiedSubject, out double deadline) && owner.Now >= deadline)
-            { Disconnect(info.Source); Runner.Disconnect(info.Source); return; }
+            { FusionSession.LogRemoval("load-timeout", HostRules.Phase); Disconnect(info.Source); Runner.Disconnect(info.Source); return; }
             if (HostRules.SetLoaded(seat.VerifiedSubject, seat.ConnectionGeneration)) loadDeadlines.Remove(seat.VerifiedSubject);
             Publish();
         }
@@ -165,7 +187,17 @@ namespace Wildstone.Networking
                     var peer = Admission.PlayerFor(pending.Key);
                     if (peer != PlayerRef.None) expiredLoads.Add(peer);
                 }
-            foreach (var player in expiredLoads) { Disconnect(player); Runner.Disconnect(player); }
+            foreach (var player in expiredLoads) { FusionSession.LogRemoval("load-timeout", HostRules.Phase); Disconnect(player); Runner.Disconnect(player); }
+            identityRetry.Clear(); identityRetry.AddRange(identityWait.Keys);
+            foreach (var player in identityRetry)
+            {
+                if (!Runner.IsPlayerValid(player)) { identityWait.Remove(player); continue; }
+                if (owner.SimulationFrozen || !Admit(player) && Rejection != IdentityPending)
+                {
+                    identityWait.Remove(player);
+                    FusionSession.LogRemoval(owner.SimulationFrozen ? "simulation-frozen" : Rejection, HostRules.Phase); Runner.Disconnect(player);
+                }
+            }
             if (HostRules.Phase == SessionPhase.Loading) HostRules.FinishLoading(now);
             if (Phase != HostRules.Phase || now >= nextHoldExpiry) Publish();
         }
