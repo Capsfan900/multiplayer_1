@@ -1,0 +1,563 @@
+{
+  "generator": "Tools/Assets/build_assets.py weapon-energy",
+  "blender": "4.2.0",
+  "axis": "Unity (X,Y,Z) -> Blender (X,-Z,Y); FBX -Z forward, Y up; FBX_SCALE_ALL; metres",
+  "provenance": "Original procedural energy cells, coils, field segments, blade and machined details; existing audited kit helpers; no downloaded/generated meshes or textures",
+  "exports": [
+    {
+      "asset": "LineDriver.fbx",
+      "bounds_min": [
+        -0.125,
+        -0.24500004947185516,
+        -0.5899999737739563
+      ],
+      "bounds_max": [
+        0.125,
+        0.36000001430511475,
+        0.6650000214576721
+      ],
+      "triangles": 7134,
+      "mesh_count": 57,
+      "actions": [],
+      "sight_line": {
+        "sight": [
+          0.0,
+          0.306,
+          -0.2
+        ],
+        "OpticGlass": [
+          0.0,
+          0.306,
+          -0.086
+        ]
+      },
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.13000009953975677,
+          0.6499999761581421
+        ],
+        "LeftHand": [
+          -0.07500000298023224,
+          -0.04500000551342964,
+          -0.019999992102384567
+        ],
+        "Sight": [
+          0.0,
+          0.3059999644756317,
+          -0.20000004768371582
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "OpticGlass",
+        "SignalCyan",
+        "SoftGrey"
+      ],
+      "signal_surface_m2": 0.169136,
+      "source_sha256": "de42b3803749768537babed5b3b0f2ae1b366696bcfe6ad248c875c363cd5da6",
+      "fbx_sha256": "73a58e46c8731d673e44cae75f1bb90775f956dbe7e56ea72d0d20a886ac980b",
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics"
+    },
+    {
+      "asset": "LaserPistol.fbx",
+      "bounds_min": [
+        -0.06149999797344208,
+        -0.2600000500679016,
+        -0.273000031709671
+      ],
+      "bounds_max": [
+        0.06149999797344208,
+        0.2250000238418579,
+        0.37700000405311584
+      ],
+      "triangles": 4664,
+      "mesh_count": 43,
+      "actions": [],
+      "sight_line": {
+        "sight": [
+          0.0,
+          0.225,
+          -0.278
+        ],
+        "FrontSight": [
+          0.0,
+          0.225,
+          0.208
+        ]
+      },
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.11200007051229477,
+          0.38999995589256287
+        ],
+        "LeftHand": [
+          -0.07500000298023224,
+          -0.04500000551342964,
+          -0.019999992102384567
+        ],
+        "Sight": [
+          0.0,
+          0.22499994933605194,
+          -0.27800002694129944
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalCyan",
+        "SoftGrey"
+      ],
+      "signal_surface_m2": 0.099344,
+      "source_sha256": "9639a116bfd6f3d04d16b5ade8f562e672f59ef1120e981a73f11cfea7cb9562",
+      "fbx_sha256": "aba2bac0eaf3fa9f979d24cef890b47bdb536401c7a316c359c72efc976608ee",
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics"
+    },
+    {
+      "asset": "LaserSniper.fbx",
+      "bounds_min": [
+        -0.06850000470876694,
+        -0.24500004947185516,
+        -0.7450000047683716
+      ],
+      "bounds_max": [
+        0.06850000470876694,
+        0.382999986410141,
+        1.1080000400543213
+      ],
+      "triangles": 7536,
+      "mesh_count": 71,
+      "actions": [],
+      "sight_line": {
+        "sight": [
+          0.0,
+          0.31,
+          -0.345
+        ],
+        "ScopeEyepiece": [
+          0.0,
+          0.31,
+          -0.255
+        ],
+        "ScopeLens": [
+          0.0,
+          0.31,
+          0.314
+        ]
+      },
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.11000017821788788,
+          1.1200000047683716
+        ],
+        "LeftHand": [
+          -0.07500000298023224,
+          -0.04500000551342964,
+          -0.019999992102384567
+        ],
+        "Sight": [
+          0.0,
+          0.309999942779541,
+          -0.3450000584125519
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalCyan",
+        "SoftGrey"
+      ],
+      "signal_surface_m2": 0.140233,
+      "source_sha256": "4833251830bb76583af4ab5b9a7aaa7fe272d0e21fe60b973aad0e4016b5bb0e",
+      "fbx_sha256": "2a7cb72d74ca13d38fe2d6a4bbf1860c659473e17dd14f68b326e9563b905ea4",
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics"
+    },
+    {
+      "asset": "LaserSMG.fbx",
+      "bounds_min": [
+        -0.060999996960163116,
+        -0.24500004947185516,
+        -0.4620000422000885
+      ],
+      "bounds_max": [
+        0.060999996960163116,
+        0.2919999957084656,
+        0.2800000011920929
+      ],
+      "triangles": 5730,
+      "mesh_count": 52,
+      "actions": [],
+      "sight_line": {
+        "sight": [
+          0.0,
+          0.258,
+          -0.17
+        ],
+        "OpticGlass": [
+          0.0,
+          0.258,
+          -0.086
+        ]
+      },
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.11200004816055298,
+          0.28999996185302734
+        ],
+        "LeftHand": [
+          -0.07500000298023224,
+          -0.04500000551342964,
+          -0.019999992102384567
+        ],
+        "Sight": [
+          0.0,
+          0.2579999566078186,
+          -0.17000004649162292
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "OpticGlass",
+        "SignalCoral",
+        "SoftGrey"
+      ],
+      "signal_surface_m2": 0.102404,
+      "source_sha256": "5af4e69970b6fbe3f64917a438f92d0d06a12395d583e54fbac95cec8e701876",
+      "fbx_sha256": "ef23712f45aa37c8f9b3b7ce44bc0495260aa2ca18076ea5711c36e7626390db",
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics"
+    },
+    {
+      "asset": "Grenade.fbx",
+      "bounds_min": [
+        -0.0949999988079071,
+        -0.09499998390674591,
+        -0.012999996542930603
+      ],
+      "bounds_max": [
+        0.0949999988079071,
+        0.0950000137090683,
+        0.20900000631809235
+      ],
+      "triangles": 2628,
+      "mesh_count": 8,
+      "actions": [],
+      "sockets": {
+        "Grip": [
+          0.0,
+          0.0,
+          -0.0
+        ],
+        "Muzzle": [
+          0.0,
+          3.405042292570215e-08,
+          0.20900000631809235
+        ],
+        "LeftHand": [
+          -0.07500000298023224,
+          -0.04500000551342964,
+          -0.019999992102384567
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalAmber",
+        "SoftGrey"
+      ],
+      "signal_surface_m2": 0.039151,
+      "source_sha256": "149a5039a5b7cfad948661a987b49b6fef33fc6f6cad07c87f9e051aad761e81",
+      "fbx_sha256": "39cf6e83023d67029e340242ba07e3d9c93775dfc9517cb77dd0ce92fa0ae4fe",
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics"
+    },
+    {
+      "asset": "LaserShotgun.fbx",
+      "bounds_min": [
+        -0.15399999916553497,
+        -0.24500004947185516,
+        -0.699999988079071
+      ],
+      "bounds_max": [
+        0.15399999916553497,
+        0.23300011456012726,
+        0.7889999747276306
+      ],
+      "triangles": 6364,
+      "mesh_count": 34,
+      "actions": [],
+      "moving_part": "PumpForeend",
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.12000012397766113,
+          0.800000011920929
+        ],
+        "LeftHand": [
+          -0.10000000149011612,
+          -0.04999994859099388,
+          0.3199999928474426
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalAmber",
+        "SignalCoral",
+        "SoftGrey"
+      ],
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics",
+      "signal_surface_m2": 0.190542,
+      "source_sha256": "7f64c6e74f5d9740cf077f9de33f8176132182ce751541a13e9aaebd32169e6e",
+      "fbx_sha256": "0738803c4c29d5b1759f7250c3718627b69ed9af969700cee271d28b80f7499c"
+    },
+    {
+      "asset": "PulseLobber.fbx",
+      "bounds_min": [
+        -0.22165220975875854,
+        -0.24500004947185516,
+        -0.3500000238418579
+      ],
+      "bounds_max": [
+        0.22165220975875854,
+        0.3728897273540497,
+        0.5525000095367432
+      ],
+      "triangles": 5276,
+      "mesh_count": 30,
+      "actions": [],
+      "moving_part": "OrbChamber",
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.16000008583068848,
+          0.550000011920929
+        ],
+        "LeftHand": [
+          -0.07500000298023224,
+          -0.06499996781349182,
+          0.20000001788139343
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalAmber",
+        "SoftGrey"
+      ],
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics",
+      "signal_surface_m2": 0.627598,
+      "source_sha256": "29348c6031bcf175523072b252bcad26c8eb9ac03bde1a17562dde100158d622",
+      "fbx_sha256": "6e177460fa1396514c7cd73e064cbc25a38c8e00c24459a29e49edb7de91510a"
+    },
+    {
+      "asset": "ReboundDisc.fbx",
+      "bounds_min": [
+        -0.27399998903274536,
+        -0.24500004947185516,
+        -0.39000001549720764
+      ],
+      "bounds_max": [
+        0.27399998903274536,
+        0.19650006294250488,
+        0.5899999737739563
+      ],
+      "triangles": 4416,
+      "mesh_count": 28,
+      "actions": [],
+      "moving_part": "DiscSignal",
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.16000008583068848,
+          0.5799999833106995
+        ],
+        "LeftHand": [
+          -0.054999999701976776,
+          0.01500001922249794,
+          0.11999999731779099
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalCoral",
+        "SoftGrey"
+      ],
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics",
+      "signal_surface_m2": 0.323231,
+      "source_sha256": "364acec05082226073153368bf9e0016a6d881bc3abf717f0096b657f2eb3e97",
+      "fbx_sha256": "161840e2c47901e40b4a92f9778c00261e79c3472afa29cdabd3123e8c7fda78"
+    },
+    {
+      "asset": "PushLens.fbx",
+      "bounds_min": [
+        -0.28301525115966797,
+        -0.24500004947185516,
+        -0.3400000333786011
+      ],
+      "bounds_max": [
+        0.28301525115966797,
+        0.41300004720687866,
+        0.4659999907016754
+      ],
+      "triangles": 5312,
+      "mesh_count": 32,
+      "actions": [],
+      "moving_part": "InnerField",
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.16000007092952728,
+          0.4699999690055847
+        ],
+        "LeftHand": [
+          -0.05999999865889549,
+          0.040000010281801224,
+          0.06999999284744263
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalViolet",
+        "SoftGrey"
+      ],
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics",
+      "signal_surface_m2": 0.464799,
+      "source_sha256": "93388376be2167b0b876972491c2847e1250875e7a9053572c5dcc6bee07edad",
+      "fbx_sha256": "201fada10409d61b44657a91d27f510da15fdb9422efb2d09f5a928a0b1f7fd1"
+    },
+    {
+      "asset": "StunGun.fbx",
+      "bounds_min": [
+        -0.1080000028014183,
+        -0.24500004947185516,
+        -0.30000004172325134
+      ],
+      "bounds_max": [
+        0.1080000028014183,
+        0.1849999874830246,
+        0.3919999897480011
+      ],
+      "triangles": 4312,
+      "mesh_count": 36,
+      "actions": [],
+      "moving_part": "WarningBar",
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.10000006854534149,
+          0.3999999761581421
+        ],
+        "LeftHand": [
+          -0.05999999865889549,
+          0.03500000387430191,
+          0.014999994076788425
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalCyan",
+        "SoftGrey"
+      ],
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics",
+      "signal_surface_m2": 0.15276,
+      "source_sha256": "82125a9afd7c5c38623458e8e6be64f05c3656003a92affd1401fdbe5811261f",
+      "fbx_sha256": "0c1eb3d3611f4a917f929cf2db20d7e677fc72cc1055a7614bbd28ef83fb1018"
+    },
+    {
+      "asset": "LaserSword.fbx",
+      "bounds_min": [
+        -0.16455811262130737,
+        -0.24500004947185516,
+        -0.2800000011920929
+      ],
+      "bounds_max": [
+        0.1648988574743271,
+        0.08100002259016037,
+        1.225000023841858
+      ],
+      "triangles": 5108,
+      "mesh_count": 28,
+      "actions": [],
+      "moving_part": "BladeCore",
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          1.4988702901064244e-07,
+          0.9200000166893005
+        ],
+        "LeftHand": [
+          0.0,
+          -0.21000002324581146,
+          -0.19999997317790985
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalCyan",
+        "SoftGrey"
+      ],
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics",
+      "signal_surface_m2": 0.231369,
+      "source_sha256": "08b0e842fd3a1cce05c2a93288c55b9b17f81fa29575bccd2ad2dec0386e66d2",
+      "fbx_sha256": "0e61e32da26d42f4cb6f28d063545eb6422fdd1420d54f4bc9c843196d1befff"
+    }
+  ]
+}

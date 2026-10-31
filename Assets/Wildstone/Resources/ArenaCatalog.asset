@@ -15,7 +15,7 @@ MonoBehaviour:
   Maps:
   - Id: atrium
     DisplayName: Atrium
-    Revision: 2
+    Revision: 6
     Minimum: {x: -32, y: -2, z: -32}
     Maximum: {x: 32, y: 24, z: 32}
     KillHeight: -12
@@ -26,23 +26,23 @@ MonoBehaviour:
       Euler: {x: 0, y: 0, z: 0}
       Tone: 1
     - Name: South boundary
-      Position: {x: 0, y: 3, z: -31.5}
-      Size: {x: 64, y: 6, z: 1}
+      Position: {x: 0, y: 4, z: -31.5}
+      Size: {x: 64, y: 8, z: 1}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: North boundary
-      Position: {x: 0, y: 3, z: 31.5}
-      Size: {x: 64, y: 6, z: 1}
+      Position: {x: 0, y: 4, z: 31.5}
+      Size: {x: 64, y: 8, z: 1}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: West boundary
-      Position: {x: -31.5, y: 3, z: 0}
-      Size: {x: 1, y: 6, z: 64}
+      Position: {x: -31.5, y: 4, z: 0}
+      Size: {x: 1, y: 8, z: 64}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: East boundary
-      Position: {x: 31.5, y: 3, z: 0}
-      Size: {x: 1, y: 6, z: 64}
+      Position: {x: 31.5, y: 4, z: 0}
+      Size: {x: 1, y: 8, z: 64}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: North gallery
@@ -148,28 +148,28 @@ MonoBehaviour:
     Spawns:
     - Team: 0
       Position: {x: -26, y: 0.02, z: -27}
-      Yaw: 43.919075
+      Yaw: -41.185925
     - Team: 0
       Position: {x: -26, y: 0.02, z: -25}
-      Yaw: 43.919075
+      Yaw: -60.25512
     - Team: 1
       Position: {x: -26, y: 0.02, z: 27}
-      Yaw: 136.08092
+      Yaw: -138.81407
     - Team: 1
       Position: {x: -26, y: 0.02, z: 25}
-      Yaw: 136.08092
+      Yaw: -119.74488
     - Team: 2
       Position: {x: 26, y: 0.02, z: -27}
-      Yaw: -43.919075
+      Yaw: 41.185925
     - Team: 2
       Position: {x: 26, y: 0.02, z: -25}
-      Yaw: -43.919075
+      Yaw: 60.25512
     - Team: 3
       Position: {x: 26, y: 0.02, z: 27}
-      Yaw: -136.08092
+      Yaw: 138.81407
     - Team: 3
       Position: {x: 26, y: 0.02, z: 25}
-      Yaw: -136.08092
+      Yaw: 119.74488
     Pickups:
     - Item: pulse-lobber
       Position: {x: 0, y: 0.45, z: -2}
@@ -181,6 +181,14 @@ MonoBehaviour:
       Position: {x: 0, y: 4.45, z: 18}
     - Item: stun-gun
       Position: {x: 0, y: 0.45, z: 8}
+    - Item: laser-pistol
+      Position: {x: -6, y: 0.45, z: -8}
+    - Item: laser-shotgun
+      Position: {x: 6, y: 0.45, z: -8}
+    - Item: laser-sniper
+      Position: {x: 0, y: 4.45, z: 24}
+    - Item: laser-smg
+      Position: {x: 0, y: 0.45, z: 3}
     - Item: blink
       Position: {x: -14, y: 0.45, z: -18}
     - Item: shield
@@ -189,12 +197,14 @@ MonoBehaviour:
       Position: {x: -14, y: 0.45, z: 18}
     - Item: grenade
       Position: {x: 14, y: 0.45, z: 18}
-    - Item: laser-pistol
-      Position: {x: -6, y: 0.45, z: -8}
-    - Item: laser-shotgun
-      Position: {x: 6, y: 0.45, z: -8}
-    - Item: laser-sniper
-      Position: {x: 0, y: 4.45, z: 24}
+    - Item: health
+      Position: {x: -28.5, y: 0.45, z: 2}
+    - Item: health
+      Position: {x: 28.5, y: 0.45, z: 2}
+    - Item: health
+      Position: {x: 0, y: 0.45, z: -24}
+    - Item: health
+      Position: {x: 0, y: 0.45, z: 14}
     ZoneRoute:
     - {x: 0, y: 0, z: -8}
     - {x: 20, y: 0, z: -8}
@@ -207,7 +217,7 @@ MonoBehaviour:
     - {x: -20, y: 0, z: -8}
   - Id: split-gallery
     DisplayName: Split Gallery
-    Revision: 2
+    Revision: 6
     Minimum: {x: -42, y: -2, z: -24}
     Maximum: {x: 42, y: 24, z: 24}
     KillHeight: -12
@@ -218,23 +228,23 @@ MonoBehaviour:
       Euler: {x: 0, y: 0, z: 0}
       Tone: 1
     - Name: South boundary
-      Position: {x: 0, y: 3, z: -23.5}
-      Size: {x: 84, y: 6, z: 1}
+      Position: {x: 0, y: 4, z: -23.5}
+      Size: {x: 84, y: 8, z: 1}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: North boundary
-      Position: {x: 0, y: 3, z: 23.5}
-      Size: {x: 84, y: 6, z: 1}
+      Position: {x: 0, y: 4, z: 23.5}
+      Size: {x: 84, y: 8, z: 1}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: West boundary
-      Position: {x: -41.5, y: 3, z: 0}
-      Size: {x: 1, y: 6, z: 48}
+      Position: {x: -41.5, y: 4, z: 0}
+      Size: {x: 1, y: 8, z: 48}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: East boundary
-      Position: {x: 41.5, y: 3, z: 0}
-      Size: {x: 1, y: 6, z: 48}
+      Position: {x: 41.5, y: 4, z: 0}
+      Size: {x: 1, y: 8, z: 48}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: Elevated crossover
@@ -335,28 +345,28 @@ MonoBehaviour:
     Spawns:
     - Team: 0
       Position: {x: -37, y: 0.02, z: -19}
-      Yaw: 62.81889
+      Yaw: -36.869896
     - Team: 0
       Position: {x: -37, y: 0.02, z: -17}
-      Yaw: 62.81889
+      Yaw: -56.309933
     - Team: 1
       Position: {x: -37, y: 0.02, z: 19}
-      Yaw: 117.181114
+      Yaw: -143.1301
     - Team: 1
       Position: {x: -37, y: 0.02, z: 17}
-      Yaw: 117.181114
+      Yaw: -123.69007
     - Team: 2
       Position: {x: 37, y: 0.02, z: -19}
-      Yaw: -62.81889
+      Yaw: 36.869896
     - Team: 2
       Position: {x: 37, y: 0.02, z: -17}
-      Yaw: -62.81889
+      Yaw: 56.309933
     - Team: 3
       Position: {x: 37, y: 0.02, z: 19}
-      Yaw: -117.181114
+      Yaw: 143.1301
     - Team: 3
       Position: {x: 37, y: 0.02, z: 17}
-      Yaw: -117.181114
+      Yaw: 123.69007
     Pickups:
     - Item: pulse-lobber
       Position: {x: 0, y: 4.45, z: 0}
@@ -368,6 +378,14 @@ MonoBehaviour:
       Position: {x: -12, y: 0.45, z: -5}
     - Item: stun-gun
       Position: {x: 12, y: 0.45, z: 5}
+    - Item: laser-pistol
+      Position: {x: -28, y: 0.45, z: -6}
+    - Item: laser-shotgun
+      Position: {x: 28, y: 0.45, z: 6}
+    - Item: laser-sniper
+      Position: {x: 0, y: 4.45, z: 10}
+    - Item: laser-smg
+      Position: {x: 0, y: 4.45, z: -10}
     - Item: blink
       Position: {x: -26, y: 0.45, z: -7}
     - Item: shield
@@ -376,12 +394,14 @@ MonoBehaviour:
       Position: {x: -26, y: 0.45, z: 7}
     - Item: grenade
       Position: {x: 26, y: 0.45, z: 7}
-    - Item: laser-pistol
-      Position: {x: -28, y: 0.45, z: -6}
-    - Item: laser-shotgun
-      Position: {x: 28, y: 0.45, z: 6}
-    - Item: laser-sniper
-      Position: {x: 0, y: 4.45, z: 10}
+    - Item: health
+      Position: {x: -36, y: 0.45, z: 0}
+    - Item: health
+      Position: {x: 36, y: 0.45, z: 0}
+    - Item: health
+      Position: {x: 0, y: 4.45, z: -17}
+    - Item: health
+      Position: {x: 0, y: 4.45, z: 17}
     ZoneRoute:
     - {x: -28, y: 0, z: -14}
     - {x: -20, y: 0, z: -14}
@@ -401,7 +421,7 @@ MonoBehaviour:
     - {x: -28, y: 0, z: 14}
   - Id: terrace-steps
     DisplayName: Terrace Steps
-    Revision: 2
+    Revision: 6
     Minimum: {x: -33, y: -2, z: -36}
     Maximum: {x: 33, y: 24, z: 36}
     KillHeight: -12
@@ -412,23 +432,23 @@ MonoBehaviour:
       Euler: {x: 0, y: 0, z: 0}
       Tone: 1
     - Name: South boundary
-      Position: {x: 0, y: 3, z: -35.5}
-      Size: {x: 66, y: 6, z: 1}
+      Position: {x: 0, y: 4, z: -35.5}
+      Size: {x: 66, y: 8, z: 1}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: North boundary
-      Position: {x: 0, y: 3, z: 35.5}
-      Size: {x: 66, y: 6, z: 1}
+      Position: {x: 0, y: 4, z: 35.5}
+      Size: {x: 66, y: 8, z: 1}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: West boundary
-      Position: {x: -32.5, y: 3, z: 0}
-      Size: {x: 1, y: 6, z: 72}
+      Position: {x: -32.5, y: 4, z: 0}
+      Size: {x: 1, y: 8, z: 72}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: East boundary
-      Position: {x: 32.5, y: 3, z: 0}
-      Size: {x: 1, y: 6, z: 72}
+      Position: {x: 32.5, y: 4, z: 0}
+      Size: {x: 1, y: 8, z: 72}
       Euler: {x: 0, y: 0, z: 0}
       Tone: 0
     - Name: Offset upper court
@@ -529,28 +549,28 @@ MonoBehaviour:
     Spawns:
     - Team: 0
       Position: {x: -27, y: 0.02, z: -30}
-      Yaw: 41.987213
+      Yaw: -41.185925
     - Team: 0
       Position: {x: -27, y: 0.02, z: -28}
-      Yaw: 41.987213
+      Yaw: -60.25512
     - Team: 1
       Position: {x: -27, y: 0.02, z: 30}
-      Yaw: 138.01279
+      Yaw: -138.81407
     - Team: 1
       Position: {x: -27, y: 0.02, z: 28}
-      Yaw: 138.01279
+      Yaw: -119.74488
     - Team: 2
       Position: {x: 27, y: 0.02, z: -30}
-      Yaw: -41.987213
+      Yaw: 41.185925
     - Team: 2
       Position: {x: 27, y: 0.02, z: -28}
-      Yaw: -41.987213
+      Yaw: 60.25512
     - Team: 3
       Position: {x: 27, y: 0.02, z: 30}
-      Yaw: -138.01279
+      Yaw: 138.81407
     - Team: 3
       Position: {x: 27, y: 0.02, z: 28}
-      Yaw: -138.01279
+      Yaw: 119.74488
     Pickups:
     - Item: pulse-lobber
       Position: {x: 3, y: 0.45, z: -8}
@@ -562,6 +582,14 @@ MonoBehaviour:
       Position: {x: -19, y: 0.45, z: -15}
     - Item: stun-gun
       Position: {x: 0, y: 4.45, z: 26}
+    - Item: laser-pistol
+      Position: {x: -19, y: 0.45, z: -20}
+    - Item: laser-shotgun
+      Position: {x: 14, y: 4.45, z: 14}
+    - Item: laser-sniper
+      Position: {x: -8, y: 4.45, z: 26}
+    - Item: laser-smg
+      Position: {x: 19, y: 0.45, z: -20}
     - Item: blink
       Position: {x: -14, y: 0.45, z: -22}
     - Item: shield
@@ -570,12 +598,14 @@ MonoBehaviour:
       Position: {x: -14, y: 0.45, z: 22}
     - Item: grenade
       Position: {x: 14, y: 0.45, z: 22}
-    - Item: laser-pistol
-      Position: {x: -19, y: 0.45, z: -20}
-    - Item: laser-shotgun
-      Position: {x: 14, y: 4.45, z: 14}
-    - Item: laser-sniper
-      Position: {x: -8, y: 4.45, z: 26}
+    - Item: health
+      Position: {x: -29, y: 0.45, z: -8}
+    - Item: health
+      Position: {x: 29, y: 0.45, z: -8}
+    - Item: health
+      Position: {x: 0, y: 0.45, z: -32}
+    - Item: health
+      Position: {x: 0, y: 0.45, z: 22}
     ZoneRoute:
     - {x: -24, y: 0, z: -21}
     - {x: 20, y: 0, z: -21}

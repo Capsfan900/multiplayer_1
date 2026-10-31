@@ -1,0 +1,643 @@
+{
+  "generator": "Tools/Assets/build_soldier.py all",
+  "blender": "4.2.0",
+  "build_identity": {
+    "command": "\"C:\\Users\\tyler\\Main Storage\\ai_skelly_tool\\.venv\\Scripts\\python.exe\" -B Tools/Assets/build_soldier.py all --output-root .",
+    "head": "fca428e167849051e523752fac179db7551dd312",
+    "generator_sha256": "bc47f7082910bf13de6fb0fc2f590e6735a042c5001cf8b6a4c3e66934629804",
+    "limits": "Blender export/reimport and static studio previews only; Unity import, moving readability and human CVD acceptance remain with integration lane"
+  },
+  "axis": "Unity (x,y,z) -> Blender (-x,-z,y) via soldier_skeleton.to_blender; FBX -Z forward, Y up, FBX_SCALE_ALL, no leaf bones, primary Y / secondary X; NO import mirror",
+  "skeleton": "Tools/Assets/soldier_skeleton.py",
+  "skeleton_sha256": "645520012eb620d6eb0e8596245b33522ba7c425f50ee5f50e8873065f6641d9",
+  "sockets": {
+    "table": [
+      [
+        "WeaponHand_R",
+        "RightHand",
+        [
+          0.775,
+          1.434,
+          -0.01
+        ],
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      [
+        "WeaponHand_L",
+        "LeftHand",
+        [
+          -0.775,
+          1.434,
+          -0.01
+        ],
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      [
+        "HeadSocket",
+        "Head",
+        [
+          0,
+          1.65,
+          0.09
+        ],
+        [
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          0
+        ]
+      ]
+    ],
+    "hand_convention": "forward = wrist->knuckles (barrel along the metacarpals); up = thumb/index side (weapon top); the grip (weapon -Y) runs through the fist along the knuckle line; Grip_R/Grip_L in SoldierArms.fbx copy WeaponHand_R/L"
+  },
+  "forge": {
+    "path": "C:\\Users\\tyler\\Main Storage\\ai_skelly_tool",
+    "commit": "450fce5c8e5510131ddf680e5e389e68a8a7319c",
+    "branch": "stitched-motion",
+    "dirty_entries": 188,
+    "concept": {
+      "forge_entry": "stages.concept.build (SDXL + OpenPose ControlNet + IP-Adapter), stages.preprocess.run + stages.image_to_3d.run (TripoSR, MIT)",
+      "description": "sleek armored sci-fi soldier, closed helmet with dark glossy visor, clean ivory hard-surface armor plates over charcoal undersuit, graphite trim, small cyan accent panels, athletic human proportions, minimalist",
+      "positive_template": "{desc}, full body, A-pose, plain light grey background, character concept art, flat lighting",
+      "negative": "standing on ground, ground, floor, terrain, puddle, pool of blood, cast shadow, pedestal, base, platform, rubble, dirt mound, extra arms, four arms, extra limbs, wings, feathered pauldrons, spiked shoulder plates, long cape, train, cropped, close-up, portrait, bust, headshot, out of frame, cut off",
+      "view_hints": {
+        "front": [
+          "front view, facing the camera, face visible",
+          ""
+        ],
+        "left": [
+          "strict side view, profile of the character's left side, facing left, one arm visible",
+          "front view, back view, facing the camera, both arms visible, symmetrical pose, three quarter view"
+        ],
+        "back": [
+          "back view, from directly behind, back of the head, facing away",
+          "face, eyes, nose, mouth, facial features, looking at viewer, front view, chest, three quarter view"
+        ],
+        "right": [
+          "strict side view, profile of the character's right side, facing right, one arm visible",
+          "front view, back view, facing the camera, both arms visible, symmetrical pose, three quarter view"
+        ]
+      },
+      "runs": [
+        {
+          "seed": 7,
+          "steps": 30,
+          "views": {
+            "front": "ArtSource\\Characters\\Forge\\soldier_concept\\seed7\\view_front.png",
+            "back": "ArtSource\\Characters\\Forge\\soldier_concept\\seed7\\view_back.png"
+          }
+        },
+        {
+          "seed": 21,
+          "steps": 30,
+          "views": {
+            "front": "ArtSource\\Characters\\Forge\\soldier_concept\\seed21\\view_front.png",
+            "back": "ArtSource\\Characters\\Forge\\soldier_concept\\seed21\\view_back.png"
+          }
+        }
+      ],
+      "triposr": {
+        "input": "ArtSource\\Characters\\Forge\\soldier_concept\\seed7\\view_front.png",
+        "mesh": "ArtSource\\Characters\\Forge\\soldier_concept\\triposr\\soldier_ref.raw.obj",
+        "note": "proportion reference only; normalised to 2 m by the forge; never exported"
+      }
+    },
+    "rig_helpers_used": "none; skinning is deterministic per region (rigid plates, axial chain blends)"
+  },
+  "vibegame1": {
+    "path": "C:\\Users\\tyler\\Main Storage\\vibegame1",
+    "commit": "2cb6e5760bccc0733f34b367be2f18c90b802766",
+    "ported_from": "Tools/weapon_models/build_art.py: Tube, superellipse, dome_factor, stations, skin, slab, shell, digit(), digit_lames(), knuckle_plate(), palm_tube(), back-of-hand lames, knuckle guard; build_weapons.py tube()/loft()"
+  },
+  "hand_rig_notes": {
+    "bind": "fingers straight along the skeleton (right hand +X, palm -Y, thumb +Z); knuckles at bone heads",
+    "pieces": "every phalanx is a separate rigid piece (100% its bone) with domes centred on both joints",
+    "handpose_port": "vibegame1 HandPose derives hinges from a bent-fist bind (cross of adjacent segments) and treats rest = fist. Here the bind is straight, so that cross product is zero: the port must use explicit hinges and treat curl 0 = bind (open), curl 1 = fist.",
+    "hinge_world_at_bind": {
+      "RightFingers": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "RightThumb": [
+        0.7248,
+        0.0,
+        -0.6795
+      ],
+      "LeftFingers": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "LeftThumb": [
+        0.7248,
+        0.0,
+        0.6795
+      ]
+    },
+    "thumb_axes_world": {
+      "Right": {
+        "spread": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "opposition": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "Left": {
+        "spread": [
+          0.0,
+          -1.0,
+          0.0
+        ],
+        "opposition": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "hinge_rule": "h = cross(segmentDir, palmNormal -Y) at bind; Quaternion.AngleAxis(+deg, h) in world space curls toward the palm. Thumb (no extra bone; ThumbProximal's other degrees of freedom): rotate ThumbProximal by AngleAxis(+spread, spreadAxis) then AngleAxis(+opposition, oppositionAxis) (world, at bind), then curl every thumb segment about R * h",
+    "grip_preview": {
+      "grip_diameter_m": 0.035,
+      "grip_axis": "Unity Z through WeaponHand_R",
+      "fit_right_hand": {
+        "Index": {
+          "deg": [
+            85.5,
+            46.0,
+            55.0
+          ],
+          "clearance_mm": 0.81,
+          "wrap_mm": 2.5
+        },
+        "Middle": {
+          "deg": [
+            85.0,
+            59.0,
+            55.0
+          ],
+          "clearance_mm": 0.84,
+          "wrap_mm": 2.6
+        },
+        "Ring": {
+          "deg": [
+            75.5,
+            67.5,
+            41.0
+          ],
+          "clearance_mm": 0.83,
+          "wrap_mm": 2.6
+        },
+        "Little": {
+          "deg": [
+            45.5,
+            82.5,
+            6.0
+          ],
+          "clearance_mm": 0.84,
+          "wrap_mm": 2.7
+        },
+        "Thumb": {
+          "deg": [
+            1.5,
+            1.0,
+            70.0
+          ],
+          "clearance_mm": 0.82,
+          "wrap_mm": 11.6,
+          "spread_deg": 0,
+          "opposition_deg": 5
+        }
+      }
+    },
+    "tips": "no tip bones (52-bone contract); distal tip = bone tail in soldier_skeleton.py"
+  },
+  "team_readability": {
+    "accent_srgb": {
+      "1": [
+        0.16,
+        0.73,
+        0.78
+      ],
+      "2": [
+        0.98,
+        0.92,
+        0.5
+      ],
+      "3": [
+        0.4,
+        0.055,
+        0.1
+      ],
+      "4": [
+        0.43,
+        0.25,
+        0.6
+      ]
+    },
+    "mark_srgb": [
+      0.95,
+      0.95,
+      0.92
+    ],
+    "surface_decals": "Chest/back fill existing plates; both pauldrons use ivory symbols on near-black backing, 0.6/1.2 mm offset (circle hole 1.8 mm); existing TeamMark1..4 meshes only",
+    "unity_integration": "SoldierBuilder must map SoldierMark to neutral ivory, not accent-tinted emissive; Unity validation belongs to integration lane"
+  },
+  "readability_baseline": {
+    "source": "Existing pre-change Soldier_Readability30m.png; native 80x80 tiles recovered from 3x nearest-neighbour contact sheet",
+    "sheet_sha256": "d7109ac715e01d92ed169928cd483c4641d8199bc543bdf2af9d6173a3ddfd4e",
+    "pairs": {
+      "palette_grey_front": {
+        "1-2": 12,
+        "1-3": 25,
+        "1-4": 14,
+        "2-3": 57,
+        "2-4": 4,
+        "3-4": 18
+      },
+      "palette_grey_side": {
+        "1-2": 0,
+        "1-3": 4,
+        "1-4": 0,
+        "2-3": 61,
+        "2-4": 0,
+        "3-4": 0
+      },
+      "palette_grey_back": {
+        "1-2": 12,
+        "1-3": 16,
+        "1-4": 10,
+        "2-3": 63,
+        "2-4": 1,
+        "3-4": 10
+      },
+      "symbol_only_grey_front": {
+        "1-2": 14,
+        "1-3": 10,
+        "1-4": 14,
+        "2-3": 12,
+        "2-4": 4,
+        "3-4": 13
+      },
+      "symbol_only_grey_side": {
+        "1-2": 0,
+        "1-3": 0,
+        "1-4": 0,
+        "2-3": 0,
+        "2-4": 0,
+        "3-4": 0
+      },
+      "symbol_only_grey_back": {
+        "1-2": 11,
+        "1-3": 8,
+        "1-4": 10,
+        "2-3": 6,
+        "2-4": 1,
+        "3-4": 4
+      }
+    },
+    "summary": {
+      "palette_grey_front": 4,
+      "palette_grey_side": 0,
+      "palette_grey_back": 1,
+      "symbol_only_grey_front": 4,
+      "symbol_only_grey_side": 0,
+      "symbol_only_grey_back": 1
+    }
+  },
+  "results": {
+    "body": {
+      "fbx": "Soldier.fbx",
+      "bones": 52,
+      "meshes": {
+        "Soldier_LOD0": 21084,
+        "Soldier_LOD1": 8888,
+        "Soldier_LOD2": 3464,
+        "TeamMark1": 602,
+        "TeamMark2": 596,
+        "TeamMark3": 564,
+        "TeamMark4": 900
+      },
+      "bounds_min": [
+        -0.9118,
+        0.0011,
+        -0.204
+      ],
+      "bounds_max": [
+        0.9118,
+        1.7909,
+        0.219
+      ]
+    },
+    "arms": {
+      "fbx": "SoldierArms.fbx",
+      "bones": 37,
+      "meshes": {
+        "SoldierArms": 10904
+      },
+      "bounds_min": [
+        -0.9118,
+        1.4074,
+        -0.0805
+      ],
+      "bounds_max": [
+        0.9118,
+        1.5388,
+        0.0968
+      ]
+    },
+    "readability_30m": {
+      "metric": "80x80 native tiles, 62px figure; count absolute difference >24/255 display grey levels",
+      "pairs": {
+        "palette_grey_front": {
+          "1-2": 78,
+          "1-3": 97,
+          "1-4": 68,
+          "2-3": 139,
+          "2-4": 116,
+          "3-4": 55
+        },
+        "palette_grey_side": {
+          "1-2": 60,
+          "1-3": 71,
+          "1-4": 54,
+          "2-3": 100,
+          "2-4": 86,
+          "3-4": 38
+        },
+        "palette_grey_back": {
+          "1-2": 92,
+          "1-3": 106,
+          "1-4": 75,
+          "2-3": 145,
+          "2-4": 131,
+          "3-4": 48
+        },
+        "symbol_only_grey_front": {
+          "1-2": 25,
+          "1-3": 17,
+          "1-4": 22,
+          "2-3": 34,
+          "2-4": 11,
+          "3-4": 23
+        },
+        "symbol_only_grey_side": {
+          "1-2": 9,
+          "1-3": 8,
+          "1-4": 10,
+          "2-3": 15,
+          "2-4": 5,
+          "3-4": 13
+        },
+        "symbol_only_grey_back": {
+          "1-2": 32,
+          "1-3": 18,
+          "1-4": 26,
+          "2-3": 30,
+          "2-4": 19,
+          "3-4": 24
+        },
+        "protanopia_grey_front": {
+          "1-2": 27,
+          "1-3": 113,
+          "1-4": 93,
+          "2-3": 139,
+          "2-4": 116,
+          "3-4": 58
+        },
+        "protanopia_rgb_front": {
+          "1-2": 91,
+          "1-3": 123,
+          "1-4": 108,
+          "2-3": 145,
+          "2-4": 129,
+          "3-4": 112
+        },
+        "protanopia_grey_side": {
+          "1-2": 10,
+          "1-3": 84,
+          "1-4": 67,
+          "2-3": 100,
+          "2-4": 86,
+          "3-4": 42
+        },
+        "protanopia_rgb_side": {
+          "1-2": 67,
+          "1-3": 91,
+          "1-4": 73,
+          "2-3": 108,
+          "2-4": 102,
+          "3-4": 81
+        },
+        "protanopia_grey_back": {
+          "1-2": 34,
+          "1-3": 122,
+          "1-4": 100,
+          "2-3": 146,
+          "2-4": 129,
+          "3-4": 50
+        },
+        "protanopia_rgb_back": {
+          "1-2": 102,
+          "1-3": 134,
+          "1-4": 112,
+          "2-3": 156,
+          "2-4": 151,
+          "3-4": 113
+        },
+        "deuteranopia_grey_front": {
+          "1-2": 75,
+          "1-3": 104,
+          "1-4": 80,
+          "2-3": 139,
+          "2-4": 120,
+          "3-4": 44
+        },
+        "deuteranopia_rgb_front": {
+          "1-2": 119,
+          "1-3": 123,
+          "1-4": 86,
+          "2-3": 144,
+          "2-4": 130,
+          "3-4": 107
+        },
+        "deuteranopia_grey_side": {
+          "1-2": 61,
+          "1-3": 74,
+          "1-4": 62,
+          "2-3": 101,
+          "2-4": 89,
+          "3-4": 14
+        },
+        "deuteranopia_rgb_side": {
+          "1-2": 84,
+          "1-3": 91,
+          "1-4": 63,
+          "2-3": 112,
+          "2-4": 105,
+          "3-4": 76
+        },
+        "deuteranopia_grey_back": {
+          "1-2": 90,
+          "1-3": 111,
+          "1-4": 90,
+          "2-3": 146,
+          "2-4": 133,
+          "3-4": 36
+        },
+        "deuteranopia_rgb_back": {
+          "1-2": 128,
+          "1-3": 134,
+          "1-4": 95,
+          "2-3": 158,
+          "2-4": 152,
+          "3-4": 112
+        },
+        "tritanopia_grey_front": {
+          "1-2": 101,
+          "1-3": 81,
+          "1-4": 52,
+          "2-3": 139,
+          "2-4": 122,
+          "3-4": 56
+        },
+        "tritanopia_rgb_front": {
+          "1-2": 148,
+          "1-3": 123,
+          "1-4": 114,
+          "2-3": 144,
+          "2-4": 131,
+          "3-4": 71
+        },
+        "tritanopia_grey_side": {
+          "1-2": 68,
+          "1-3": 67,
+          "1-4": 40,
+          "2-3": 101,
+          "2-4": 89,
+          "3-4": 40
+        },
+        "tritanopia_rgb_side": {
+          "1-2": 119,
+          "1-3": 90,
+          "1-4": 78,
+          "2-3": 110,
+          "2-4": 109,
+          "3-4": 60
+        },
+        "tritanopia_grey_back": {
+          "1-2": 106,
+          "1-3": 98,
+          "1-4": 62,
+          "2-3": 145,
+          "2-4": 133,
+          "3-4": 48
+        },
+        "tritanopia_rgb_back": {
+          "1-2": 178,
+          "1-3": 133,
+          "1-4": 122,
+          "2-3": 155,
+          "2-4": 153,
+          "3-4": 76
+        }
+      },
+      "accent_linear_luminance": {
+        "1": 0.3977,
+        "2": 0.8104,
+        "3": 0.0321,
+        "4": 0.0923
+      },
+      "palette_grey_front": 55,
+      "palette_grey_side": 38,
+      "palette_grey_back": 48,
+      "symbol_only_grey_front": 11,
+      "symbol_only_grey_side": 5,
+      "symbol_only_grey_back": 18,
+      "cvd_model": "Machado 2009/2010 severity 1.0, linear sRGB; count >24 difference in any simulated display RGB channel, plus conservative greyscale counts; not human recognition evidence",
+      "protanopia_grey_front": 27,
+      "protanopia_rgb_front": 91,
+      "protanopia_grey_side": 10,
+      "protanopia_rgb_side": 67,
+      "protanopia_grey_back": 34,
+      "protanopia_rgb_back": 102,
+      "deuteranopia_grey_front": 44,
+      "deuteranopia_rgb_front": 86,
+      "deuteranopia_grey_side": 14,
+      "deuteranopia_rgb_side": 63,
+      "deuteranopia_grey_back": 36,
+      "deuteranopia_rgb_back": 95,
+      "tritanopia_grey_front": 52,
+      "tritanopia_rgb_front": 71,
+      "tritanopia_grey_side": 40,
+      "tritanopia_rgb_side": 60,
+      "tritanopia_grey_back": 48,
+      "tritanopia_rgb_back": 76
+    }
+  },
+  "previews": [
+    "ArtSource\\Previews\\Soldier_Bind.png",
+    "ArtSource\\Previews\\Soldier_Team1_Front.png",
+    "ArtSource\\Previews\\Soldier_Team1_Back.png",
+    "ArtSource\\Previews\\Soldier_Team1_ThreeQuarter.png",
+    "ArtSource\\Previews\\Soldier_Team2_Front.png",
+    "ArtSource\\Previews\\Soldier_Team2_Back.png",
+    "ArtSource\\Previews\\Soldier_Team2_ThreeQuarter.png",
+    "ArtSource\\Previews\\Soldier_Team3_Front.png",
+    "ArtSource\\Previews\\Soldier_Team3_Back.png",
+    "ArtSource\\Previews\\Soldier_Team3_ThreeQuarter.png",
+    "ArtSource\\Previews\\Soldier_Team4_Front.png",
+    "ArtSource\\Previews\\Soldier_Team4_Back.png",
+    "ArtSource\\Previews\\Soldier_Team4_ThreeQuarter.png",
+    "ArtSource\\Previews\\Soldier_Detail_Torso.png",
+    "ArtSource\\Previews\\Soldier_Detail_Helmet.png",
+    "ArtSource\\Previews\\Soldier_LOD1.png",
+    "ArtSource\\Previews\\Soldier_LOD2.png",
+    "ArtSource\\Previews\\Soldier_Pose_Run.png",
+    "ArtSource\\Previews\\Soldier_Pose_RunSide.png",
+    "ArtSource\\Previews\\Soldier_Pose_Slide.png",
+    "ArtSource\\Previews\\Soldier_Pose_SlideSide.png",
+    "ArtSource\\Previews\\Soldier_Pose_Aim.png",
+    "ArtSource\\Previews\\Soldier_Pose_AimSide.png",
+    "ArtSource\\Previews\\Soldier_Pose_CrouchLand.png",
+    "ArtSource\\Previews\\Soldier_Pose_CrouchLandSide.png",
+    "ArtSource\\Previews\\Soldier_Readability30m.png",
+    "ArtSource\\Previews\\Soldier_Readability30m_CVD.png",
+    "ArtSource\\Previews\\SoldierArms_Bind.png",
+    "ArtSource\\Previews\\SoldierArms_Grip.png",
+    "ArtSource\\Previews\\SoldierArms_GripEnd.png"
+  ],
+  "files": {
+    "ArtSource/Characters/Soldier.blend": "36f5275119b3ae7960db4bce40bf48f4801f681c24356f7efa39d26e209e4195",
+    "ArtSource/Characters/SoldierArms.blend": "8bdaa14a297e11a47593650ddc5b3d0c466869872abeced312b80f58b2baf34a",
+    "Assets/Wildstone/Art/Soldier.fbx": "4e1d9d6320cafa63b72433e864b958e56c86e392d6f08954adb9df8f9000f6e6",
+    "Assets/Wildstone/Art/SoldierArms.fbx": "39293a40a8786dc3df78317a74f63b75544a133fc7ad0a3d97c1b398206f3953"
+  }
+}

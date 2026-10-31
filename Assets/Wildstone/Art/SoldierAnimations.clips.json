@@ -1,0 +1,424 @@
+{
+ "clips": [
+  {
+   "name": "Idle",
+   "loop": true,
+   "duration": 3.6,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "WalkF",
+   "loop": true,
+   "duration": 0.933333,
+   "speed": 1.643,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.4667,
+     "name": "FootR"
+    }
+   ]
+  },
+  {
+   "name": "WalkB",
+   "loop": true,
+   "duration": 0.933333,
+   "speed": 1.313,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.4667,
+     "name": "FootR"
+    }
+   ]
+  },
+  {
+   "name": "WalkL",
+   "loop": true,
+   "duration": 0.533333,
+   "speed": 1.05,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.2667,
+     "name": "FootR"
+    }
+   ]
+  },
+  {
+   "name": "WalkR",
+   "loop": true,
+   "duration": 0.533333,
+   "speed": 1.05,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootR"
+    },
+    {
+     "time": 0.2667,
+     "name": "FootL"
+    }
+   ]
+  },
+  {
+   "name": "RunF",
+   "loop": true,
+   "duration": 0.666667,
+   "speed": 7.94,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootR"
+    }
+   ]
+  },
+  {
+   "name": "RunB",
+   "loop": true,
+   "duration": 0.666667,
+   "speed": 7.832,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootR"
+    }
+   ]
+  },
+  {
+   "name": "RunL",
+   "loop": true,
+   "duration": 0.666667,
+   "speed": 8.018,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootR"
+    }
+   ]
+  },
+  {
+   "name": "RunR",
+   "loop": true,
+   "duration": 0.666667,
+   "speed": 8.018,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootR"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootL"
+    }
+   ]
+  },
+  {
+   "name": "JumpStart",
+   "loop": false,
+   "duration": 0.266667,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.25,
+     "name": "Takeoff"
+    }
+   ]
+  },
+  {
+   "name": "Fall",
+   "loop": true,
+   "duration": 1.2,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "Land",
+   "loop": false,
+   "duration": 0.3,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "Land"
+    }
+   ]
+  },
+  {
+   "name": "Dash",
+   "loop": false,
+   "duration": 0.3,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "SlideEnter",
+   "loop": false,
+   "duration": 0.2,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "Slide",
+   "loop": true,
+   "duration": 1.0,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "WallRunL",
+   "loop": true,
+   "duration": 0.666667,
+   "speed": 7.94,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootR"
+    }
+   ]
+  },
+  {
+   "name": "WallRunR",
+   "loop": true,
+   "duration": 0.666667,
+   "speed": 7.94,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.0,
+     "name": "FootL"
+    },
+    {
+     "time": 0.3333,
+     "name": "FootR"
+    }
+   ]
+  },
+  {
+   "name": "WallJump",
+   "loop": false,
+   "duration": 0.333333,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.1,
+     "name": "Push"
+    }
+   ]
+  },
+  {
+   "name": "DeathF",
+   "loop": false,
+   "duration": 1.333333,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "DeathB",
+   "loop": false,
+   "duration": 1.333333,
+   "speed": 0.0,
+   "mask": "full",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "HoldRifle",
+   "loop": true,
+   "duration": 2.4,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "HoldPistol",
+   "loop": true,
+   "duration": 2.4,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "HoldSword",
+   "loop": true,
+   "duration": 2.4,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "AimRifle",
+   "loop": true,
+   "duration": 2.0,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "AimPistol",
+   "loop": true,
+   "duration": 2.0,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "Reload",
+   "loop": false,
+   "duration": 1.2,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.3,
+     "name": "MagOut"
+    },
+    {
+     "time": 0.7,
+     "name": "ReloadInsert"
+    }
+   ]
+  },
+  {
+   "name": "Throw",
+   "loop": false,
+   "duration": 0.466667,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.2,
+     "name": "Release"
+    }
+   ]
+  },
+  {
+   "name": "SwordSwing",
+   "loop": false,
+   "duration": 0.4,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": [
+    {
+     "time": 0.12,
+     "name": "SlashStart"
+    },
+    {
+     "time": 0.185,
+     "name": "Slash"
+    },
+    {
+     "time": 0.25,
+     "name": "SlashEnd"
+    }
+   ]
+  },
+  {
+   "name": "Equip",
+   "loop": false,
+   "duration": 0.3,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": false,
+   "events": []
+  },
+  {
+   "name": "Recoil",
+   "loop": false,
+   "duration": 0.2,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": true,
+   "events": []
+  },
+  {
+   "name": "HitF",
+   "loop": false,
+   "duration": 0.3,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": true,
+   "events": []
+  },
+  {
+   "name": "HitB",
+   "loop": false,
+   "duration": 0.3,
+   "speed": 0.0,
+   "mask": "upper",
+   "additive": true,
+   "events": []
+  }
+ ]
+}

@@ -1,62 +1,241 @@
 {
-  "generator": "Tools/Assets/build_assets.py laser-kit",
+  "generator": "Tools/Assets/build_assets.py weapon(root, name); four starter-gun first-person art pass (2026-10-30)",
   "blender": "4.2.0",
-  "provenance": "Original procedural laser pistol, twin-barrel shotgun and scoped sniper; no copied meshes or textures",
-  "axis": "Unity (X,Y,Z) -> Blender (X,-Z,Y); FBX -Z forward, Y up; metres",
+  "provenance": "Original procedural four starter laser guns; existing audited kit helpers, added top/right/rear mechanical details. Historical LaserShotgun entry preserved; no copied meshes, textures, dependencies or generated 3D assets.",
+  "axis": "Unity (X,Y,Z) -> Blender (X,-Z,Y); FBX -Z forward, Y up; FBX_SCALE_ALL; metres",
   "exports": [
     {
       "asset": "LaserPistol.fbx",
       "bounds_min": [
-        -0.07500000298023224,
+        -0.06149999797344208,
         -0.2600000500679016,
-        -0.27000004053115845
+        -0.273000031709671
       ],
       "bounds_max": [
-        0.07500000298023224,
-        0.22249996662139893,
-        0.38199999928474426
+        0.06149999797344208,
+        0.2250000238418579,
+        0.37700000405311584
       ],
-      "triangles": 984,
-      "mesh_count": 9,
+      "triangles": 4664,
+      "mesh_count": 43,
       "actions": [],
-      "source_sha256": "9248c10356468ffc5a6ecd9307921ef5e990bab151e927cdc21396247b9b42cd",
-      "fbx_sha256": "f38caa9e081aa0b7379267cd21eeae3854f940814eb2b1cca4f5b015e25d9fe7"
+      "source_sha256": "9639a116bfd6f3d04d16b5ade8f562e672f59ef1120e981a73f11cfea7cb9562",
+      "fbx_sha256": "aba2bac0eaf3fa9f979d24cef890b47bdb536401c7a316c359c72efc976608ee",
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.11200007051229477,
+          0.38999995589256287
+        ],
+        "LeftHand": [
+          -0.07500000298023224,
+          -0.04500000551342964,
+          -0.019999992102384567
+        ],
+        "Sight": [
+          0.0,
+          0.22499994933605194,
+          -0.27800002694129944
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalCyan",
+        "SoftGrey"
+      ],
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics"
     },
     {
       "asset": "LaserShotgun.fbx",
       "bounds_min": [
-        -0.17399999499320984,
-        -0.24750003218650818,
-        -0.7050000429153442
+        -0.15399999916553497,
+        -0.24500004947185516,
+        -0.699999988079071
       ],
       "bounds_max": [
-        0.17399999499320984,
-        0.20999997854232788,
-        0.7820000052452087
+        0.15399999916553497,
+        0.23300011456012726,
+        0.7889999747276306
       ],
-      "triangles": 1212,
-      "mesh_count": 11,
+      "triangles": 6364,
+      "mesh_count": 34,
       "actions": [],
-      "source_sha256": "f36d967d2bb8284eeedf3abaa7ba8f202285b1df98d1ee9096d5bf4d7674d1cb",
-      "fbx_sha256": "6a831c4b073c6b1dc7662ccae7eac3b2e9545175e014c50eaea34db6a67c7a62"
+      "source_sha256": "7f64c6e74f5d9740cf077f9de33f8176132182ce751541a13e9aaebd32169e6e",
+      "fbx_sha256": "0738803c4c29d5b1759f7250c3718627b69ed9af969700cee271d28b80f7499c"
     },
     {
       "asset": "LaserSniper.fbx",
       "bounds_min": [
-        -0.08500000089406967,
-        -0.24750003218650818,
-        -0.7099999785423279
+        -0.06850000470876694,
+        -0.24500004947185516,
+        -0.7450000047683716
       ],
       "bounds_max": [
-        0.08500000089406967,
-        0.4350000023841858,
-        1.1119999885559082
+        0.06850000470876694,
+        0.382999986410141,
+        1.1080000400543213
       ],
-      "triangles": 1300,
-      "mesh_count": 13,
+      "triangles": 7536,
+      "mesh_count": 71,
       "actions": [],
-      "source_sha256": "5fa67d354dc6a9ea7d5bf4f61adf4113e6763ed7081fd4bd85027fb0f5ce74f6",
-      "fbx_sha256": "4fd9364d5a162feeb3fb8d162a250e0d14d62a89dfa3204ccda94d383b8851b7"
+      "source_sha256": "4833251830bb76583af4ab5b9a7aaa7fe272d0e21fe60b973aad0e4016b5bb0e",
+      "fbx_sha256": "2a7cb72d74ca13d38fe2d6a4bbf1860c659473e17dd14f68b326e9563b905ea4",
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.11000017821788788,
+          1.1200000047683716
+        ],
+        "LeftHand": [
+          -0.07500000298023224,
+          -0.04500000551342964,
+          -0.019999992102384567
+        ],
+        "Sight": [
+          0.0,
+          0.309999942779541,
+          -0.3450000584125519
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "SignalCyan",
+        "SoftGrey"
+      ],
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics"
+    },
+    {
+      "asset": "LineDriver.fbx",
+      "bounds_min": [
+        -0.125,
+        -0.24500004947185516,
+        -0.5899999737739563
+      ],
+      "bounds_max": [
+        0.125,
+        0.36000001430511475,
+        0.6650000214576721
+      ],
+      "triangles": 7134,
+      "mesh_count": 57,
+      "actions": [],
+      "sight_line": {
+        "sight": [
+          0.0,
+          0.306,
+          -0.2
+        ],
+        "OpticGlass": [
+          0.0,
+          0.306,
+          -0.086
+        ]
+      },
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.13000009953975677,
+          0.6499999761581421
+        ],
+        "LeftHand": [
+          -0.07500000298023224,
+          -0.04500000551342964,
+          -0.019999992102384567
+        ],
+        "Sight": [
+          0.0,
+          0.3059999644756317,
+          -0.20000004768371582
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "OpticGlass",
+        "SignalCyan",
+        "SoftGrey"
+      ],
+      "source_sha256": "de42b3803749768537babed5b3b0f2ae1b366696bcfe6ad248c875c363cd5da6",
+      "fbx_sha256": "73a58e46c8731d673e44cae75f1bb90775f956dbe7e56ea72d0d20a886ac980b",
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics"
+    },
+    {
+      "asset": "LaserSMG.fbx",
+      "bounds_min": [
+        -0.060999996960163116,
+        -0.24500004947185516,
+        -0.4620000422000885
+      ],
+      "bounds_max": [
+        0.060999996960163116,
+        0.2919999957084656,
+        0.2800000011920929
+      ],
+      "triangles": 5730,
+      "mesh_count": 52,
+      "actions": [],
+      "sight_line": {
+        "sight": [
+          0.0,
+          0.258,
+          -0.17
+        ],
+        "OpticGlass": [
+          0.0,
+          0.258,
+          -0.086
+        ]
+      },
+      "sockets": {
+        "Grip": [
+          0.0,
+          -0.12000002712011337,
+          -0.17999999225139618
+        ],
+        "Muzzle": [
+          0.0,
+          0.11200004816055298,
+          0.28999996185302734
+        ],
+        "LeftHand": [
+          -0.07500000298023224,
+          -0.04500000551342964,
+          -0.019999992102384567
+        ],
+        "Sight": [
+          0.0,
+          0.2579999566078186,
+          -0.17000004649162292
+        ]
+      },
+      "materials": [
+        "Graphite",
+        "MatteIvory",
+        "OpticGlass",
+        "SignalCoral",
+        "SoftGrey"
+      ],
+      "source_sha256": "5af4e69970b6fbe3f64917a438f92d0d06a12395d583e54fbac95cec8e701876",
+      "fbx_sha256": "ef23712f45aa37c8f9b3b7ce44bc0495260aa2ca18076ea5711c36e7626390db",
+      "verify": "PASS: exact sockets, identity frames, bounds, triangle budget, palette, legacy names, optics"
     }
-  ]
+  ],
+  "latest_weapon_pass": "weapon-energy; see weapon-energy-export-manifest.json for current evidence"
 }

@@ -1,0 +1,159 @@
+{
+  "generator": "Tools/Assets/build_assets.py weapon-kit",
+  "blender": "4.2.0",
+  "provenance": "Original procedural LineDriver (holo sight), LaserPistol (iron sights), LaserSniper (scope), LaserSMG (red dot) and segmented Grenade. Lofted-section, side-slab and lathe techniques adapted from read-only vibegame1 Tools/weapon_models/build_laser_kit.py and build_weapons.py at 2cb6e5760bccc0733f34b367be2f18c90b802766; no copied meshes, textures or third-party assets.",
+  "axis": "Unity (X,Y,Z) -> Blender (X,-Z,Y); FBX -Z forward, Y up; metres; Unity import adds an X reflection",
+  "sockets": "Grip, Muzzle, LeftHand on every kit weapon; Sight (forward = weapon +Z) on the four guns",
+  "materials": "Palette materials plus OpticGlass (LineDriver, LaserSMG OpticGlass objects only)",
+  "exports": [
+    {
+      "name": "LineDriver",
+      "source": "ArtSource/LineDriver.blend",
+      "fbx": "Assets/Wildstone/Art/LineDriver.fbx",
+      "source_sha256": "de42b3803749768537babed5b3b0f2ae1b366696bcfe6ad248c875c363cd5da6",
+      "fbx_sha256": "73a58e46c8731d673e44cae75f1bb90775f956dbe7e56ea72d0d20a886ac980b",
+      "triangles": 7134,
+      "mesh_count": 57,
+      "bounds_min": [
+        -0.125,
+        -0.24500004947185516,
+        -0.5899999737739563
+      ],
+      "bounds_max": [
+        0.125,
+        0.36000001430511475,
+        0.6650000214576721
+      ],
+      "sight_line": {
+        "sight": [
+          0.0,
+          0.306,
+          -0.2
+        ],
+        "OpticGlass": [
+          0.0,
+          0.306,
+          -0.086
+        ]
+      }
+    },
+    {
+      "name": "LaserPistol",
+      "source": "ArtSource/LaserPistol.blend",
+      "fbx": "Assets/Wildstone/Art/LaserPistol.fbx",
+      "source_sha256": "9639a116bfd6f3d04d16b5ade8f562e672f59ef1120e981a73f11cfea7cb9562",
+      "fbx_sha256": "aba2bac0eaf3fa9f979d24cef890b47bdb536401c7a316c359c72efc976608ee",
+      "triangles": 4664,
+      "mesh_count": 43,
+      "bounds_min": [
+        -0.06149999797344208,
+        -0.2600000500679016,
+        -0.273000031709671
+      ],
+      "bounds_max": [
+        0.06149999797344208,
+        0.2250000238418579,
+        0.37700000405311584
+      ],
+      "sight_line": {
+        "sight": [
+          0.0,
+          0.225,
+          -0.278
+        ],
+        "FrontSight": [
+          0.0,
+          0.225,
+          0.208
+        ]
+      }
+    },
+    {
+      "name": "LaserSniper",
+      "source": "ArtSource/LaserSniper.blend",
+      "fbx": "Assets/Wildstone/Art/LaserSniper.fbx",
+      "source_sha256": "4833251830bb76583af4ab5b9a7aaa7fe272d0e21fe60b973aad0e4016b5bb0e",
+      "fbx_sha256": "2a7cb72d74ca13d38fe2d6a4bbf1860c659473e17dd14f68b326e9563b905ea4",
+      "triangles": 7536,
+      "mesh_count": 71,
+      "bounds_min": [
+        -0.06850000470876694,
+        -0.24500004947185516,
+        -0.7450000047683716
+      ],
+      "bounds_max": [
+        0.06850000470876694,
+        0.382999986410141,
+        1.1080000400543213
+      ],
+      "sight_line": {
+        "sight": [
+          0.0,
+          0.31,
+          -0.345
+        ],
+        "ScopeEyepiece": [
+          0.0,
+          0.31,
+          -0.255
+        ],
+        "ScopeLens": [
+          0.0,
+          0.31,
+          0.314
+        ]
+      }
+    },
+    {
+      "name": "LaserSMG",
+      "source": "ArtSource/LaserSMG.blend",
+      "fbx": "Assets/Wildstone/Art/LaserSMG.fbx",
+      "source_sha256": "5af4e69970b6fbe3f64917a438f92d0d06a12395d583e54fbac95cec8e701876",
+      "fbx_sha256": "ef23712f45aa37c8f9b3b7ce44bc0495260aa2ca18076ea5711c36e7626390db",
+      "triangles": 5730,
+      "mesh_count": 52,
+      "bounds_min": [
+        -0.060999996960163116,
+        -0.24500004947185516,
+        -0.4620000422000885
+      ],
+      "bounds_max": [
+        0.060999996960163116,
+        0.2919999957084656,
+        0.2800000011920929
+      ],
+      "sight_line": {
+        "sight": [
+          0.0,
+          0.258,
+          -0.17
+        ],
+        "OpticGlass": [
+          0.0,
+          0.258,
+          -0.086
+        ]
+      }
+    },
+    {
+      "name": "Grenade",
+      "source": "ArtSource/Grenade.blend",
+      "fbx": "Assets/Wildstone/Art/Grenade.fbx",
+      "source_sha256": "149a5039a5b7cfad948661a987b49b6fef33fc6f6cad07c87f9e051aad761e81",
+      "fbx_sha256": "39cf6e83023d67029e340242ba07e3d9c93775dfc9517cb77dd0ce92fa0ae4fe",
+      "triangles": 2628,
+      "mesh_count": 8,
+      "bounds_min": [
+        -0.0949999988079071,
+        -0.09499998390674591,
+        -0.012999996542930603
+      ],
+      "bounds_max": [
+        0.0949999988079071,
+        0.0950000137090683,
+        0.20900000631809235
+      ]
+    }
+  ],
+  "latest_weapon_pass": "weapon-energy; see weapon-energy-export-manifest.json for current evidence"
+}
