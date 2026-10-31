@@ -71,8 +71,25 @@ namespace Wildstone.DevTools
             {
                 marks++; log.Line("mark",Now).Num("n",marks).Num("tick",session.Match?.Tick??-1).Str("screen",session.Flow.Screen.ToString()).End();
                 StartCoroutine(Capture(Path.Combine(Directory,"mark-"+marks+".png")));
+                Beep();
             }
             if(Time.realtimeSinceStartup-windowStart>=1) WritePerf();
+        }
+
+        // Audible confirmation for F8: an on-screen message would land in the mark's own screenshot. Generated in code,
+        // so the add-on ships no audio asset.
+        AudioSource beep;
+        void Beep()
+        {
+            if(beep==null)
+            {
+                const int rate=44100, length=rate/10;
+                var data=new float[length];
+                for(int i=0;i<length;i++) data[i]=Mathf.Sin(2*Mathf.PI*880*i/rate)*.35f*Mathf.Min(1,(length-i)/(rate*.03f));
+                var clip=AudioClip.Create("Session mark",length,1,rate,false); clip.SetData(data,0);
+                beep=gameObject.AddComponent<AudioSource>(); beep.clip=clip; beep.spatialBlend=0; beep.ignoreListenerPause=true; beep.playOnAwake=false;
+            }
+            beep.Play();
         }
 
         // Uses the already-enabled image conversion module (not the screen capture module) and encodes off the main

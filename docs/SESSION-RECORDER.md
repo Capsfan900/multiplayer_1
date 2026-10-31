@@ -26,7 +26,7 @@ movement state and frame time.
 |---|---|
 | `--wildstone-record` | Turn recording on |
 | `--wildstone-record-dir <dir>` | Output folder (default `%USERPROFILE%\AppData\LocalLow\<company>\<product>\Recordings\<stamp>`) |
-| F8 (in game) | Mark "something felt wrong here": writes a `mark` row and `mark-N.png` screenshot (encoded off the main thread) |
+| F8 (in game) | Mark "something felt wrong here": short beep, writes a `mark` row and `mark-N.png` screenshot (encoded off the main thread) |
 | `Play-Recorded.ps1 -Expect "<k=v,...>"` | Trust check against the report's Counts |
 | `Play-Recorded.ps1 -Video` | Also record the screen (off by default; game data is always recorded) |
 

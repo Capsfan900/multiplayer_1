@@ -30,6 +30,10 @@ def load(path):
     return rows
 
 
+def clock(t):
+    return f"{int(t // 60)}:{t % 60:04.1f}"
+
+
 def pct(a, b):
     return f"{100 * a / b:.0f}%" if b else "-"
 
@@ -198,7 +202,7 @@ def report(a):
         avg = sum(fa) / len(fa)
         out.append(f"Avg {1000 / avg:.0f} fps ({avg:.1f} ms). Worst-second p95 {max(p['p95Ms'] for p in a['perf']):.1f} ms. "
                    f"Frames >25 ms: {sum(p['over25ms'] for p in a['perf']):.0f}, >50 ms: {sum(p['over50ms'] for p in a['perf']):.0f}. GC: {sum(p['gc'] for p in a['perf']):.0f}.")
-        out.append("Worst moments: " + ", ".join(f"{p['t'] / 60:.0f}:{p['t'] % 60:04.1f} max {p['maxMs']:.0f} ms" for p in a["worst"]))
+        out.append("Worst moments: " + ", ".join(f"{clock(p['t'])} max {p['maxMs']:.0f} ms" for p in a["worst"]))
     else:
         out.append("No gameplay frames recorded.")
 
@@ -210,8 +214,8 @@ def report(a):
             mv = Counter(e for x in a["moves"] if t0 <= x["t"] <= t1 and x.get("who") == LOCAL for e in x["events"].split(", "))
             s = [x for x in a["samples"] if t0 <= x["t"] <= t1]
             pf = [x for x in a["perf"] if t0 <= x["t"] <= t1 + 1]
-            kinds = Counter(x["kind"] for x in near)
-            out.append(f"- **Mark {m['n']}** at {t1 / 60:.0f}:{t1 % 60:04.1f} (mark-{m['n']}.png): "
+            kinds = Counter(f"{x['kind']} ({x.get('action')}: {x.get('reason')})" if x["kind"] == "Rejected" else x["kind"] for x in near)
+            out.append(f"- **Mark {m['n']}** at {clock(t1)} (mark-{m['n']}.png): "
                        f"{dict(kinds) or 'no combat'}; moves {dict(mv) or 'none'}; "
                        + (f"weapon {s[-1].get('weapon')}, hp {s[-1].get('hp'):.0f}, speed {max(x.get('speed', 0) for x in s):.1f} max; " if s else "")
                        + (f"worst frame {max(x['maxMs'] for x in pf):.0f} ms" if pf else ""))
@@ -312,6 +316,7 @@ def selftest():
         with open(os.path.join(folder, "video.json"), "w", encoding="utf-8-sig") as f:
             json.dump({"startedUtc": "2026-10-31T17:00:00.0000000+00:00"}, f)
         assert abs(video_offset({"meta": [{"startedUtc": "2026-10-31T17:00:02.5000000Z"}]}, folder) - 2.5) < 1e-6
+    assert clock(51.06) == "0:51.1" and clock(61.7) == "1:01.7", clock(51.06)
     print("selftest passed")
 
 
