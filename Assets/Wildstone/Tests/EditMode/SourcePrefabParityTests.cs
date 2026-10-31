@@ -9,6 +9,7 @@ namespace Wildstone.Tests
     public class SourcePrefabParityTests
     {
         // Captured independently from Player.prefab at 2cb6e576, not from MotorTuning.
+        // airStrafeWishSpeed (source 2) is no longer retained: D041 retunes it to 2.5 (foundation spec, section 5).
         const string Baseline=@"
 groundSpeed=11
 groundAccel=90
@@ -69,7 +70,6 @@ slideChainFalloff=0.6
 fallGravityMultiplier=1.5
 airCarryDecay=0.8
 airSteerDegPerSec=120
-airStrafeWishSpeed=2
 landingSoftSpeed=16
 landingHardSpeed=26
 landingSpeedLoss=0.35

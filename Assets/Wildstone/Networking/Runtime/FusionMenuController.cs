@@ -47,7 +47,9 @@ namespace Wildstone.Networking
             menu.HostMatch+=Host; menu.Join+=Join; menu.Leave+=Leave;
             menu.Team+=Team; menu.SetReady+=Ready; menu.StartMatch+=StartMatch;
             menu.ReconnectRequested+=Reconnect;
+            menu.RematchRequested+=Rematch;
         }
+        void Rematch() { var coordinator=GetComponent<FusionGameCoordinator>(); if(coordinator!=null) coordinator.Rematch(); }
         internal static AuthenticationValues NewGuestAuthentication() => new AuthenticationValues(Guid.NewGuid().ToString("N")) {AuthType=CustomAuthenticationType.None};
         async Task Run(Func<CancellationToken,Task> action,string status)
         {
@@ -72,7 +74,7 @@ namespace Wildstone.Networking
             await Run(async token=>
             {
                 var practice=GetComponent<PracticeSession>(); var map=practice.Catalog.Find(menu.Map);
-                var content=new ContentVersion("1",FusionBuildIdentity.Read(),map.Id+"-"+map.Revision,"weapons-"+WeaponCatalog.Revision+"-120");
+                var content=new ContentVersion("1",FusionBuildIdentity.Read(),map.Id+"-"+map.Revision,Ruleset);
                 var created=new FusionSession(content,code); Session=created; room=code;
                 menu.ActiveSession=true;
                 menu.Recovering=false; menu.RecoverySecondsRemaining=0;
@@ -92,6 +94,8 @@ namespace Wildstone.Networking
                 catch { await ReleaseSession(created); throw; }
             },host?"Creating private match…":"Joining private match…");
         }
+        // Rules both peers must share beyond the map: weapon catalog, tick rate and (D041) the movement laws a client predicts with.
+        public static string Ruleset => "weapons-"+WeaponCatalog.Revision+"-120-movement-"+Wildstone.Movement.MotorTuning.Revision;
         public static string NewRoomCode() => Guid.NewGuid().ToString("N").Substring(0,8).ToUpperInvariant();
         async void Reconnect()
         {

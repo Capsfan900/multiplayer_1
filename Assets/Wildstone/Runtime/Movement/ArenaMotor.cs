@@ -60,9 +60,10 @@ namespace Wildstone.Movement
         public static bool ValidSnapshot(in MotorState saved) =>
             Finite(saved.Position) && Finite(saved.Velocity) && Finite(saved.Yaw) && Finite(saved.Pitch) &&
             Finite(saved.CapsuleHeight) && saved.CapsuleHeight>=MotorTuning.Source.radius*2 && saved.CapsuleHeight<=MotorTuning.Source.height &&
-            Finite(saved.CapsuleCenter) && ValidTraversalState(saved) && saved.Generation>=1 && saved.Tick>=-1;
+            Finite(saved.CapsuleCenter) && ValidTraversalState(saved) && saved.Generation>=1 && saved.Tick>=-1 && saved.SuppressedUntil>=0;
 
-        public void SetSuppressed(bool suppressed) { s.Suppressed=suppressed; }
+        // liftTick>0 is the motor tick a stun ends, so a predicting client unfreezes on time, not one round trip late.
+        public void SetSuppressed(bool suppressed,int liftTick=0) { s.Suppressed=suppressed; s.SuppressedUntil=suppressed?Mathf.Max(0,liftTick):0; }
 
         public void Teleport(Vector3 position,float yaw)
         {
@@ -94,6 +95,7 @@ namespace Wildstone.Movement
             if(deltaTime!=MotorTuning.TickDelta || tick!=s.Tick+1 || tick<0) return false;
             if(input.Present && (!ValidInput(input,tick) || input.Sequence<=s.LastInputSequence)) return false;
             s.Tick=tick; s.Events=MotorEvents.None; s.EventTick=tick;
+            if(s.Suppressed && s.SuppressedUntil>0 && tick>=s.SuppressedUntil) { s.Suppressed=false; s.SuppressedUntil=0; }
             MotorButtons pressed=MotorButtons.None;
             if(input.Present)
             {
@@ -193,8 +195,13 @@ namespace Wildstone.Movement
                 {
                     if(s.Sliding && Now-s.LastGroundedAt>t.coyoteTime) EndSlide();
                     bool floating=Now-s.LaunchedAt<=t.launchFloatSeconds;
-                    if(!floating && Mathf.Abs(m.y)<.2f && Mathf.Abs(m.x)>.5f)
-                        hv=AirMath.AirStrafe(hv,wish,t.airStrafeWishSpeed,t.airAccel,dt);
+                    // D041: a held strafe key owns the air, W or not. The CS-style term gains along the sideways wish while the
+                    // forward component only tops up toward ground speed; steering never erases the lead the strafe needs.
+                    if(!floating && Mathf.Abs(m.x)>.5f)
+                    {
+                        hv=AirMath.AirStrafe(hv,Right*m.x,t.airStrafeWishSpeed,t.airStrafeAccel,dt);
+                        hv=AirMath.AirAccelerate(hv,Forward*m.y,t.groundSpeed,t.airAccel,dt);
+                    }
                     else
                     {
                         hv=AirMath.AirSteer(hv,wish,t.airSteerDegPerSec*(floating?t.launchSteerBoost:1),dt);

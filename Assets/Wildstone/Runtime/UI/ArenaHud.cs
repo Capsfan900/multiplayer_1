@@ -3,56 +3,471 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using Wildstone.Combat;
 using Wildstone.Game;
+using Wildstone.Presentation;
 
 namespace Wildstone.UI
 {
+    // Combat HUD: team score strip, clock and zone pointer on top; vitals bottom-left; weapon, ammo and items bottom-right.
+    // Hit feedback reacts only to host-confirmed events; nothing here changes simulation.
     public sealed class ArenaHud
     {
+        public enum Marker { None, Body, Shield, Head, Kill }
         public readonly VisualElement Root=new VisualElement();
-        readonly Label scores=new Label(),status=new Label(),vitals=new Label(),weapon=new Label(),items=new Label(),zone=new Label(),prompt=new Label(),cue=new Label();
-        float cueUntil;
-        static readonly string[] Teams={"▲ IVORY","■ ASH","◆ SAGE","● CLAY"};
+        readonly Label time=new Label(),mode=new Label(),zoneArrow=new Label("▲"),zoneText=new Label(),health=new Label(),shieldValue=new Label(),
+            weaponName=new Label(),ammo=new Label(),ammoTag=new Label(),prompt=new Label(),hint=new Label(),respawn=new Label(),cue=new Label(),feed=new Label(),banner=new Label(),mapIntro=new Label(),
+            zoneMarker=new Label(),speed=new Label();
+        readonly Label[] scoreValues=new Label[4];
+        readonly VisualElement[] chips=new VisualElement[4],scoreFills=new VisualElement[4];
+        readonly VisualElement vitals=new VisualElement(),weaponPanel=new VisualElement(),shieldBar,reloadBar,shieldFill,healthFill,staminaFill,reloadFill;
+        readonly VisualElement[] items=new VisualElement[3];
+        readonly Label[] itemKeys=new Label[3],itemLabels=new Label[3];
+        readonly VisualElement bloomRing=new VisualElement();
+        readonly VisualElement crosshair=new VisualElement(),dot=new VisualElement(),scope=new VisualElement(),scopeRing=new VisualElement(),
+            scopeH=new VisualElement(),scopeV=new VisualElement(),vignette=new VisualElement(),damage=new VisualElement();
+        readonly VisualElement[] ticks=new VisualElement[4];
+        readonly PresentationEventHistory history=new PresentationEventHistory();
+        readonly int[] lastHitter=new int[9],lastHitTick=new int[9];
+        readonly bool[] lastHitHead=new bool[9];
+        readonly string[] feedLines=new string[4];
+        readonly float[] feedUntil=new float[4];
+        int feedVersion;
+        // Labels rebuild their string only when the value they show changes, so a steady HUD allocates nothing per frame.
+        readonly System.Collections.Generic.Dictionary<Label,int> shown=new System.Collections.Generic.Dictionary<Label,int>();
+        bool Changed(Label label,int key) { if(shown.TryGetValue(label,out int last) && last==key) return false; shown[label]=key; return true; }
+        static string KeyLabel(string binding) => LocalSettings.BindingLabel(binding).ToUpperInvariant();
+        // Assigned by the menu: a 2D source for the head "ding" and kill confirmation.
+        public AudioSource Feedback;
+        public Marker LastMarker { get; private set; }
+        public float CrosshairGap { get; private set; }
+        // D041 proposals: Practice-only speed readout; body marker 24 px at <=10 damage to 32 px at >=32; a 1 px bloom ring
+        // around the sight dot while the hip crosshair is hidden by ADS and bloom is still open.
+        public float BloomRingRadius { get; private set; }
+        public bool SpeedVisible => speed.style.display.value==DisplayStyle.Flex;
+        public static float MarkerSize(float damage)=>Mathf.Lerp(24,32,Mathf.InverseLerp(10,32,damage));
+        public static bool BloomRingVisible(WeaponKind kind,float ads,float bloom,bool alive)=>alive && bloom>.05f && !WeaponCatalog.HipCrosshairVisible(kind,ads);
+        public bool ScopeVisible => scope.style.display.value==DisplayStyle.Flex;
+        static AudioClip headClip,killClip,tickClip,dryClip;
+        public const float TickScale=.45f; // body/shield ticks sit under the head and kill confirmations
+        public const float DryScale=.35f;
+        WeaponKind lastWeapon; int lastRounds=-1;
+        // The last quarter of a magazine reads in the warning colour and clicks dry on each shot.
+        public static bool LowAmmo(WeaponKind weapon,int rounds)
+        {
+            int capacity=WeaponCatalog.PickupAmmo(weapon);
+            return capacity>0 && rounds*4<=capacity;
+        }
+        public float DamageRadius { get; private set; }
+        // Blink says what it does at the pickup: one charge, a 6 m teleport along the horizontal aim.
+        public static string PickupPrompt(string item,string pickupBinding,string blinkBinding) =>
+            $"{KeyLabel(pickupBinding)}   PICK UP "+(item=="blink"?$"BLINK · {KeyLabel(blinkBinding)} TO TELEPORT 6 m":item.Replace('-',' ').ToUpperInvariant());
+        // Panel position of the zone waypoint: on screen it sits over the zone; off screen or behind it slides to the edge
+        // along the direction from center, so it always points the way to turn.
+        public static Vector2 ZoneMarkerPosition(Vector3 viewport,float width,float height,float margin)
+        {
+            float x=viewport.x, y=1-viewport.y;
+            if(viewport.z<0)
+            {
+                // Behind: the projection is mirrored and its height is meaningless, so show only which way to turn.
+                float side=.5f-viewport.x;
+                if(Math.Abs(side)<.05f) { x=.5f; y=1; } else { x=side<0?0:1; y=.5f; }
+            }
+            else if(x<0 || x>1 || y<0 || y>1)
+            {
+                float dx=x-.5f, dy=y-.5f, reach=Math.Max(Math.Abs(dx),Math.Abs(dy));
+                x=.5f+dx*.5f/reach; y=.5f+dy*.5f/reach;
+            }
+            return new Vector2(Mathf.Clamp(x*width,margin,width-margin),Mathf.Clamp(y*height,margin,height-margin));
+        }
+        public static float DamageArcRadius(float panelHeight) => panelHeight>0?Math.Max(60,panelHeight*.35f):60;
+        // A Blink press that still holds its charge after BlinkDenySeconds was refused (no supported floor ahead).
+        public const float BlinkDenySeconds=.6f;
+        Wildstone.Game.PracticeInput blinkInput; int blinkPresses,blinkCharges; float blinkCheckAt=float.MaxValue,blinkDeniedUntil;
+        public bool BlinkDenied => Time.unscaledTime<blinkDeniedUntil;
+        float cueUntil,damageUntil,soundedAt=-1,bannerUntil,lastKillAt=float.MinValue;
+        // Your kill names the victim under the crosshair; kills within StreakSeconds of the last one count up.
+        public const float StreakSeconds=4,BannerSeconds=1.8f;
+        public int KillStreak { get; private set; }
+        public string BannerText => banner.text;
+        // The three maps share one stone kit, so each round opens on the map's name and the hint line keeps it.
+        public const float MapIntroSeconds=3;
+        public static float MapIntroOpacity(int elapsedTicks,int tickRate,bool reduced)
+        {
+            float t=tickRate>0?elapsedTicks/(float)tickRate:MapIntroSeconds;
+            return t>=MapIntroSeconds?0:reduced?1:Mathf.Clamp01((MapIntroSeconds-t)*2);
+        }
+        public string MapIntroText => mapIntro.text;
+        string hintMap; bool hintExternal;
+        static string MapName(PracticeSession session)
+        {
+            if(session.Catalog!=null) foreach(var map in session.Catalog.Maps) if(map!=null && map.Id==session.MapId) return map.DisplayName.ToUpperInvariant();
+            return (session.MapId??"").Replace('-',' ').ToUpperInvariant();
+        }
+        Marker sounded;
+        public int CuesSounded { get; private set; }
+        Vector3 damageFrom;
+        int ownTeam=-1;
+        // Names match the soldier accent colours (SoldierRig.TeamAccents); the symbol carries identity without colour.
+        static readonly string[] Teams={"▲ TEAL","■ GOLD","◆ CRIMSON","● VIOLET"};
+        // Interface tints of the accents: crimson and violet are lifted so they read on graphite panels.
+        public static readonly Color[] TeamTints={new Color(.16f,.73f,.78f),new Color(.98f,.92f,.50f),new Color(.88f,.26f,.32f),new Color(.66f,.50f,.95f)};
+        // Zone seconds that win the round (ArenaMatch.ScoreZone); the score strip fills toward it.
+        public const float WinSeconds=120;
+        // The idle zone accent matches the world zone (PresentationBuilder ZoneIdle): no team hue, no danger orange, no stone grey.
+        public static readonly Color ZoneIdle=new Color(.95f,.14f,.80f);
+        static readonly Color Ivory=new Color(.96f,.94f,.90f,.92f),Warning=new Color(.95f,.42f,.34f),ShieldBlue=new Color(.52f,.80f,.95f);
         public ArenaHud()
         {
-            Root.AddToClassList("hud"); Root.pickingMode=PickingMode.Ignore;
-            var top=new VisualElement(); top.AddToClassList("hud-top"); top.Add(scores); top.Add(status); Root.Add(top);
-            var center=new Label("·"); center.AddToClassList("crosshair"); Root.Add(center);
-            cue.name="hud-hit-cue"; cue.AddToClassList("hit-cue"); cue.style.display=DisplayStyle.None; Root.Add(cue);
-            var bottom=new VisualElement(); bottom.AddToClassList("hud-bottom");
-            bottom.Add(vitals); bottom.Add(weapon); bottom.Add(items); bottom.Add(zone); bottom.Add(prompt); Root.Add(bottom);
+            Root.pickingMode=PickingMode.Ignore;
+            Fill(Root);
+            vignette.pickingMode=PickingMode.Ignore; Fill(vignette); vignette.style.display=DisplayStyle.None; Root.Add(vignette);
+            scope.pickingMode=PickingMode.Ignore; Fill(scope); scope.style.display=DisplayStyle.None; Root.Add(scope);
+            foreach(var part in new[]{scopeRing,scopeH,scopeV}) { part.pickingMode=PickingMode.Ignore; part.style.position=Position.Absolute; scope.Add(part); }
+            scopeRing.style.borderTopColor=scopeRing.style.borderBottomColor=scopeRing.style.borderLeftColor=scopeRing.style.borderRightColor=new Color(.03f,.04f,.035f,1);
+            scopeH.style.backgroundColor=scopeV.style.backgroundColor=new Color(.05f,.06f,.05f,.85f);
+            var frame=Add(Root,"hud");
+
+            var board=Add(frame,"hud-scoreboard");
+            for(int i=0;i<4;i++)
+            {
+                if(i==2) { var clock=Add(board,"hud-clock"); clock.Add(Style(time,"hud-clock__time")); clock.Add(Style(mode,"hud-clock__mode")); }
+                var chip=chips[i]=Add(board,"hud-chip");
+                chip.Add(Style(new Label(Teams[i].Substring(0,1)),"hud-chip__symbol"));
+                chip.Add(Style(scoreValues[i]=new Label(),"hud-chip__score"));
+                Add(chip,"hud-chip__track").style.backgroundColor=TeamTints[i];
+                scoreFills[i]=Add(chip,"hud-chip__fill"); scoreFills[i].style.backgroundColor=TeamTints[i];
+            }
+            var zone=Add(frame,"hud-zone"); zone.Add(Style(zoneArrow,"hud-zone__arrow")); zone.Add(Style(zoneText,"hud-zone__text"));
+
+            // The hint and ability chips stack on top of the vitals panel, clear of the scores and the held weapon.
+            var left=Add(frame,"hud-left"); left.Add(Style(hint,"hud-hint"));
+            left.Add(Style(speed,"hud-hint")); speed.name="hud-speed"; speed.style.backgroundColor=new Color(.08f,.094f,.086f,.72f);
+            speed.style.paddingLeft=speed.style.paddingRight=6; speed.style.paddingTop=speed.style.paddingBottom=2; speed.style.display=DisplayStyle.None;
+            var itemRow=Add(left,"hud-items");
+            for(int i=0;i<3;i++)
+            {
+                items[i]=Add(itemRow,"hud-item");
+                items[i].Add(Style(itemKeys[i]=new Label(),"hud-key")); items[i].Add(Style(itemLabels[i]=new Label(),"hud-item__label"));
+            }
+            vitals.AddToClassList("hud-vitals"); left.Add(vitals);
+            var shieldRow=Add(vitals,"hud-vitals__row"); shieldRow.Add(Style(shieldValue,"hud-shield"));
+            shieldBar=Bar(vitals,"hud-bar--shield",out shieldFill);
+            var healthRow=Add(vitals,"hud-vitals__row"); healthRow.Add(Style(health,"hud-health")); healthRow.Add(Style(new Label("HEALTH"),"hud-unit"));
+            Bar(vitals,"hud-bar--health",out healthFill);
+            Bar(vitals,"hud-bar--stamina",out staminaFill);
+
+            weaponPanel.AddToClassList("hud-weapon"); frame.Add(weaponPanel);
+            weaponPanel.Add(Style(weaponName,"hud-weapon__name"));
+            var ammoRow=Add(weaponPanel,"hud-weapon__row"); ammoRow.Add(Style(ammo,"hud-ammo")); ammoRow.Add(Style(ammoTag,"hud-ammo__tag"));
+            reloadBar=Bar(weaponPanel,"hud-bar--reload",out reloadFill);
+            frame.Add(Style(prompt,"hud-prompt"));
+            frame.Add(Style(respawn,"hud-respawn"));
+
+            feed.name="hud-kill-feed"; feed.style.position=Position.Absolute; feed.style.right=Length.Percent(3); feed.style.top=Length.Percent(15);
+            feed.style.fontSize=14; feed.style.unityTextAlign=TextAnchor.UpperRight; feed.style.color=Ivory; Root.Add(feed);
+            Center(crosshair); crosshair.name="hud-crosshair"; Root.Add(crosshair);
+            // A 2 x 8 ivory core inside a 1 px dark rim (border-box): ivory alone vanished against ivory stone.
+            for(int i=0;i<4;i++)
+            {
+                var tick=ticks[i]=new VisualElement(); tick.style.position=Position.Absolute; tick.style.backgroundColor=Ivory;
+                tick.style.width=i<2?4:10; tick.style.height=i<2?10:4; Rim(tick); crosshair.Add(tick);
+            }
+            dot.style.position=Position.Absolute; dot.style.width=dot.style.height=4; dot.style.left=dot.style.top=-2; dot.style.backgroundColor=Ivory; Rim(dot); crosshair.Add(dot);
+            Center(bloomRing); bloomRing.name="hud-bloom-ring"; Rim(bloomRing);
+            bloomRing.style.borderTopColor=bloomRing.style.borderBottomColor=bloomRing.style.borderLeftColor=bloomRing.style.borderRightColor=new Color(Ivory.r,Ivory.g,Ivory.b,.6f);
+            bloomRing.style.display=DisplayStyle.None; Root.Add(bloomRing);
+            // A waypoint over the zone center, clamped to the screen edge when off-screen or behind (PLAYTEST-FIX-LATER #12).
+            zoneMarker.name="hud-zone-marker"; zoneMarker.pickingMode=PickingMode.Ignore; zoneMarker.style.position=Position.Absolute;
+            zoneMarker.style.width=80; zoneMarker.style.marginLeft=-40; zoneMarker.style.marginTop=-12; zoneMarker.style.fontSize=14;
+            zoneMarker.style.unityTextAlign=TextAnchor.UpperCenter; zoneMarker.style.unityFontStyleAndWeight=FontStyle.Bold;
+            // A graphite chip like the zone pill: a 1.5 px text outline ate the 14 px glyphs and left them hollow.
+            zoneMarker.style.backgroundColor=new Color(.08f,.094f,.086f,.72f); zoneMarker.style.paddingTop=zoneMarker.style.paddingBottom=2;
+            zoneMarker.style.display=DisplayStyle.None; Root.Add(zoneMarker);
+            // A thin arc at 35 % of screen height, sized each frame: a bar 120 px from center read as a red hitmarker.
+            Center(damage); damage.name="hud-damage-direction"; damage.style.display=DisplayStyle.None; Root.Add(damage);
+            damage.generateVisualContent+=context=>
+            {
+                var paint=context.painter2D; paint.strokeColor=new Color(.86f,.30f,.22f,.85f); paint.lineWidth=6; paint.lineCap=LineCap.Round;
+                paint.BeginPath(); paint.Arc(new Vector2(DamageRadius,DamageRadius),DamageRadius,Angle.Degrees(-112),Angle.Degrees(-68)); paint.Stroke();
+            };
+            // The hitmarker keeps the original hidden cue element; variants change glyph size and color.
+            cue.name="hud-hit-cue"; cue.AddToClassList("hit-cue"); cue.text="×"; cue.pickingMode=PickingMode.Ignore;
+            cue.style.position=Position.Absolute; cue.style.left=cue.style.top=Length.Percent(50); cue.style.width=cue.style.height=48;
+            cue.style.marginLeft=cue.style.marginTop=-24; cue.style.unityTextAlign=TextAnchor.MiddleCenter; cue.style.display=DisplayStyle.None; Root.Add(cue);
+            cue.style.unityTextOutlineWidth=1.5f; cue.style.unityTextOutlineColor=RimColor;
+            // A graphite pill like the other HUD panels: coloured text alone was muddy on the ivory floor.
+            banner.name="hud-kill-banner"; Style(banner,"hud-kill-banner"); banner.style.display=DisplayStyle.None; Root.Add(banner);
+            mapIntro.name="hud-map-intro"; Style(mapIntro,"hud-map-intro"); mapIntro.style.display=DisplayStyle.None; Root.Add(mapIntro);
         }
+        // The streak word takes the kill-mark red; the headshot is spelled out (a ◎ read as the violet team's ●).
+        public static string KillBanner(int streak,string victim,bool head)
+        {
+            string count=streak<=1?"":"<color=#EB5440>"+(streak==2?"DOUBLE":streak==3?"TRIPLE":"×"+streak)+"</color>  ·  ";
+            return count+"ELIMINATED  "+victim+(head?"  ·  HEADSHOT":"");
+        }
+        // The dark edge on reticle elements, the soldier outline's near-black.
+        static readonly Color RimColor=new Color(.05f,.055f,.065f,.8f);
+        static void Rim(VisualElement element)
+        {
+            element.style.borderTopWidth=element.style.borderBottomWidth=element.style.borderLeftWidth=element.style.borderRightWidth=1;
+            element.style.borderTopColor=element.style.borderBottomColor=element.style.borderLeftColor=element.style.borderRightColor=RimColor;
+        }
+        static VisualElement Add(VisualElement parent,string style)
+        { var element=new VisualElement(); element.AddToClassList(style); element.pickingMode=PickingMode.Ignore; parent.Add(element); return element; }
+        static Label Style(Label label,string style) { label.AddToClassList(style); label.pickingMode=PickingMode.Ignore; return label; }
+        static VisualElement Bar(VisualElement parent,string variant,out VisualElement fill)
+        { var bar=Add(parent,"hud-bar"); bar.AddToClassList(variant); fill=Add(bar,"hud-bar__fill"); return bar; }
+        static void SetFill(VisualElement fill,float fraction) => fill.style.width=Length.Percent(100*Mathf.Clamp01(fraction));
+        static void Show(VisualElement element,bool shown) => element.style.display=shown?DisplayStyle.Flex:DisplayStyle.None;
+        static void Fill(VisualElement element)
+        { element.style.position=Position.Absolute; element.style.left=element.style.top=element.style.right=element.style.bottom=0; }
+        static void Center(VisualElement element)
+        { element.pickingMode=PickingMode.Ignore; element.style.position=Position.Absolute; element.style.left=element.style.top=Length.Percent(50); element.style.width=element.style.height=0; }
         public static string Team(int team) => Teams[Math.Max(0,Math.Min(3,team))];
         public static string WeaponName(WeaponKind kind)
         {
-            switch(kind) { case WeaponKind.LineDriver:return "Line Driver"; case WeaponKind.PulseLobber:return "Pulse Lobber"; case WeaponKind.ReboundDisc:return "Rebound Disc"; case WeaponKind.PushLens:return "Push Lens"; case WeaponKind.StunGun:return "Stun Gun"; case WeaponKind.LaserSword:return "Laser Sword"; case WeaponKind.LaserPistol:return "Laser Pistol"; case WeaponKind.LaserShotgun:return "Laser Shotgun"; case WeaponKind.LaserSniper:return "Laser Sniper"; default:return kind.ToString(); }
+            switch(kind) { case WeaponKind.LineDriver:return "Line Driver"; case WeaponKind.PulseLobber:return "Pulse Lobber"; case WeaponKind.ReboundDisc:return "Rebound Disc"; case WeaponKind.PushLens:return "Push Lens"; case WeaponKind.StunGun:return "Stun Gun"; case WeaponKind.LaserSword:return "Laser Sword"; case WeaponKind.LaserPistol:return "Laser Pistol"; case WeaponKind.LaserShotgun:return "Laser Shotgun"; case WeaponKind.LaserSniper:return "Laser Sniper"; case WeaponKind.LaserSMG:return "Laser SMG"; default:return kind.ToString(); }
+        }
+        // Cone half-angle to panel units at the camera's current vertical FOV.
+        public static float SpreadPixels(float spreadDegrees,float verticalFov,float panelHeight)
+        {
+            if(!(verticalFov>0 && verticalFov<180) || !(panelHeight>0) || !(spreadDegrees>0)) return 0;
+            return Mathf.Tan(spreadDegrees*Mathf.Deg2Rad)/Mathf.Tan(verticalFov*.5f*Mathf.Deg2Rad)*panelHeight*.5f;
         }
         public void Step(PracticeSession session)
         {
+            var match=session.Match; int local=session.LocalParticipantId; float now=Time.unscaledTime;
             for(int i=0;i<session.CombatEvents.Count;i++)
             {
-                var evt=session.CombatEvents[i];
-                if(evt.Kind==CombatEventKind.Hit && (evt.Target==session.LocalParticipantId || evt.Action.Participant==session.LocalParticipantId))
-                { cue.text=evt.Target==session.LocalParticipantId?"DAMAGE":"×"; cueUntil=Time.unscaledTime+.16f; }
+                var e=session.CombatEvents[i];
+                if(!history.Accept(e)) continue;
+                int attacker=e.Action.Participant, target=e.Target;
+                if(e.Kind==CombatEventKind.Hit && target>=1 && target<=8)
+                {
+                    RecordHit(e);
+                    if(attacker==local && target!=local) Mark(e.Headshot?Marker.Head:Marker.Body,now,e.Amount);
+                    if(target==local && attacker!=local && attacker>0)
+                    { var source=match?.Find(attacker); damageFrom=source!=null?source.Eye:e.Position; damageUntil=now+1; }
+                }
+                else if(e.Kind==CombatEventKind.ShieldBroken && attacker==local && target!=local) Mark(Marker.Shield,now,0);
+                else if(e.Kind==CombatEventKind.Death && target>=1 && target<=8)
+                {
+                    int killer=Killer(target,e.Tick,out bool head);
+                    AddFeed(match,killer,target,killer!=0 && head,now);
+                    if(killer==local && target!=local) { Mark(Marker.Kill,now,0); Confirm(Name(match,target),head,now); }
+                }
             }
+        }
+        void Mark(Marker marker,float now,float damage)
+        {
+            if(now<cueUntil && marker<LastMarker) return;
+            LastMarker=marker;
+            cueUntil=now+(marker==Marker.Kill?.30f:marker==Marker.Body?.15f:.22f);
+            cue.text=marker==Marker.Kill?"✕":"×";
+            cue.style.fontSize=marker==Marker.Kill?40:marker==Marker.Head?34:marker==Marker.Body?MarkerSize(damage):28;
+            cue.style.color=marker==Marker.Kill?new Color(.92f,.33f,.25f):marker==Marker.Head?new Color(.98f,.78f,.36f):marker==Marker.Shield?ShieldBlue:Ivory;
+            // A shotgun's pellets each report a hit: sound once per frame, unless a stronger marker lands in it.
+            if(Feedback==null || now==soundedAt && marker<=sounded) return;
+            soundedAt=now; sounded=marker; CuesSounded++;
+            if(marker==Marker.Head || marker==Marker.Kill)
+            {
+                if(marker==Marker.Head) headClip=headClip??ArenaAudio.MakeConfirm(false); else killClip=killClip??ArenaAudio.MakeConfirm(true);
+                Feedback.PlayOneShot(marker==Marker.Head?headClip:killClip);
+            }
+            else Feedback.PlayOneShot(tickClip=tickClip??ArenaAudio.MakeTick(),TickScale);
+        }
+        // The rules finish a target only at the end of its tick (ArenaMatch.Kill), so later pellets and other shooters'
+        // hits that tick land for 0: only a damaging hit names the killer and its headshot.
+        void RecordHit(CombatEvent e)
+        {
+            if(e.Amount<=0 || e.Target<1 || e.Target>8) return;
+            lastHitter[e.Target]=e.Action.Participant; lastHitTick[e.Target]=e.Tick; lastHitHead[e.Target]=e.Headshot;
+        }
+        public int Killer(int target,int tick,out bool head)
+        {
+            head=target>=1 && target<=8 && lastHitHead[target];
+            return target>=1 && target<=8 && lastHitTick[target]==tick?lastHitter[target]:0;
+        }
+        public void Confirm(string victim,bool head,float now)
+        {
+            KillStreak=now-lastKillAt<=StreakSeconds?KillStreak+1:1; lastKillAt=now;
+            banner.text=KillBanner(KillStreak,victim,head);
+            bannerUntil=now+BannerSeconds; // Refresh shows it, so a kill landing after your own death never flashes
+        }
+        static string Name(Wildstone.Match.ArenaMatch match,int participant)
+        { var p=match?.Find(participant); return (p!=null?Teams[Math.Max(0,Math.Min(3,p.Team))].Substring(0,1):"·")+" P"+participant; }
+        void AddFeed(Wildstone.Match.ArenaMatch match,int killer,int victim,bool head,float now)
+        {
+            for(int i=feedLines.Length-1;i>0;i--) { feedLines[i]=feedLines[i-1]; feedUntil[i]=feedUntil[i-1]; }
+            feedLines[0]=killer!=0 && killer!=victim?Name(match,killer)+"  ›  "+Name(match,victim)+(head?"  ◎":""):Name(match,victim)+"  eliminated";
+            feedUntil[0]=now+5; feedVersion++;
         }
         public void Refresh(PracticeSession session)
         {
             var match=session.Match; var p=session.LocalPlayer; if(match==null || p==null || session.Motor==null || session.View==null) return;
-            scores.text=$"▲ {match.Score(0):0}    ■ {match.Score(1):0}    ◆ {match.Score(2):0}    ● {match.Score(3):0}";
+            float now=Time.unscaledTime; bool reduced=session.Settings!=null && session.Settings.ReducedMotion;
+            if(Feedback!=null && session.Settings!=null) Feedback.volume=Mathf.Clamp01(session.Settings.EffectsVolume)*.5f;
+            if(ownTeam!=p.Team)
+            {
+                ownTeam=p.Team;
+                for(int i=0;i<4;i++) chips[i].EnableInClassList("hud-chip--own",i==ownTeam);
+                vitals.style.borderLeftColor=TeamTints[Math.Max(0,Math.Min(3,ownTeam))];
+            }
+            for(int i=0;i<4;i++)
+            {
+                float score=match.Score(i); int whole=(int)(score+.5f);
+                if(Changed(scoreValues[i],whole)) scoreValues[i].text=whole.ToString();
+                SetFill(scoreFills[i],score/WinSeconds);
+            }
             int seconds=Math.Max(0,480-match.ElapsedTicks/match.TickRate);
-            status.text=$"{(session.ExternalSimulation?"PRIVATE MATCH":"OFFLINE PRACTICE")} · {seconds/60:00}:{seconds%60:00}";
-            vitals.text=p.Alive?$"{p.Health:0} HEALTH   {p.Shield:0} SHIELD   {session.Motor.CaptureState().Stamina:0} STAMINA":$"RESPAWN IN {Math.Max(0,(p.RespawnTick-match.Tick)/(float)match.TickRate):0.0}s";
-            var selected=p.SelectedSpecial?p.SpecialWeapon:WeaponKind.LineDriver;
-            weapon.text=WeaponName(selected)+"   "+(selected==WeaponKind.LaserSword?"∞":(p.SelectedSpecial?p.SpecialAmmo:p.StarterAmmo).ToString())+(p.ReloadUntil>match.Tick?"  RELOADING":selected==WeaponKind.LineDriver?"  AUTO":"");
-            string Key(int i)=>LocalSettings.BindingLabel(session.Settings.Bindings[i]);
-            items.text=$"{Key(12)}  Blink {p.BlinkCharges}     {Key(13)}  Shield {p.ShieldCharges}     {Key(11)}  Grenade {p.GrenadeAmmo}";
+            if(Changed(time,seconds)) time.text=$"{seconds/60}:{seconds%60:00}";
+            mode.text=session.ExternalSimulation?"PRIVATE MATCH":"PRACTICE";
+
+            Show(vitals,p.Alive); Show(weaponPanel,p.Alive); Show(items[0].parent,p.Alive); Show(respawn,!p.Alive);
+            int tenths=p.Alive?-1:(int)(Math.Max(0,(p.RespawnTick-match.Tick)/(float)match.TickRate)*10+.5f);
+            if(Changed(respawn,tenths)) respawn.text=tenths<0?"":$"RESPAWN  {tenths/10f:0.0}";
+            int hp=Mathf.CeilToInt(p.Health);
+            if(Changed(health,hp)) health.text=hp.ToString();
+            health.style.color=p.Health<35?Warning:Ivory;
+            SetFill(healthFill,p.Health/WeaponCatalog.Health); healthFill.style.backgroundColor=p.Health<35?Warning:Ivory;
+            bool shielded=p.Shield>0;
+            Show(shieldValue,shielded); Show(shieldBar,shielded);
+            int shield=Mathf.CeilToInt(p.Shield);
+            if(Changed(shieldValue,shield)) shieldValue.text=$"{shield} SHIELD";
+            SetFill(shieldFill,p.Shield/WeaponCatalog.Shield);
+            SetFill(staminaFill,session.Motor.CaptureState().Stamina/100);
+
+            var selected=CombatRules.CurrentWeapon(p);
+            if(Changed(weaponName,(int)selected)) weaponName.text=WeaponName(selected).ToUpperInvariant();
+            bool reloading=p.ReloadUntil>match.Tick;
+            int rounds=p.SelectedSpecial?p.SpecialAmmo:p.StarterAmmo;
+            int shownRounds=selected==WeaponKind.LaserSword?-1:rounds;
+            if(Changed(ammo,shownRounds)) ammo.text=shownRounds<0?"∞":rounds.ToString();
+            bool dry=LowAmmo(selected,rounds);
+            ammo.style.color=dry?Warning:new StyleColor(StyleKeyword.Null);
+            if(Feedback!=null && p.Alive && dry && selected==lastWeapon && rounds<lastRounds) Feedback.PlayOneShot(dryClip=dryClip??ArenaAudio.MakeDry(),DryScale);
+            lastWeapon=selected; lastRounds=rounds;
+            ammoTag.text=reloading?"RELOADING":WeaponCatalog.IsAutomatic(selected)?"AUTO":"";
+            Show(reloadBar,reloading);
+            if(reloading) SetFill(reloadFill,1-(p.ReloadUntil-match.Tick)/(WeaponCatalog.ReloadSeconds*match.TickRate));
+            var bindings=session.Settings.Bindings;
+            Item(0,bindings[12],"BLINK",p.BlinkCharges); Item(1,bindings[13],"SHIELD",p.ShieldCharges); Item(2,bindings[11],"GRENADE",p.GrenadeAmmo);
+
             Vector3 delta=match.ZonePosition-p.Feet; float bearing=Vector3.SignedAngle(Quaternion.Euler(0,session.View.Yaw,0)*Vector3.forward,new Vector3(delta.x,0,delta.z),Vector3.up);
-            string direction=Math.Abs(bearing)<30?"AHEAD":Math.Abs(bearing)>150?"BEHIND":bearing>0?"RIGHT":"LEFT";
-            zone.text=(session.ZoneContested?"ZONE CONTESTED":session.ZoneCaptor>=0?"ZONE · "+Team(session.ZoneCaptor):"MOVING ZONE")+$"  {delta.magnitude:0}m · {direction}";
-            prompt.text=session.ExternalSimulation?"Esc  Menu":"Esc  Menu · Stationary target fixture";
-            foreach(var pickup in match.Pickups) if(pickup.AvailableTick<=match.Tick && (pickup.Position-p.Feet).sqrMagnitude<6.25f)
-            { prompt.text=$"{Key(14)}  Pick up {pickup.Item.Replace('-',' ')}"; break; }
-            cue.style.display=Time.unscaledTime<cueUntil?DisplayStyle.Flex:DisplayStyle.None;
+            zoneArrow.style.rotate=new Rotate(new Angle(bearing,AngleUnit.Degree));
+            Color zoneColor=session.ZoneContested?Warning:session.ZoneCaptor>=0?TeamTints[Math.Min(3,session.ZoneCaptor)]:ZoneIdle;
+            zoneArrow.style.color=zoneColor;
+            int meters=(int)(delta.magnitude+.5f), zoneState=session.ZoneContested?5:Math.Min(4,session.ZoneCaptor+1);
+            if(Changed(zoneText,zoneState<<20|meters))
+                zoneText.text=(session.ZoneContested?"ZONE CONTESTED":session.ZoneCaptor>=0?"ZONE · "+Team(session.ZoneCaptor):"MOVING ZONE")+$"   {meters} m";
+            float panelWidth=Root.layout.width, panelHeight=Root.layout.height;
+            bool marked=p.Alive && session.Camera!=null && panelWidth>0 && panelHeight>0 && new Vector2(delta.x,delta.z).magnitude>Wildstone.Match.MovingZone.Radius;
+            zoneMarker.style.display=marked?DisplayStyle.Flex:DisplayStyle.None;
+            if(marked)
+            {
+                var spot=ZoneMarkerPosition(session.Camera.WorldToViewportPoint(match.ZonePosition+Vector3.up*2),panelWidth,panelHeight,44);
+                zoneMarker.style.left=spot.x; zoneMarker.style.top=spot.y; zoneMarker.style.color=zoneColor;
+                if(Changed(zoneMarker,meters)) zoneMarker.text="◆ "+meters+" m";
+            }
+            if(hintMap!=session.MapId || hintExternal!=session.ExternalSimulation)
+            {
+                hintMap=session.MapId; hintExternal=session.ExternalSimulation; mapIntro.text=MapName(session);
+                hint.text=mapIntro.text+"  ·  "+(session.ExternalSimulation?"ESC  MENU":"ESC  MENU  ·  STRAFING TARGET FIXTURE");
+            }
+            float intro=MapIntroOpacity(match.ElapsedTicks,match.TickRate,reduced);
+            mapIntro.style.display=intro>0?DisplayStyle.Flex:DisplayStyle.None; mapIntro.style.opacity=intro;
+            var input=session.Input;
+            if(input!=blinkInput) { blinkInput=input; blinkPresses=input?.BlinkPresses??0; blinkCheckAt=float.MaxValue; }
+            else if(input!=null && input.BlinkPresses!=blinkPresses)
+            {
+                blinkPresses=input.BlinkPresses;
+                if(p.Alive && p.BlinkCharges>0) { blinkCharges=p.BlinkCharges; blinkCheckAt=now+BlinkDenySeconds; }
+            }
+            if(now>=blinkCheckAt)
+            {
+                blinkCheckAt=float.MaxValue;
+                if(p.Alive && p.BlinkCharges>=blinkCharges)
+                { blinkDeniedUntil=now+1.5f; Feedback?.PlayOneShot(dryClip=dryClip??ArenaAudio.MakeDry(),DryScale); }
+            }
+            int pick=-1; var feet=session.Motor.CaptureState().Position; // predicted, like the pickup request
+            for(int i=0;i<match.Pickups.Count;i++)
+            { var pickup=match.Pickups[i]; if(pickup.AvailableTick<=match.Tick && (pickup.Position-feet).sqrMagnitude<WeaponCatalog.PickupReach*WeaponCatalog.PickupReach) { pick=i; break; } }
+            bool denied=now<blinkDeniedUntil;
+            if(Changed(prompt,denied?-2:pick<0?-1:HashCode.Combine(pick,bindings[14],bindings[12])))
+                prompt.text=denied?"NO FLOOR TO BLINK TO · AIM AT OPEN GROUND":pick<0?"":PickupPrompt(match.Pickups[pick].Item,bindings[14],bindings[12]);
+            Show(prompt,p.Alive && (pick>=0 || denied));
+            cue.style.display=now<cueUntil?DisplayStyle.Flex:DisplayStyle.None;
+            banner.style.display=p.Alive && now<bannerUntil?DisplayStyle.Flex:DisplayStyle.None;
+            banner.style.opacity=reduced?1:Mathf.Clamp01((bannerUntil-now)*3);
+
+            float width=Root.layout.width, height=Root.layout.height, ads=session.LocalAdsProgress;
+            float fov=session.Camera!=null?session.Camera.fieldOfView:60;
+            // Cone size follows the authoritative ADS/bloom used by the rules; visibility follows the local zoom.
+            CrosshairGap=Math.Max(3,SpreadPixels(WeaponCatalog.SpreadDegrees(selected,p.AdsProgress,p.Bloom),fov,height));
+            bool scoped=p.Alive && WeaponCatalog.ScopeActive(selected,ads);
+            crosshair.style.display=p.Alive && !scoped && WeaponCatalog.HipCrosshairVisible(selected,ads)?DisplayStyle.Flex:DisplayStyle.None;
+            ticks[0].style.left=-2; ticks[0].style.top=-CrosshairGap-9; ticks[1].style.left=-2; ticks[1].style.top=CrosshairGap-1;
+            ticks[2].style.left=-CrosshairGap-9; ticks[2].style.top=-2; ticks[3].style.left=CrosshairGap-1; ticks[3].style.top=-2;
+            bool ringOn=!scoped && BloomRingVisible(selected,ads,p.Bloom,p.Alive);
+            BloomRingRadius=ringOn?CrosshairGap:0; Show(bloomRing,ringOn);
+            if(ringOn)
+            {
+                bloomRing.style.width=bloomRing.style.height=CrosshairGap*2; bloomRing.style.marginLeft=bloomRing.style.marginTop=-CrosshairGap;
+                bloomRing.style.borderTopLeftRadius=bloomRing.style.borderTopRightRadius=bloomRing.style.borderBottomLeftRadius=bloomRing.style.borderBottomRightRadius=CrosshairGap;
+            }
+            bool speedOn=!session.ExternalSimulation && !reduced && p.Alive; Show(speed,speedOn);
+            if(speedOn)
+            {
+                var v=session.Motor.CaptureState().Velocity; int speedTenths=Mathf.RoundToInt(new Vector2(v.x,v.z).magnitude*10);
+                if(Changed(speed,speedTenths)) speed.text=$"SPEED  {speedTenths/10f:0.0} m/s";
+            }
+            scope.style.display=scoped && width>0 && height>0?DisplayStyle.Flex:DisplayStyle.None;
+            if(scoped && width>0 && height>0)
+            {
+                float aperture=.9f*Math.Min(width,height), border=Math.Max(width,height), outer=aperture*.5f+border;
+                scopeRing.style.left=width*.5f-outer; scopeRing.style.top=height*.5f-outer; scopeRing.style.width=scopeRing.style.height=outer*2;
+                scopeRing.style.borderTopWidth=scopeRing.style.borderBottomWidth=scopeRing.style.borderLeftWidth=scopeRing.style.borderRightWidth=border;
+                scopeRing.style.borderTopLeftRadius=scopeRing.style.borderTopRightRadius=scopeRing.style.borderBottomLeftRadius=scopeRing.style.borderBottomRightRadius=outer;
+                scopeH.style.left=width*.5f-aperture*.5f; scopeH.style.top=height*.5f-.5f; scopeH.style.width=aperture; scopeH.style.height=1;
+                scopeV.style.left=width*.5f-.5f; scopeV.style.top=height*.5f-aperture*.5f; scopeV.style.width=1; scopeV.style.height=aperture;
+            }
+            bool low=p.Alive && p.Health<35;
+            vignette.style.display=low?DisplayStyle.Flex:DisplayStyle.None;
+            if(low)
+            {
+                float alpha=reduced?.26f:.20f+.10f*(.5f+.5f*Mathf.Sin(now*Mathf.PI*2*1.1f));
+                var red=new Color(.62f,.12f,.09f,alpha); float edge=Math.Max(12,height*.06f);
+                vignette.style.borderTopColor=vignette.style.borderBottomColor=vignette.style.borderLeftColor=vignette.style.borderRightColor=red;
+                vignette.style.borderTopWidth=vignette.style.borderBottomWidth=vignette.style.borderLeftWidth=vignette.style.borderRightWidth=edge;
+            }
+            bool hurt=p.Alive && now<damageUntil;
+            damage.style.display=hurt?DisplayStyle.Flex:DisplayStyle.None;
+            if(hurt)
+            {
+                float radius=DamageArcRadius(height);
+                if(Math.Abs(radius-DamageRadius)>.5f)
+                {
+                    DamageRadius=radius; damage.style.width=damage.style.height=radius*2; damage.style.marginLeft=damage.style.marginTop=-radius;
+                    damage.MarkDirtyRepaint();
+                }
+                Vector3 from=damageFrom-p.Feet;
+                float angle=Vector3.SignedAngle(Quaternion.Euler(0,session.View.Yaw,0)*Vector3.forward,new Vector3(from.x,0,from.z),Vector3.up);
+                damage.style.rotate=new Rotate(new Angle(angle,AngleUnit.Degree));
+                damage.style.opacity=reduced?1:Mathf.Clamp01((damageUntil-now)*1.5f);
+            }
+            int visible=0;
+            for(int i=0;i<feedLines.Length;i++) if(feedLines[i]!=null && now<feedUntil[i]) visible|=1<<i;
+            if(Changed(feed,feedVersion<<4|visible))
+            {
+                string lines="";
+                for(int i=0;i<feedLines.Length;i++) if((visible&1<<i)!=0) lines+=(lines.Length>0?"\n":"")+feedLines[i];
+                feed.text=lines;
+            }
+        }
+        void Item(int index,string binding,string label,int count)
+        {
+            if(Changed(itemKeys[index],binding?.GetHashCode()??0)) itemKeys[index].text=KeyLabel(binding);
+            if(Changed(itemLabels[index],count)) itemLabels[index].text=$"{label} {count}";
+            items[index].EnableInClassList("hud-item--empty",count<=0);
         }
     }
 }

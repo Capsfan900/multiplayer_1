@@ -55,6 +55,16 @@ namespace Wildstone.Tests
             Assert.That(FusionSession.CanAwaitMigrationToken(Fusion.Sockets.NetDisconnectReason.Requested,false,SessionPhase.Running),Is.False);
             Assert.That(FusionSession.CanAwaitMigrationToken(Fusion.Sockets.NetDisconnectReason.ProtocolError,false,SessionPhase.Running),Is.False);
         }
+        // The SDK can report a joined peer before its user ID: only a remote peer waits, and only until its deadline.
+        [Test] public void APeerWithoutAUserIdIsRetriedUntilItsDeadlineInsteadOfRemoved()
+        {
+            double wait=FusionLobby.IdentityWaitSeconds;
+            Assert.That(FusionLobby.AwaitIdentity(null,false,0,wait),Is.True);
+            Assert.That(FusionLobby.AwaitIdentity("",false,wait-.1,wait),Is.True);
+            Assert.That(FusionLobby.AwaitIdentity(null,false,wait,wait),Is.False,"After the wait the peer is refused as invalid-peer.");
+            Assert.That(FusionLobby.AwaitIdentity(null,true,0,wait),Is.False,"The host's own identity never waits.");
+            Assert.That(FusionLobby.AwaitIdentity("peer",false,0,wait),Is.False);
+        }
         [Test] public void RecoveryDiagnosticsExposeLocalFailureWithoutLoggingExternalCredentials()
         {
             var external=new InvalidOperationException("secret-token-and-guest-id");
@@ -100,6 +110,16 @@ namespace Wildstone.Tests
             CollectionAssert.AreNotEqual(FusionSession.ContentToken(new ContentVersion("a|b","c","d","e")),
                 FusionSession.ContentToken(new ContentVersion("a","b|c","d","e")));
             Assert.Throws<ArgumentException>(() => FusionSession.ContentToken(default));
+        }
+        [Test] public void MovementRevisionIsPartOfTheRulesetAndAMismatchRefusesTheJoin()
+        {
+            Assert.That(FusionMenuController.Ruleset,Does.Contain("movement-"+Wildstone.Movement.MotorTuning.Revision));
+            var local=new ContentVersion("p1","b1","atrium1",FusionMenuController.Ruleset);
+            var stale=FusionMenuController.Ruleset.Replace("movement-"+Wildstone.Movement.MotorTuning.Revision,"movement-0");
+            var properties=new Dictionary<string, SessionProperty>{ ["protocol"]="p1", ["build"]="b1", ["map"]="atrium1", ["rules"]=stale };
+            Assert.That(FusionSession.MatchesProperties(properties,local),Is.False);
+            properties["rules"]=FusionMenuController.Ruleset;
+            Assert.That(FusionSession.MatchesProperties(properties,local),Is.True);
         }
         [Test] public void MissingWrongTypedAndMismatchedPropertiesFailClosed()
         {

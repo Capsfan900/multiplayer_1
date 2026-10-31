@@ -54,6 +54,40 @@ namespace Wildstone.Tests
             Assert.That(motor.CaptureState().Position.z, Is.GreaterThan(3));
             Assert.That(JsonUtility.ToJson(motor.CaptureState()), Is.EqualTo(expected));
         }
+        // D041: the A key held through a plain jump (12 m/s up, held, ~88 ticks of air) with the facing turned so the sideways
+        // wish leads the velocity by the gain angle, as a player turning into the strafe does.
+        MotorState Jumping(){ var s=Air(); s.Velocity=new Vector3(0,12,11); return s; }
+        float Strafe(bool forwardHeld,int ticks,out float peak)
+        {
+            peak=0;
+            for(int i=0;i<ticks;i++)
+            {
+                var s=motor.CaptureState(); var hv=new Vector3(s.Velocity.x,0,s.Velocity.z);
+                float heading=Mathf.Atan2(hv.x,hv.z)*Mathf.Rad2Deg, sweet=Mathf.Acos(Mathf.Clamp01((2.5f-18*Dt)/hv.magnitude))*Mathf.Rad2Deg;
+                var c=Command(i,MotorButtons.Jump,new Vector2(-1,forwardHeld?1:0)); c.Yaw=Mathf.Repeat(heading+90-sweet+180,360)-180;
+                motor.Simulate(c,Dt,i); hv=motor.CaptureState().Velocity; hv.y=0; peak=Mathf.Max(peak,hv.magnitude);
+            }
+            var v=motor.CaptureState().Velocity; return new Vector3(v.x,0,v.z).magnitude;
+        }
+        [Test] public void ScriptedStrafeBuildsSpeedWithinOneJumpAndStaysUnderTheSoftCap()
+        {
+            var start=Jumping(); // captured once: a second capture would carry the first run's tick and refuse the replayed commands
+            motor.RestoreState(start); float a=Strafe(false,88,out float peakA);
+            motor.RestoreState(start); float wa=Strafe(true,88,out float peakWa);
+            Assert.That(a,Is.GreaterThanOrEqualTo(12.8f));
+            Assert.That(Mathf.Max(peakA,peakWa),Is.LessThanOrEqualTo(17.6f+.5f));
+            Assert.That(wa,Is.EqualTo(a).Within(.2f));
+        }
+        [Test] public void AirStrafeReplayFromMidFlightProducesIdenticalEntireState()
+        {
+            motor.RestoreState(Jumping()); Strafe(false,30,out _);
+            var saved=motor.CaptureState();
+            for(int i=30;i<88;i++){ var c=Command(i,MotorButtons.Jump,new Vector2(1,1)); c.Yaw=-80+i*.5f; motor.Simulate(c,Dt,i); }
+            string expected=JsonUtility.ToJson(motor.CaptureState());
+            motor.RestoreState(saved);
+            for(int i=30;i<88;i++){ var c=Command(i,MotorButtons.Jump,new Vector2(1,1)); c.Yaw=-80+i*.5f; motor.Simulate(c,Dt,i); }
+            Assert.That(JsonUtility.ToJson(motor.CaptureState()),Is.EqualTo(expected));
+        }
         [Test] public void RejectsNonFiniteAndWrongGenerationWithoutChangingAnything()
         {
             string initial = JsonUtility.ToJson(motor.CaptureState());
@@ -238,6 +272,20 @@ namespace Wildstone.Tests
             Assert.That(motor.CaptureState().Velocity.z,Is.Zero);
             var view=body.AddComponent<FirstPersonView>(); view.OwnsLocalView=true; view.SampleLook(new Vector2(20,5));
             Assert.That(view.Yaw,Is.EqualTo(20)); Assert.That(view.Pitch,Is.EqualTo(-5));
+        }
+        [Test] public void StunSuppressionLiftsAtItsEndTickWithoutAHostUpdate()
+        {
+            motor.RestoreState(Air()); motor.SetSuppressed(true,2);
+            motor.Simulate(Command(0,MotorButtons.None,Vector2.up),Dt,0);
+            motor.Simulate(Command(1,MotorButtons.None,Vector2.up),Dt,1);
+            Assert.That(motor.CaptureState().Suppressed,Is.True);
+            Assert.That(motor.CaptureState().Velocity.z,Is.Zero);
+            motor.Simulate(Command(2,MotorButtons.None,Vector2.up),Dt,2);
+            Assert.That(motor.CaptureState().Suppressed,Is.False);
+            Assert.That(motor.CaptureState().SuppressedUntil,Is.Zero);
+            Assert.That(motor.CaptureState().Velocity.z,Is.GreaterThan(0));
+            motor.SetSuppressed(false,9);
+            Assert.That(motor.CaptureState().SuppressedUntil,Is.Zero,"Only an active suppression carries a lift tick");
         }
         [Test] public void ReplayingOrPresentingRemoteEventsCannotDuplicateLocalFeedback()
         {

@@ -5,6 +5,8 @@ namespace Wildstone.Movement
     public sealed class MotorTuning
     {
         public const float TickDelta = 1f / 120f;
+        // Joins the online ContentVersion ruleset (FusionMenuController): a build whose air laws differ cannot meet this one.
+        public const int Revision = 1;
         public const int PlayerLayer = 6;
         public const int WorldMask = ~((1 << 6) | (1 << 7) | (1 << 8));
         public static readonly MotorTuning Source = new MotorTuning();
@@ -70,7 +72,9 @@ namespace Wildstone.Movement
         public readonly float fallGravityMultiplier = 1.5f;
         public readonly float airCarryDecay = 0.8f;
         public readonly float airSteerDegPerSec = 120f;
-        public readonly float airStrafeWishSpeed = 2f;
+        // D041 proposals: a held strafe key owns the air with its own, slower gain (airAccel stays the forward top-up).
+        public readonly float airStrafeWishSpeed = 2.5f;
+        public readonly float airStrafeAccel = 18f;
         public readonly float landingSoftSpeed = 16f;
         public readonly float landingHardSpeed = 26f;
         public readonly float landingSpeedLoss = 0.35f;

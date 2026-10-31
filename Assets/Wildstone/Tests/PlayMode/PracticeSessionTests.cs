@@ -1,7 +1,9 @@
+using System.Collections;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Wildstone.Game;
 using Wildstone.Maps;
 using Wildstone.Movement;
@@ -23,6 +25,45 @@ namespace Wildstone.Tests
             for(int i=0;i<256;i++) step(false);
             long allocated=bytes()-before;
             Assert.That(allocated,Is.Zero,"Warm coordinator/movement/combat path must not allocate; no presentation subscribers are attached.");
+        }
+        [Test] public void ApplyingSettingsKeepsTheOnlineMovementSequenceRising()
+        {
+            int last=0; for(int i=1;i<=5;i++) last=session.Input.ConsumeMovement(i,1,0,0).Sequence;
+            session.ApplySettings(session.Settings,false);
+            Assert.That(session.Input.ConsumeMovement(6,1,0,0).Sequence,Is.EqualTo(last+1),"Host and client drop samples whose sequence does not rise.");
+        }
+        [Test] public void PracticeSpeedReadoutShowsHorizontalSpeedUnlessReduced()
+        {
+            var hud=new ArenaHud(); hud.Refresh(session);
+            Assert.That(hud.SpeedVisible,Is.True);
+            var label=UnityEngine.UIElements.UQueryExtensions.Q<UnityEngine.UIElements.Label>(hud.Root,"hud-speed");
+            var v=session.Motor.CaptureState().Velocity; Assert.That(label.text,Is.EqualTo($"SPEED  {new UnityEngine.Vector2(v.x,v.z).magnitude:0.0} m/s"));
+            session.Settings.ReducedMotion=true; hud.Refresh(session); Assert.That(hud.SpeedVisible,Is.False); session.Settings.ReducedMotion=false;
+            Assert.That(hud.BloomRingRadius,Is.Zero,"Hip fire shows ticks, not the ring.");
+        }
+        [Test] public void SteadyHudRefreshAllocatesNoManagedBytes()
+        {
+            var hud=new ArenaHud();
+            var bytes=(System.Func<long>)System.Delegate.CreateDelegate(typeof(System.Func<long>),typeof(System.GC).GetMethod("GetAllocatedBytesForCurrentThread",System.Type.EmptyTypes));
+            for(int i=0;i<8;i++) hud.Refresh(session);
+            bytes(); long before=bytes();
+            for(int i=0;i<64;i++) hud.Refresh(session);
+            Assert.That(bytes()-before,Is.Zero,"Unchanged HUD values must not rebuild their strings every frame.");
+            session.LocalPlayer.Health-=7.5f; hud.Refresh(session);
+            Assert.That(UnityEngine.UIElements.UQueryExtensions.Q<UnityEngine.UIElements.Label>(hud.Root,className:"hud-health").text,Is.EqualTo(UnityEngine.Mathf.CeilToInt(session.LocalPlayer.Health).ToString()),"A changed value still updates.");
+        }
+        // A Blink press whose charge is still held after the round trip was refused; a spent one is not a refusal.
+        [UnityTest] public IEnumerator RefusedBlinkShowsADenyCueButASpentOneDoesNot()
+        {
+            var hud=new ArenaHud(); var p=session.LocalPlayer; var presses=typeof(PracticeInput).GetProperty("BlinkPresses");
+            p.BlinkCharges=1; hud.Refresh(session);
+            presses.SetValue(session.Input,session.Input.BlinkPresses+1); hud.Refresh(session); p.BlinkCharges=0;
+            yield return new WaitForSecondsRealtime(ArenaHud.BlinkDenySeconds+.1f);
+            hud.Refresh(session); Assert.That(hud.BlinkDenied,Is.False,"The charge was spent.");
+            p.BlinkCharges=1; presses.SetValue(session.Input,session.Input.BlinkPresses+1); hud.Refresh(session);
+            yield return new WaitForSecondsRealtime(ArenaHud.BlinkDenySeconds+.1f);
+            hud.Refresh(session); Assert.That(hud.BlinkDenied,Is.True,"The charge is still held.");
+            Assert.That(UnityEngine.UIElements.UQueryExtensions.Q<UnityEngine.UIElements.Label>(hud.Root,className:"hud-prompt").text,Does.StartWith("NO FLOOR TO BLINK"));
         }
         GameObject owner,floor,camera;
         PracticeSession session;

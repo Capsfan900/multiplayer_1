@@ -11,15 +11,41 @@ namespace Wildstone.Tests
             gravity=-30,minEntrySpeed=6,maxEntryFallSpeed=9,maxApproachCos=.8f,minLookAlongCos=-.05f,
             maxDuration=1.75f,gravityStartScale=.1f,gravityEndScale=.6f,entryUpSpeed=3,speedDecay=.35f,
             minSustainSpeed=4,accel=14,topSpeed=13.75f,maxSpeed=22,exitUpSpeed=10,exitPushSpeed=7,exitTangentBoost=4 };
+        [Test] public void AimBitIsCombatIntentThatTheMotorNeverSees()
+        {
+            var input=new MotorInput { Present=true,Held=MotorButtons.Aim|MotorButtons.Slide,Pressed=MotorButtons.Aim|MotorButtons.Jump };
+            Assert.That(input.Aiming,Is.True);
+            var motor=input.ForMotor();
+            Assert.That(motor.Held,Is.EqualTo(MotorButtons.Slide)); Assert.That(motor.Pressed,Is.EqualTo(MotorButtons.Jump)); Assert.That(motor.Aiming,Is.False);
+            Assert.That(input.Held,Is.EqualTo(MotorButtons.Aim|MotorButtons.Slide),"ForMotor copies; the combat sample keeps its aim bit.");
+        }
         [Test] public void BackwardIntentBrakesThroughAcceleration()
         {
             Assert.That(AirMath.AirAccelerate(Vector3.forward*11,Vector3.back,11,35,.1f).z,Is.EqualTo(7.5f));
         }
         [Test] public void SidewaysStrafeCanOnlyAddItsTwoMetreWishSpeed()
         {
-            var v=AirMath.AirStrafe(Vector3.forward*11,Vector3.right,2,35,1);
-            Assert.That(v,Is.EqualTo(new Vector3(2,0,11)));
-            Assert.That(AirMath.AirStrafe(v,Vector3.right,2,35,1),Is.EqualTo(v));
+            var v=AirMath.AirStrafe(Vector3.forward*11,Vector3.right,2.5f,18,1);
+            Assert.That(v,Is.EqualTo(new Vector3(2.5f,0,11)));
+            Assert.That(AirMath.AirStrafe(v,Vector3.right,2.5f,18,1),Is.EqualTo(v));
+        }
+        [Test] public void AirStrafeGainPerTickIsBoundedByTheWishSpeed()
+        {
+            float dt=1f/120f; var v=Vector3.forward*11;
+            for(int i=0;i<40;i++)
+            {
+                var next=AirMath.AirStrafe(v,Vector3.right,2.5f,18,dt);
+                Assert.That((next-v).magnitude,Is.LessThanOrEqualTo(18*dt+1e-5f));
+                Assert.That(Vector3.Dot(next,Vector3.right),Is.LessThanOrEqualTo(2.5f+1e-5f)); v=next;
+            }
+            Assert.That(v.x,Is.EqualTo(2.5f).Within(1e-4));
+        }
+        [Test] public void ForwardHeldDoesNotRotateAHeldStrafe()
+        {
+            float dt=1f/120f; var v=Vector3.forward*11;
+            var strafe=AirMath.AirAccelerate(AirMath.AirStrafe(v,Vector3.right,2.5f,18,dt),Vector3.forward,11,35,dt);
+            Assert.That(strafe,Is.EqualTo(AirMath.AirStrafe(v,Vector3.right,2.5f,18,dt)));
+            Assert.That(AirMath.AirSteer(v,(Vector3.forward+Vector3.right).normalized,120,dt),Is.Not.EqualTo(v));
         }
         [Test] public void ExcessDecayIsExponentialAndCannotCrossTheCap()
         {

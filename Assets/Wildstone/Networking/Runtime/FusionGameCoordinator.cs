@@ -27,6 +27,9 @@ namespace Wildstone.Networking
         FusionLobby subscribedLobby;
         int actionSequence;
         float nextPresentation, nextDiscovery;
+        // A refused 20 Hz snapshot keeps the last good model; refusals this long in a row end the match.
+        internal const double SnapshotRefusalSeconds=2;
+        double snapshotRefusedSince=-1;
         int eventCursor;
         readonly List<CombatEvent> presentationEvents = new List<CombatEvent>(FusionCombatEvent.Capacity);
         readonly Dictionary<int,Transform> renderPoses = new Dictionary<int,Transform>();
@@ -64,7 +67,7 @@ namespace Wildstone.Networking
             observedRunner=null; match=null; clientModel=null;
             avatars.Clear(); avatarNetworkIds.Clear(); motors.Clear(); renderPoses.Clear(); presentationEvents.Clear();
             discoveredMatches.Clear(); discoveredPlayers.Clear();
-            loading=loaded=loadAcknowledged=attached=false; loadDeadline=0; actionSequence=eventCursor=0; nextDiscovery=nextPresentation=0;
+            loading=loaded=loadAcknowledged=attached=false; loadDeadline=0; actionSequence=eventCursor=0; nextDiscovery=nextPresentation=0; snapshotRefusedSince=-1;
         }
         void Update()
         {
@@ -86,6 +89,10 @@ namespace Wildstone.Networking
             }
             try
             {
+                // Only the host's rematch takes a loaded session back to Lobby; every peer follows it there.
+                if(loading && lobby.Phase==SessionPhase.Lobby) { FollowRematch(); return; }
+                // The rematch despawns the finished match; a client may observe that before the lobby phase arrives.
+                if(match!=null && (match.Object==null || !match.Object.IsValid)) match=null;
                 if(!loading && (lobby.Phase==SessionPhase.Loading || lobby.Phase==SessionPhase.Warmup || lobby.Phase==SessionPhase.Running))
                 {
                     loading=true; loadDeadline=Time.realtimeSinceStartupAsDouble+SessionState.OperationTimeoutSeconds;
@@ -125,9 +132,8 @@ namespace Wildstone.Networking
                 if(!runner.IsServer && Time.unscaledTime>=nextPresentation)
                 {
                     nextPresentation=Time.unscaledTime+.05f;
-                    clientModel=clientModel??new ArenaMatch(presentation.Catalog.Find(mapId),120);
                     // shortcut: render snapshots allocate at 20 Hz; replace with reusable buffers before performance acceptance.
-                    if(!clientModel.TryRestore(match.CaptureSnapshot())) throw new InvalidOperationException("Invalid replicated match state.");
+                    ApplySnapshot(match.CaptureSnapshot(),Time.unscaledTime);
                 }
                 model=model??clientModel;
                 FusionPlayer local=null;
@@ -141,6 +147,10 @@ namespace Wildstone.Networking
                     eventCursor=match.EventSequence;
                 }
                 match.CopyPresentationEvents(presentationEvents,ref eventCursor);
+#if WILDSTONE_SMOKE
+                for(int i=0;i<presentationEvents.Count;i++) if(presentationEvents[i].Kind==CombatEventKind.Shot && presentationEvents[i].Action.Participant==presentation.LocalParticipantId)
+                    Debug.Log("WILDSTONE SHOT CUE host "+presentationEvents[i].Action.Participant+":"+presentationEvents[i].Action.LifeGeneration+":"+presentationEvents[i].Action.Sequence);
+#endif
                 presentation.PresentNetworkTick(presentationEvents,match.Header.Captor,match.Header.Contested);
                 if(model.Phase==ArenaMatchPhase.Finished && presentation.Flow.Screen!=MenuScreen.Results) presentation.Show(MenuScreen.Results);
                 else if(model.Phase==ArenaMatchPhase.Aborted) { CloseOnline(); return; }
@@ -148,9 +158,24 @@ namespace Wildstone.Networking
             }
             catch(Exception exception)
             {
-                Debug.LogWarning("Online match stopped: "+exception.GetType().Name);
+                Debug.LogWarning("Online match stopped: "+exception.GetType().Name+": "+exception.Message);
                 CloseOnline();
             }
+        }
+        // TryRestore replaces nothing on refusal, so the previous model stays. Only a refusal streak of SnapshotRefusalSeconds throws.
+        internal void ApplySnapshot(MatchSnapshot snapshot,double now)
+        {
+            clientModel=clientModel??new ArenaMatch(presentation.Catalog.Find(mapId),120);
+            if(clientModel.TryRestore(snapshot,out var reason)) { snapshotRefusedSince=-1; return; }
+            if(snapshotRefusedSince<0) { snapshotRefusedSince=now; Debug.LogWarning("Replicated match snapshot refused: "+reason); }
+            if(now-snapshotRefusedSince>=SnapshotRefusalSeconds) throw new InvalidOperationException("Replicated match state refused for "+SnapshotRefusalSeconds+" s: "+reason);
+        }
+        // A client whose runner was destroyed or stopped, or whose lobby despawned, lost its host; the generic failure text would hide why.
+        bool HostLeft(bool localHost)
+        {
+            if(localHost || ReferenceEquals(observedRunner,null)) return false;
+            if(observedRunner==null || !observedRunner.IsRunning) return true;
+            return !ReferenceEquals(subscribedLobby,null) && (subscribedLobby==null || subscribedLobby.Object==null || !subscribedLobby.Object.IsValid);
         }
         void CloseOnline()
         {
@@ -164,8 +189,26 @@ namespace Wildstone.Networking
                 return;
             }
             var bridge=GetComponent<OnlineMenuBridge>();
-            bridge.Status="The online match could not continue. Return to the lobby and retry.";
+            bridge.Status=HostLeft(bridge.Host)?"Host left the match. Host or join a room to play again.":"The online match could not continue. Return to the lobby and retry.";
             menu.LeaveWithFailure(bridge.Status); ResetSession(); bridge.Refresh();
+        }
+        // Host-only: a normally finished match returns this room to its lobby with seats, teams and reconnect holds kept.
+        // Clients have no request path; they follow the replicated lobby phase.
+        public bool Rematch()
+        {
+            var runner=session?.Runner; var lobby=session?.Lobby;
+            if(runner==null || !runner.IsRunning || !runner.IsServer || lobby==null || match==null || !match.Initialized ||
+                match.Model==null || match.Model.Phase!=ArenaMatchPhase.Finished || !lobby.ReturnToLobby()) return false;
+            FollowRematch();
+            // Retire every match-scoped object; the lobby object, its seats and the runner survive.
+            foreach(var obj in new List<NetworkObject>(runner.GetAllNetworkObjects()))
+                if(obj!=null && obj.IsValid && (obj.GetComponent<FusionMatch>()!=null || obj.GetComponent<FusionPlayer>()!=null)) runner.Despawn(obj);
+            return true;
+        }
+        void FollowRematch()
+        {
+            ResetWorld();
+            if(presentation.Flow.Screen!=MenuScreen.Online) presentation.Show(MenuScreen.Online);
         }
         void HostMatch(FusionLobby lobby,NetworkRunner runner)
         {
@@ -173,7 +216,8 @@ namespace Wildstone.Networking
             {
                 var prefab=Resources.Load<NetworkObject>("WildstoneFusionMatch");
                 if(prefab==null) throw new InvalidOperationException("Network match prefab missing.");
-                match=runner.Spawn(prefab,onBeforeSpawned:(r,obj)=>obj.GetComponent<FusionMatch>().Initialize(presentation.Catalog.Find(mapId))).GetComponent<FusionMatch>();
+                int authority=checked((int)session.Rules.AuthorityGeneration);
+                match=runner.Spawn(prefab,onBeforeSpawned:(r,obj)=>obj.GetComponent<FusionMatch>().Initialize(presentation.Catalog.Find(mapId),false,authority)).GetComponent<FusionMatch>();
             }
             match.RecoveryWarmup = lobby.Phase != SessionPhase.Running;
             for(int i=0;i<lobby.Seats.Length;i++)
@@ -209,6 +253,8 @@ namespace Wildstone.Networking
                     }
                     continue;
                 }
+                // A peer admitted while Results is showing cannot join a finished round; it waits for the rematch lobby.
+                if(existing==null && match.Model.Phase==ArenaMatchPhase.Finished) continue;
                 var map=presentation.Catalog.Find(mapId); int slot=0; ArenaSpawn spawn=default;
                 foreach(var candidate in map.Spawns) if(candidate.Team==seat.Team && slot++==seat.Slot) { spawn=candidate; break; }
                 var playerPrefab=Resources.Load<NetworkObject>("WildstoneFusionPlayer");
@@ -250,6 +296,8 @@ namespace Wildstone.Networking
             if(avatars.TryGetValue(participant,out var avatar) && avatar!=null && avatar.Object!=null)
                 avatar.Object.RemoveInputAuthority();
             if(!match.SetConnection(participant,generation,false)) throw new InvalidOperationException("Disconnected avatar could not retire.");
+            // Seat number and ticks only; never identity or credential data.
+            Debug.LogWarning($"WILDSTONE PEER LEFT participant={participant} generation={generation} tick={match.Model.Tick}");
         }
         void RefreshAvatars(NetworkRunner runner)
         {
@@ -283,7 +331,7 @@ namespace Wildstone.Networking
         }
         void SendCombat(FusionPlayer local,ArenaMatch model)
         {
-            presentation.Input.ConsumeActions(commands,model.Tick+1,model.TickRate,model.Find(local.Participant),presentation.Flow.GameplayInput && model.Phase==ArenaMatchPhase.Running);
+            presentation.Input.ConsumeActions(commands,match.NextActionTick,model.TickRate,model.Find(local.Participant),presentation.Flow.GameplayInput && model.Phase==ArenaMatchPhase.Running);
             if(!presentation.Flow.GameplayInput || model.Phase!=ArenaMatchPhase.Running) return;
             var player=model.Find(local.Participant);
             actionSequence=Math.Max(actionSequence,player.LastActionSequence);
@@ -294,11 +342,22 @@ namespace Wildstone.Networking
                     Kind=kind, Direction=Quaternion.Euler(presentation.View.Pitch,presentation.View.Yaw,0)*Vector3.forward,PickupId=-1 };
                 if(kind==CombatActionKind.Pickup)
                 {
-                    float distance=6.25f;
+                    // The model copy trails the predicted motor by up to a round trip plus 50 ms; choose from where you are.
+                    float distance=WeaponCatalog.PickupReach*WeaponCatalog.PickupReach;
+                    var feet=presentation.Motor!=null?presentation.Motor.CaptureState().Position:player.Feet;
                     foreach(var item in model.Pickups)
-                    { float next=(item.Position-player.Feet).sqrMagnitude; if(next<distance && item.AvailableTick<=model.Tick) { distance=next; action.PickupId=item.Id; action.PickupGeneration=item.Generation; } }
+                    { float next=(item.Position-feet).sqrMagnitude; if(next<distance && item.AvailableTick<=model.Tick) { distance=next; action.PickupId=item.Id; action.PickupGeneration=item.Generation; } }
                 }
                 local.RPC_Combat(FusionCombatAction.FromCombat(action));
+                var weapon=CombatRules.CurrentWeapon(player);
+                if(kind==CombatActionKind.Fire && WeaponCatalog.IsHitscan(weapon) && player.Alive && player.Connected && presentation.Motor!=null)
+                {
+                    var state=presentation.Motor.CaptureState();
+                    presentation.PredictShot(new CombatEvent(CombatEventKind.Shot,action,match.NextActionTick,position:state.Position+Vector3.up*(state.CapsuleHeight-.15f),vector:action.Direction,weapon:weapon));
+#if WILDSTONE_SMOKE
+                    Debug.Log("WILDSTONE SHOT CUE predicted "+action.Participant+":"+action.LifeGeneration+":"+action.Sequence);
+#endif
+                }
             }
         }
         void OnDestroy() { if(menu!=null) menu.SessionCreated-=SetSession; ResetSession(); }

@@ -41,7 +41,12 @@ The Photon-only flow uses a random guest identifier for the running game and a
 separate cryptographic credential for each match. Neither is a recoverable account.
 Admission binds the SDK-reported peer identifier; reclaiming a held seat also requires
 the original credential. Display labels never grant control. Credentials remain in
-memory, outside room metadata and logs. App restart and cross-device account recovery
+memory, outside room metadata and logs. Since 2026-10-31 ([D040](../../DECISIONS.md)),
+the match credential is an HMAC-SHA256 of the match ID, keyed with a 32-byte random
+secret held for the game process. Leaving and rejoining the same room in one run
+reclaims the held seat; before, a fresh random credential was refused as
+`seat-credential-mismatch`. Another room's credential differs. Acceptance:
+`FusionLobbyAdmissionTests.RejoiningTheSameRoomWithinTheHoldReclaimsTheSameSeatButAnotherRoomsCredentialCannot`. App restart and cross-device account recovery
 are outside this flow. Live admission and rejected-takeover tests remain mandatory.
 
 The current implementation uses bounded network arrays for eight combatants,
@@ -50,8 +55,13 @@ never mutate gameplay and may be evicted under overload; acknowledgement/rejecti
 diagnostic text is not replicated. Woven object sizes must fit the SDK allocation
 limit, verified separately from compilation. Hitscan queries use SDK-observed view
 ticks with the section 8 rewind cap; static cover and travelling projectiles retain
-current-time queries. Combat RPCs use the SDK send tick and reject commands older
-than the implemented 150 ms window, future ticks and retired connection/life epochs.
+current-time queries. Combat RPCs use the SDK send tick and reject future ticks and
+retired connection/life epochs. They also reject commands older than their window
+(D035):
+- fire, grenade, Blink and shield have 250 ms (30 ticks; [D040](../../DECISIONS.md)
+  proposal, 150 ms before 2026-10-31);
+- pickup, reload and weapon selection have 500 ms, because the host judges them on
+  current state and a resend after loss must not silently drop the press.
 Client render snapshots currently allocate at 20 Hz. Avatar discovery polls at
 5 Hz using reusable runner-local SDK lists. Rebuild the presentation registry only
 when membership, avatar reference, network ID or effective render root changes;
@@ -272,6 +282,36 @@ input, continuous movement may be held for at most 100 ms before neutral input;
 one-shot actions are never synthesized. Exact handling must fit Fusion's scheduling
 and be verified in the fault tests, rather than competing with it.
 
+The movement sequence must keep rising for the whole match. Applying settings
+rebuilds the local input object, and since 2026-10-31 the new one continues the old
+one's movement sequence. Restarting it at zero made the host and client drop every
+later sample as stale, and movement stuck
+([playtest item 1](../../PLAYTEST-FIX-LATER.md#1-changing-settings-gets-stuck)).
+Acceptance: `PracticeSessionTests.ApplyingSettingsKeepsTheOnlineMovementSequenceRising`.
+
+Air control (2026-10-31 feel pass, [D041](../../DECISIONS.md); implemented, every
+number a proposal for the user's playtest). In the air, outside the launch float,
+a held strafe key (|x| > 0.5) owns the step whether or not forward is held:
+`AirMath.AirStrafe` adds up to `airStrafeWishSpeed` (2.5 m/s, was 2) along the
+sideways wish at `airStrafeAccel` (18 m/s², new; `airAccel` 35 stays the forward
+top-up), then `AirAccelerate` only tops the forward component up toward ground
+speed. Any other stick uses the steer path as before (120°/s toward the wish, 1.6×
+during the float). Before this pass, W+A steered the velocity toward the diagonal
+and the strafe gain never built; releasing W still works. The carry decay above 11
+m/s (`airCarryDecay` 0.8), the 17.6 m/s soft cap and its drag are unchanged; the
+audit's second phase (a slower carry decay) is deferred. A scripted strafe that
+leads its velocity by the gain angle through one held jump reaches the speed
+recorded in [QA](../../QA.md#2026-10-31-feel-pass-d041), never passes the soft cap
+by more than 0.5 m/s, and lands within 0.2 m/s of the same run with forward held.
+`MotorTuning.Revision` (1) joins the session ruleset token
+(`FusionMenuController.Ruleset`, `weapons-<catalog>-120-movement-<revision>`), so a
+peer with other motor laws is refused at the lobby like a catalog mismatch.
+Acceptance: `MovementLawTests.AirStrafeGainPerTickIsBoundedByTheWishSpeed`,
+`ForwardHeldDoesNotRotateAHeldStrafe`, `SidewaysStrafeCanOnlyAddItsTwoMetreWishSpeed`;
+`ArenaMotorTests.ScriptedStrafeBuildsSpeedWithinOneJumpAndStaysUnderTheSoftCap`,
+`AirStrafeReplayFromMidFlightProducesIdenticalEntireState`;
+`FusionSessionBoundaryTests.MovementRevisionIsPartOfTheRulesetAndAMismatchRefusesTheJoin`.
+
 Refactor the copied movement simulation to consume explicit input, fixed delta and
 restorable state. State must include everything affecting the next tick:
 
@@ -292,6 +332,10 @@ inputs using Fusion. Correct the simulation immediately; smooth only the rendere
 presentation. Never blend the authoritative collider through a wall to hide an error.
 Respawn/teleport/life changes reset incompatible prediction history and interpolation.
 Record correction magnitude before smoothing so visual hiding cannot pass a bad motor.
+Host-decided movement state that ends on a known tick replicates that tick, so replay
+ends it on time: a stun's movement suppression carries its end tick (implemented
+2026-10-30, [QA](../../QA.md#2026-10-30-stun-end-on-a-predicting-client)). Death,
+disconnection and match-phase suppression lift only from the host.
 
 Collision/traversal queries must return the appropriate state during replay. Convert
 water, launch and surface triggers into reproducible simulation queries or SDK-safe
@@ -335,8 +379,11 @@ confirmed hit markers and damage require the server verdict. Static world geomet
 and player hitboxes are both considered, preventing hits through cover.
 
 Hitscan uses Fusion's server-side historical hitbox queries with the SDK's view-time
-information, not an arbitrary timestamp chosen by the client. Initial maximum rewind
-is 150 ms; memory buffers can be larger, but allowed compensation is bounded. High
+information, not an arbitrary timestamp chosen by the client. Maximum rewind is
+250 ms ([D040](../../DECISIONS.md) proposal; the initial 150 ms clamped every measured
+regional80 shot, see [PLAYTEST-FIX-LATER](../../PLAYTEST-FIX-LATER.md#2-4-11-hitbox-position-hitbox-shifting-while-moving-random-no-reg)).
+The SDK hitbox buffer (`HitboxBufferLengthInMs`) keeps 300 ms so the cap never meets
+the buffer end. Allowed compensation stays bounded. High
 ping does not earn unlimited historical hits. Record accepted shot tick, rewind age,
 weapon/sequence and hit verdict for diagnosis. Sub-tick query capability is useful,
 but it is not a promise that every input action is simulated at sub-tick precision.
@@ -373,6 +420,30 @@ late callbacks and commands from a retired generation. A retry cannot duplicate 
 seat or start a second local runner. UI distinguishes joining, full team,
 incompatible build, reconnecting, migrating and failed recovery.
 
+Rematch (implemented 2026-10-30). A finished match leaves the session `Running`;
+`Completed` is not used yet. Only the host can then return it to `Lobby`, through
+`FusionGameCoordinator.Rematch`. No client RPC or input reaches that path.
+- It requires a normally `Finished` match. An aborted round has already closed the
+  session.
+- Kept: the room code, match ID, runner and map/content pin. Seats, teams and
+  connection generations stay too, with reconnect credentials and holds. Changing
+  the map needs a new room.
+- Reset: every seat's readiness and avatar. The absence deadline, pending load
+  deadlines, the match object and all avatars are retired.
+- Peers follow the replicated lobby phase. The next start takes the ordinary lobby
+  → loading → warmup path. The new match starts at the session's current authority
+  generation.
+- A peer admitted while Results is showing waits, without an avatar, for that lobby.
+  Joins and reconnects in the lobby behave as in any lobby.
+- Known limit, from code reading and unmeasured: a migration before the next
+  match's first checkpoint finds only the previous match's snapshot. The 3-second
+  rollback bound should reject it, so that round aborts.
+
+Acceptance: `SessionRulesTests.Rematch*`,
+`AbortedOnlineResultsTests.FinishedRoundRematchNeedsTheHostAndPeersFollowTheLobbyInTheSameSession`
+and the two-process `Invoke-NetworkSmoke.ps1 -Scenario rematch`. Native results
+belong in QA.
+
 Flow: establish a temporary Photon guest connection -> create or join a private room
 by code in the same region -> host assigns a seat -> load matching content ->
 exchange readiness -> spawn. The code locates the session; it is not account
@@ -388,6 +459,41 @@ gameplay seats must both respect the eight-player limit, including reconnect cas
 Empty and one-player teams are legal; teams are selectable in the lobby and locked
 in a match. Starting requires at least two occupied teams. Clients pin protocol,
 build, map and ruleset versions; another player cannot supply executable content.
+
+Whenever the host removes a peer, it writes one player-log warning,
+`WILDSTONE HOST REMOVED PEER reason=<code> phase=<phase>`, in every build. That covers
+a refused admission at startup or join, and a load timeout. Codes are fixed strings
+with no player, user, session or credential data:
+- `invalid-peer`, `rebind-mismatch`, `generation-exhausted`;
+- `seat-already-connected`, `seat-credential-mismatch`, `reconnect-refused`;
+- `phase-<phase>`, `teams-full`, `session-refused`, `seat-missing`;
+- `lobby-not-ready`, `load-timeout`, `credential-unreadable`, `simulation-frozen`.
+
+A client `Requested` disconnect with no such line in the host log was not a host
+removal. Acceptance: `FusionLobbyAdmissionTests.RefusedAdmissionsNameAFixedReason`.
+
+Refused client checkpoints (2026-10-31, [D040](../../DECISIONS.md), playtest item 5).
+- A replicated checkpoint the client refuses replaces nothing; the last good model
+  stays.
+- The start of a refusal streak writes one warning with a coarse reason (`header`,
+  `player`, `pickup` or `projectile`).
+- Only 2 s of consecutive refusals (`FusionGameCoordinator.SnapshotRefusalSeconds`,
+  a builder value) end the match. Before, one refusal ended it.
+- The closing error logs the exception message as well as its type.
+- A client whose runner stopped, or whose lobby object despawned, reads
+  "Host left the match"; other failures keep the generic text.
+
+Acceptance:
+`AbortedOnlineResultsTests.OneRefusedSnapshotKeepsTheLastGoodModelAndOnlySustainedRefusalsEndTheMatch`
+and `AClientWhoseRunnerIsGoneIsToldTheHostLeftWhileOtherFailuresKeepTheGenericText`.
+
+The SDK can report a joined remote peer before it reports that peer's guest ID.
+Implemented 2026-10-30: such a peer is not removed at once. The host retries its
+admission every tick for up to 5 seconds, and only then refuses it as `invalid-peer`.
+The host's own identity never waits. A pending peer has no seat, so its RPCs and
+inputs bind to nothing. The 5-second wait is a builder value. Acceptance:
+`FusionSessionBoundaryTests.APeerWithoutAUserIdIsRetriedUntilItsDeadlineInsteadOfRemoved`
+and the [reconnect cycles](../../QA.md#2026-10-30-reconnect-cycles-and-late-peer-identity).
 
 On a remote-client disconnect, neutralize inputs, remove zone presence and reserve
 the guest's seat for 30 seconds. Keep its avatar vulnerable for five seconds
@@ -458,7 +564,7 @@ Restore the whole snapshot consistently: a rollback may undo a recent kill, pick
 or score, and UI must say that play resumed from a checkpoint. Clear obsolete input,
 prediction, interpolation and hitbox histories; never accept pre-migration shots
 against new history. Resume after a short synchronized warmup sufficient to rebuild
-the 150 ms hitbox window. Do not replay past VFX or award damage twice. Reconnect
+the hitbox window (the rewind cap above). Do not replay past VFX or award damage twice. Reconnect
 holds and opponent absence deadlines retain elapsed absence through migration
 rather than restarting; test this explicitly. One active generation owns the match;
 old-host recovery may only rejoin as a client after verification. Unsupported network
