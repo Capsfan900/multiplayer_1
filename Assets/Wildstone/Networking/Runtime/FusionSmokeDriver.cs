@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -25,10 +26,16 @@ namespace Wildstone.Networking
             public double sdkRemoteRttMinMs, sdkRemoteRttMaxMs, sdkRemoteRttMeanMs;
             public CombatMetrics combat;
             public LaserMetrics[] lasers;
+            public GunplayMetrics[] gunplay;
             public ProjectileMetrics projectile;
             public GrenadeMetrics grenade;
             public SpecialProjectileMetrics[] specialProjectiles;
+            public DeflectionRound[] deflection;
+            public StunClientMetrics stunClient;
+            public RematchMetrics rematch;
             public string role,scenario,stage="boot",room="",error="",phase="Closed",screen="Title";
+            // "stage@elapsed;" per stage change (whole seconds; the latest ~3000 chars), so a deadline failure shows which step took the time.
+            public string stageTimes="";
             public bool success,finished,externalSimulation;
             public bool initialVerified,reconnectRequested,reconnectDisconnected,reconnectComplete,retainedAvatar;
             public bool migrationRequested,migrationComplete,sawRunnerChange,electedHost,isServer;
@@ -58,6 +65,20 @@ namespace Wildstone.Networking
             public int capacitySoakSeconds,capacityRunningSdkTicks,capacityFinishedSdkTicks;
             public float capacityRunningSeconds,capacityFinishedSeconds,capacityHoldStartElapsed,capacityHoldEndElapsed;
             public bool capacityMatchFinished;
+            // Fusion Debug-DLL per-update In/OutBandwidth summed over the hold; ForwardTicks should track the SDK tick totals above.
+            public bool capacityStatsAvailable;
+            public int capacityStatsForwardTicks;
+            public double capacityRunningInBytes,capacityRunningOutBytes,capacityFinishedInBytes,capacityFinishedOutBytes;
+            public float capacityRunningInBytesPerSecond,capacityRunningOutBytesPerSecond,capacityFinishedInBytesPerSecond,capacityFinishedOutBytesPerSecond;
+            // Gameplay soak (capacity plus --wildstone-smoke-soak-gameplay 1): every peer moves and fires; the host rematches.
+            public bool soakGameplay;
+            public int soakRoundSeconds,soakRounds,soakShots,soakReloads,soakDeaths;
+            public float soakBetweenSeconds;
+            // Managed heap in use and Gen0 collections so far; the runner copies them into each per-minute memory point.
+            public long managedHeapBytes;
+            // Largest frame gap seen by this process: a machine-wide stall drops peers and is not a game desync.
+            public float maxFrameGapSeconds;
+            public int gcCollections;
         }
         Status status;
         string output,peerOutput,joinRoom;
@@ -66,6 +87,7 @@ namespace Wildstone.Networking
         PracticeSession presentation;
         bool connectedRequested,teamRequested,readyRequested,startRequested,finishing;
         double began,stableAt=-1,verifiedAt=-1,lastTickAt,nextWrite;
+        string loggedStage;
         double nextRttSample;
         int firstMatchTick,lastMatchTick=-1;
         FusionSession retainedSession;
@@ -109,15 +131,19 @@ namespace Wildstone.Networking
             began=Time.realtimeSinceStartupAsDouble;
             bool capacity=status.scenario=="capacity";
             if(capacity?CapacityRoleIndex(status.role)<0:status.role!="host" && status.role!="client" && status.role!="client2") throw new ArgumentException();
-            if(status.scenario!="basic" && status.scenario!="reconnect" && !IsMigrationScenario && status.scenario!="combat" && status.scenario!="projectile-combat" && status.scenario!="grenade-combat" && status.scenario!="special-projectiles" && status.scenario!="laser-combat" && status.scenario!="laser-moving-cover" && status.scenario!="late-join" && status.scenario!="team-switch" && !capacity) throw new NotSupportedException("This smoke scenario is not implemented.");
+            if(status.scenario!="basic" && status.scenario!="reconnect" && !IsMigrationScenario && status.scenario!="combat" && status.scenario!="projectile-combat" && status.scenario!="grenade-combat" && status.scenario!="special-projectiles" && status.scenario!="deflection" && status.scenario!="stun-client" && status.scenario!="laser-combat" && status.scenario!="laser-moving-cover" && status.scenario!="gunplay" && status.scenario!="late-join" && status.scenario!="team-switch" && status.scenario!="rematch" && !capacity) throw new NotSupportedException("This smoke scenario is not implemented.");
             if(status.role=="client2" && !IsMigrationScenario && status.scenario!="late-join" && !capacity) throw new ArgumentException();
             if((IsMigrationScenario || capacity || status.scenario=="late-join") && Path.GetFileName(output)!=status.role+".json") throw new ArgumentException("This scenario requires fixed sibling status filenames.");
             if(capacity)
             {
                 status.roleIndex=CapacityRoleIndex(status.role);
                 status.capacitySoakSeconds=ParseCapacitySoakSeconds(args.TryGetValue("--wildstone-smoke-soak-seconds",out var soak)?soak:null);
+                status.soakGameplay=args.TryGetValue("--wildstone-smoke-soak-gameplay",out var gameplay) && gameplay=="1";
+                if(args.TryGetValue("--wildstone-smoke-soak-round-seconds",out var round) &&
+                    (!status.soakGameplay || !int.TryParse(round,NumberStyles.None,CultureInfo.InvariantCulture,out status.soakRoundSeconds) || status.soakRoundSeconds<20 || status.soakRoundSeconds>480))
+                    throw new ArgumentException("Gameplay soak rounds must be 20 to 480 seconds.");
             }
-            if((status.scenario=="reconnect" || status.scenario=="combat" || status.scenario=="projectile-combat" || status.scenario=="grenade-combat" || status.scenario=="special-projectiles" || status.scenario=="laser-combat" || status.scenario=="laser-moving-cover" || status.scenario=="team-switch") && peerOutput==null) throw new ArgumentException("This scenario requires the peer status file.");
+            if((status.scenario=="reconnect" || status.scenario=="combat" || status.scenario=="projectile-combat" || status.scenario=="grenade-combat" || status.scenario=="special-projectiles" || status.scenario=="deflection" || status.scenario=="stun-client" || status.scenario=="laser-combat" || status.scenario=="laser-moving-cover" || status.scenario=="gunplay" || status.scenario=="team-switch" || status.scenario=="rematch") && peerOutput==null) throw new ArgumentException("This scenario requires the peer status file.");
             if(status.role!="host")
             {
                 joinRoom=args["--wildstone-smoke-room"].Trim().ToUpperInvariant();
@@ -139,7 +165,13 @@ namespace Wildstone.Networking
             try
             {
                 double now=Time.realtimeSinceStartupAsDouble; status.elapsed=(float)(now-began);
-                if(now-began>=(status.scenario=="capacity"?status.capacitySoakSeconds+120:IsMigrationScenario?180:120)) { Finish(false,"DeadlineExceeded"); return; }
+                if(status.stage!=loggedStage)
+                {
+                    loggedStage=status.stage; status.stageTimes+=status.stage+"@"+((int)status.elapsed)+";";
+                    if(status.stageTimes.Length>4000) status.stageTimes=status.stageTimes.Substring(status.stageTimes.Length-3000);
+                }
+                // Injected latency stretches every round-trip step; one moving-cover adverse150 run verified everything at 118 s.
+                if(now-began>=(status.scenario=="capacity"?status.capacitySoakSeconds+120:IsMigrationScenario || status.networkProfile?.injected==true?180:120)) { Finish(false,"DeadlineExceeded"); return; }
                 if(menu==null)
                 {
                     menu=FindFirstObjectByType<FusionMenuController>();
@@ -188,6 +220,8 @@ namespace Wildstone.Networking
                     throw new InvalidOperationException("Team switching replaced the runner.");
                 if(status.scenario=="team-switch" && lobby!=null && runner!=null && runner.IsRunning && lobby.Phase==SessionPhase.Lobby)
                     DriveTeamSwitch(lobby,runner,peerStatus,now);
+                if(status.scenario=="rematch" && lobby!=null && runner!=null && runner.IsRunning && lobby.Phase==SessionPhase.Lobby)
+                    ObserveRematchLobby(lobby,runner);
                 if(status.scenario!="team-switch" && lobby!=null && runner!=null && runner.IsRunning && lobby.Phase==SessionPhase.Lobby)
                 {
                     status.stage="lobby"; int team=status.scenario=="capacity"?status.roleIndex%4:status.role=="host"?0:status.role=="client2"?2:1; bool localOnTeam=false;
@@ -210,9 +244,13 @@ namespace Wildstone.Networking
                 status.externalSimulation=presentation.ExternalSimulation;
                 var model=presentation.Match; status.playerCount=model?.Players.Count??0;
                 status.avatarCount=0;
-                if(runner!=null)
-                    foreach(var avatar in FindObjectsByType<FusionPlayer>())
-                        if(avatar.Runner==runner && avatar.Initialized && avatar.Object!=null && avatar.Object.IsValid) status.avatarCount++;
+                if(runner!=null && runner.IsRunning)
+                {
+                    // Reused list: a per-frame scene search would put the harness's own garbage into soak GC figures.
+                    smokeAvatars.Clear(); runner.GetAllBehaviours(smokeAvatars);
+                    foreach(var avatar in smokeAvatars)
+                        if(avatar.Initialized && avatar.Object!=null && avatar.Object.IsValid) status.avatarCount++;
+                }
                 if(presentation.ExternalSimulation && presentation.Flow.Screen==MenuScreen.Pause) presentation.Show(MenuScreen.Playing);
                 bool playing=presentation.ExternalSimulation && model!=null && model.Phase==ArenaMatchPhase.Running &&
                     session.Phase==SessionPhase.Running && status.playerCount>=2 && status.avatarCount>=2 && presentation.LocalPlayer!=null;
@@ -263,6 +301,11 @@ namespace Wildstone.Networking
                     ObserveLateJoin(session,runner,model,playing,now);
                     PublishDue(now); return;
                 }
+                if(status.scenario=="rematch")
+                {
+                    ObserveRematch(session,runner,model,playing,peerStatus,now);
+                    PublishDue(now); return;
+                }
                 if(status.scenario=="reconnect" && status.initialVerified && !status.reconnectRequested)
                 {
                     status.stage="awaiting_disconnect";
@@ -300,7 +343,10 @@ namespace Wildstone.Networking
                 bool combatReady=status.scenario=="grenade-combat" ? playing && DriveGrenadeCombat(model,runner,peerStatus,now) :
                     status.scenario=="special-projectiles" ? playing && DriveSpecialProjectiles(model,runner,peerStatus,now) :
                     status.scenario=="projectile-combat" ? playing && DriveProjectileCombat(model,runner,peerStatus,now) :
+                    status.scenario=="stun-client" ? playing && DriveStunClient(model,runner,peerStatus,now) :
+                    status.scenario=="deflection" ? playing && DriveDeflection(model,runner,peerStatus,now) :
                     (status.scenario=="laser-combat" || status.scenario=="laser-moving-cover") ? playing && DriveLaserCombat(model,runner,peerStatus,now) :
+                    status.scenario=="gunplay" ? playing && DriveGunplay(model,runner,peerStatus,now) :
                     status.scenario!="combat" || (playing && DriveCombat(session,model,runner,peerStatus,now));
                 bool observeStability=(status.scenario=="basic" || !status.initialVerified || status.reconnectComplete) && combatReady;
                 if(playing && !status.success && observeStability)
@@ -502,16 +548,19 @@ namespace Wildstone.Networking
             var peer=ReadPeer();
             return peer!=null && peer.success && (status.role!="host" || peer.finished);
         }
+        // A transient read failure (the peer replacing or a scanner holding its file) returns the last good copy. A null
+        // there used to reset 10 s stability windows, stretching loaded runs into DeadlineExceeded.
+        Status lastPeer;
         Status ReadPeer()
         {
             if(peerOutput==null) return null;
             try
             {
-                if(!File.Exists(peerOutput)) return null;
+                if(!File.Exists(peerOutput)) return lastPeer;
                 var peer=ReadStatus(peerOutput);
-                return peer!=null && peer.room==status.room && peer.role!=status.role && peer.scenario==status.scenario?peer:null;
+                return lastPeer=peer!=null && peer.room==status.room && peer.role!=status.role && peer.scenario==status.scenario?peer:null;
             }
-            catch(IOException) { return null; }
+            catch(IOException) { return lastPeer; }
         }
         CombatState RemotePlayer(ArenaMatch model)
         {
@@ -524,7 +573,8 @@ namespace Wildstone.Networking
             using(var file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
             using(var reader=new StreamReader(file)) return JsonUtility.FromJson<Status>(reader.ReadToEnd());
         }
-        void PublishDue(double now) { if(now>=nextWrite) { nextWrite=now+.25; WriteOutput(); } }
+        readonly List<FusionPlayer> smokeAvatars=new List<FusionPlayer>();
+        void PublishDue(double now) { if(now>=nextWrite) { nextWrite=now+(status.scenario=="capacity"?1:.25); WriteOutput(); } }
         void WriteOutput()
         {
             Directory.CreateDirectory(Path.GetDirectoryName(output)); string temporary=output+".tmp";

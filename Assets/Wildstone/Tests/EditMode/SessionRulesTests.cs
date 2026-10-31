@@ -136,6 +136,56 @@ namespace Wildstone.Tests
         }
 
         [Test]
+        public void RematchReturnsToTheLobbyWithSeatsTeamsAndHoldsButNoReadinessOrMatchDeadline()
+        {
+            var session = Running();
+            Assert.That(session.MarkSpawned("a", 1) && session.MarkSpawned("b", 2), Is.True);
+            var before = session.CaptureSeats(3.5).Seats.Select(s => (s.VerifiedSubject, s.Team, s.Slot, s.ConnectionGeneration)).ToArray();
+            session.Disconnect("b", 2, 4);
+            Assert.That(session.AbsenceDeadline, Is.EqualTo(34));
+            Assert.That(session.ReturnToLobby(5), Is.True);
+            Assert.That(session.Phase, Is.EqualTo(SessionPhase.Lobby));
+            Assert.That(session.ReturnToLobby(6), Is.False, "Only a running session can return to its lobby.");
+            Assert.That(session.AbsenceDeadline, Is.Zero);
+            var seats = session.CaptureSeats(6).Seats;
+            Assert.That(seats.Select(s => (s.VerifiedSubject, s.Team, s.Slot, s.ConnectionGeneration)), Is.EqualTo(before));
+            Assert.That(seats.All(s => !s.Ready && s.RequiresRespawn), Is.True, "Every seat readies again and spawns a fresh avatar.");
+            Assert.That(seats.Single(s => s.VerifiedSubject == "b").HoldUntil, Is.EqualTo(34), "The reconnect hold survives the rematch.");
+            Assert.That(session.Reconnect("b", 3, 20), Is.True);
+            session.Tick(40);
+            Assert.That(session.Phase, Is.EqualTo(SessionPhase.Lobby), "The retired match's absence deadline cannot abort the lobby.");
+            Assert.That(session.StartLoading(40), Is.False, "Readiness was cleared.");
+            Assert.That(session.SetReady("a", 1, true) && session.SetReady("b", 3, true), Is.True);
+            Assert.That(session.StartLoading(41), Is.True);
+            session.SetLoaded("a", 1); session.SetLoaded("b", 3);
+            Assert.That(session.FinishLoading(42), Is.True);
+            session.Tick(42.2);
+            Assert.That(session.Phase, Is.EqualTo(SessionPhase.Running));
+            Assert.That(session.CaptureSeats(42.2).Seats.Select(s => (s.VerifiedSubject, s.Team, s.Slot)), Is.EqualTo(before.Select(s => (s.VerifiedSubject, s.Team, s.Slot))));
+        }
+
+        [Test]
+        public void RematchIsRefusedOutsideARunningSessionAndAfterAnAbortedRound()
+        {
+            var session = new SessionState(Content, "match");
+            Assert.That(session.ReturnToLobby(0), Is.False);
+            session.BeginConnect(0);
+            Assert.That(session.ReturnToLobby(0), Is.False);
+            session.EnterLobby(session.AttemptGeneration, Content, 1);
+            session.TryAdmit("a", 0, 1, Content, 1); session.TryAdmit("b", 1, 2, Content, 1);
+            Assert.That(session.ReturnToLobby(1), Is.False);
+            session.SetReady("a", 1, true); session.SetReady("b", 2, true); session.StartLoading(2);
+            Assert.That(session.ReturnToLobby(2), Is.False);
+            Assert.That(session.Phase, Is.EqualTo(SessionPhase.Loading));
+            var running = Running();
+            Assert.That(running.ReturnToLobby(double.NaN), Is.False);
+            Assert.That(running.Phase, Is.EqualTo(SessionPhase.Running));
+            running.Disconnect("b", 2, 4);
+            Assert.That(running.ReturnToLobby(34), Is.False, "The absence deadline aborts the round first.");
+            Assert.That(running.Phase, Is.EqualTo(SessionPhase.Aborted));
+        }
+
+        [Test]
         public void RecoveryPreservesDeadlinesRejectsOldAuthorityAndRequiresFreshBindings()
         {
             var session = Running();

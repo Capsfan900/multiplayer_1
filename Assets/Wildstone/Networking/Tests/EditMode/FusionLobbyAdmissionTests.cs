@@ -90,6 +90,47 @@ namespace Wildstone.Tests
                 "Expired seat is a fresh anonymous lobby admission.");
             Assert.That(rules.CaptureSeats(31).Seats[0].ConnectionGeneration, Is.GreaterThan(1));
         }
+        // Every refusal names a fixed reason (logged by the host when it removes the peer); success clears it.
+        [Test] public void RefusedAdmissionsNameAFixedReason()
+        {
+            var rules=Lobby(); var admission=new FusionLobbyAdmission(rules,Content);
+            Assert.That(admission.Admit(PlayerRef.None,"a",Credential(1),0),Is.False); Assert.That(admission.Rejection,Is.EqualTo("invalid-peer"));
+            Assert.That(admission.Admit(PlayerRef.FromIndex(0),"a",Credential(1),0),Is.True); Assert.That(admission.Rejection,Is.Null);
+            Assert.That(admission.Admit(PlayerRef.FromIndex(0),"other",Credential(1),0),Is.False); Assert.That(admission.Rejection,Is.EqualTo("rebind-mismatch"));
+            Assert.That(admission.Admit(PlayerRef.FromIndex(1),"a",Credential(1),0),Is.False); Assert.That(admission.Rejection,Is.EqualTo("seat-already-connected"));
+            Assert.That(admission.Disconnect(PlayerRef.FromIndex(0),1),Is.True);
+            Assert.That(admission.Admit(PlayerRef.FromIndex(1),"a",Credential(2),2),Is.False); Assert.That(admission.Rejection,Is.EqualTo("seat-credential-mismatch"));
+            for(int i=1;i<SeatTable.Capacity;i++) Assert.That(admission.Admit(PlayerRef.FromIndex(i+1),"p"+i,Credential((byte)(i+1)),3),Is.True);
+            Assert.That(admission.Admit(PlayerRef.FromIndex(20),"ninth",Credential(20),3),Is.False); Assert.That(admission.Rejection,Is.EqualTo("teams-full"));
+            var loading=Lobby(); var late=new FusionLobbyAdmission(loading,Content);
+            late.Admit(PlayerRef.FromIndex(0),"a",Credential(1),0); late.Admit(PlayerRef.FromIndex(1),"b",Credential(2),0);
+            foreach(var seat in loading.CaptureSeats(0).Seats) loading.SetReady(seat.VerifiedSubject,seat.ConnectionGeneration,true);
+            Assert.That(loading.StartLoading(0),Is.True);
+            Assert.That(late.Admit(PlayerRef.FromIndex(2),"c",Credential(3),0),Is.False); Assert.That(late.Rejection,Is.EqualTo("phase-Loading"));
+        }
+        // Leaving and joining the same room again builds a new FusionSession; its credential must still open the seat the old one held.
+        [Test] public void RejoiningTheSameRoomWithinTheHoldReclaimsTheSameSeatButAnotherRoomsCredentialCannot()
+        {
+            byte[] Issued(string room)
+            {
+                Assert.That(FusionSession.TryReadCredential(new FusionSession(Content,room).ConnectionToken,Content,out var credential),Is.True);
+                return credential;
+            }
+            var firstJoin=Issued("ROOM1"); var rejoin=Issued("ROOM1"); var otherRoom=Issued("ROOM2");
+            CollectionAssert.AreEqual(firstJoin,rejoin,"One reconnect secret serves every join of a room during this app run.");
+            CollectionAssert.AreNotEqual(firstJoin,otherRoom,"A host of another room never learns a credential that works here.");
+            var rules=Lobby(); var admission=new FusionLobbyAdmission(rules,Content);
+            Assert.That(admission.Admit(PlayerRef.FromIndex(0),"guest",firstJoin,0),Is.True);
+            var held=System.Array.Find(rules.CaptureSeats(0).Seats,s=>s.VerifiedSubject=="guest");
+            Assert.That(admission.Disconnect(PlayerRef.FromIndex(0),1),Is.True);
+            Assert.That(admission.Admit(PlayerRef.FromIndex(1),"guest",otherRoom,2),Is.False);
+            Assert.That(admission.Rejection,Is.EqualTo("seat-credential-mismatch"));
+            Assert.That(admission.Admit(PlayerRef.FromIndex(1),"guest",rejoin,3),Is.True,"Rejoining within the hold must not read as a stranger.");
+            var back=System.Array.Find(rules.CaptureSeats(3).Seats,s=>s.VerifiedSubject=="guest");
+            Assert.That(back.Connected,Is.True); Assert.That(back.Team,Is.EqualTo(held.Team)); Assert.That(back.Slot,Is.EqualTo(held.Slot));
+            Assert.That(back.ConnectionGeneration,Is.GreaterThan(held.ConnectionGeneration));
+            Assert.That(rules.CaptureSeats(3).Seats.Length,Is.EqualTo(1));
+        }
         static FusionLobbyAdmission Running(out SessionState rules)
         {
             rules=Lobby(); var admission=new FusionLobbyAdmission(rules,Content);

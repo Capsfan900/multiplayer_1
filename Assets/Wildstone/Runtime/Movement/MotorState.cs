@@ -15,6 +15,7 @@ namespace Wildstone.Movement
         public Vector2 LastMove;
         public MotorButtons Held;
         public bool Suppressed;
+        public int SuppressedUntil;
         public double LastGroundedAt, JumpPressedAt;
         public bool DashRequested, DashFromGround, AirDashUsed;
         public double DashUntil, DashReadyAt, DashStartedAt;

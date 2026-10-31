@@ -15,6 +15,7 @@ namespace Wildstone.Networking
         public Vector2 LastMove;
         public MotorButtons Held;
         public NetworkBool Suppressed;
+        public int SuppressedUntil;
         public double LastGroundedAt, JumpPressedAt;
         public NetworkBool DashRequested, DashFromGround, AirDashUsed;
         public double DashUntil, DashReadyAt, DashStartedAt;
@@ -54,6 +55,7 @@ namespace Wildstone.Networking
             LastMove = state.LastMove,
             Held = state.Held,
             Suppressed = state.Suppressed,
+            SuppressedUntil = state.SuppressedUntil,
             LastGroundedAt = state.LastGroundedAt,
             JumpPressedAt = state.JumpPressedAt,
             DashRequested = state.DashRequested,
@@ -120,6 +122,7 @@ namespace Wildstone.Networking
             LastMove = LastMove,
             Held = Held,
             Suppressed = Suppressed,
+            SuppressedUntil = SuppressedUntil,
             LastGroundedAt = LastGroundedAt,
             JumpPressedAt = JumpPressedAt,
             DashRequested = DashRequested,

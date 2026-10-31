@@ -23,6 +23,21 @@ namespace Wildstone.Networking
             public int sequence,connection,authority,ammo,samples,lastTick=-1,firstTick=-1,shots,hits,ricochets,stuns,stunUntil,immunityUntil,maxBounces,ricochetMask,stunTick,expireTick,firstDespawnTick=-1,directionReversals,lastZSign,directionMask;
             public float firstTravel,lastTravel,damage,eventDamage,firstRicochetZ,secondRicochetZ;
             public string identity="",events="";
+            // Last stun shot only: the stunned host holds forward input; it must not move until the stun ends, then must.
+            public int probeStunnedSamples;
+            public float probeStunnedTravel,probeReleasedTravel=-1;
+            public Vector3 probeOrigin;
+        }
+        // Host-only forward input while the last stun shot's probe holds it. Once started it keeps owning the input
+        // sequence (idle afterwards), like the combat movement probe.
+        bool stunProbeHeld,stunProbeStarted;
+        void SmokeStunProbeInput(NetworkInput output)
+        {
+            stunProbeStarted|=stunProbeHeld;
+            if(!stunProbeStarted || combatAvatar==null) return;
+            combatInputSequence=checked(Math.Max(combatInputSequence,combatAvatar.LastSampleSequence)+1);
+            output.Set(new FusionInput {Present=true,Sequence=combatInputSequence,Generation=combatAvatar.State.Generation,
+                Move=stunProbeHeld?Vector2.up:Vector2.zero,Yaw=combatAvatar.State.Yaw,Pitch=combatAvatar.State.Pitch});
         }
         int specialWeaponIndex,specialShotIndex;
         double specialBegan=-1,specialStable=-1,specialAck=-1;
@@ -44,6 +59,7 @@ namespace Wildstone.Networking
                 foreach(var candidate in FindObjectsByType<FusionMatch>()) if(candidate.Runner==runner && candidate.Initialized) combatMatch=candidate;
                 combatAvatar=LaserAvatar(runner,presentation.LocalParticipantId);
                 if(combatMatch==null) throw new InvalidOperationException("Missing special projectile match.");
+                if(status.role=="host") { combatSession=menu.Session; combatSession.InputRequested+=SmokeStunProbeInput; }
             }
             if(peer?.specialProjectiles==null || peer.specialProjectiles.Length==0) return false;
             if(peer.specialProjectiles.Length!=2) throw new InvalidOperationException("Malformed special projectile peer metrics.");
@@ -83,7 +99,7 @@ namespace Wildstone.Networking
                 m.pickupSequence=shooter.LastActionSequence+1; m.pickupSent=true;
                 SendLaserAction(model,shooter,m.pickupSequence,CombatActionKind.Pickup,Vector3.forward,pickup.Id,pickup.Generation);
             }
-            m.picked|=client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==spec.Ammo && pickup.Generation==host.pickupGeneration+1;
+            m.picked|=client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==WeaponCatalog.PickupAmmo(weapon) && pickup.Generation==host.pickupGeneration+1;
             if(!m.picked || !q.picked) return false;
             if(status.role=="client" && !m.equipSent)
             { m.equipSequence=shooter.LastActionSequence+1; m.equipSent=true; SendLaserAction(model,shooter,m.equipSequence,CombatActionKind.SelectSpecial,Vector3.forward); }
@@ -187,7 +203,7 @@ namespace Wildstone.Networking
                 s.events+=e.ToCombat().Id+";";
             }
             s.ammo=shooter.SpecialAmmo; s.damage=m.baselineHealth-target.Health;
-            if(s.shots>1 || s.hits>1 || s.ricochets>2 || s.stuns>1 || s.ammo<spec.Ammo-specialShotIndex-1 || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
+            if(s.shots>1 || s.hits>1 || s.ricochets>2 || s.stuns>1 || s.ammo<WeaponCatalog.PickupAmmo(weapon)-specialShotIndex-1 || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
                 throw new InvalidOperationException("Special projectile duplicated spending/events.");
             // Event-ring and avatar snapshots can arrive separately. Keep sampling until the exact event/timer contract agrees.
             if(s.hits==1 && specialWeaponIndex==1)
@@ -205,6 +221,7 @@ namespace Wildstone.Networking
                 else statusValid=s.stuns==1 && s.stunUntil==s.stunTick+WeaponCatalog.Ticks(.45f,model.TickRate) && s.immunityUntil==s.stunUntil+WeaponCatalog.Ticks(1.75f,model.TickRate);
                 s.stunExpired=model.Tick>=s.stunUntil && !target.Suppressed(model.Tick);
                 statusValid&=s.stunExpired && (specialShotIndex==1 || (status.role=="host"?s:r).suppressionObserved);
+                if(specialShotIndex==2 && s.stuns==1) statusValid&=ProbeStunnedMovement(s,r,target,model,targetPoint);
             }
             s.absent=s.samples>=2 && !present;
             if(s.absent && s.firstDespawnTick<0) s.firstDespawnTick=model.Tick;
@@ -215,7 +232,7 @@ namespace Wildstone.Networking
             bool discTerminal=s.firstDespawnTick>s.lastTick && s.firstDespawnTick<s.expireTick &&
                 s.lastTravel+spec.Speed*(s.firstDespawnTick-s.lastTick)/(float)model.TickRate<spec.Range-1;
             s.observed=s.absent && s.lastTick>s.firstTick && s.lastTravel>s.firstTravel+.2f && s.shots==1 && s.hits==1 &&
-                s.ammo==spec.Ammo-specialShotIndex-1 && Mathf.Abs(s.eventDamage-spec.Damage)<.01f &&
+                s.ammo==WeaponCatalog.PickupAmmo(weapon)-specialShotIndex-1 && Mathf.Abs(s.eventDamage-spec.Damage)<.01f &&
                 Mathf.Abs(s.damage-spec.Damage*(specialShotIndex+1))<.01f && statusValid &&
                 (specialWeaponIndex!=0 || s.ricochets==2 && s.ricochetMask==6 && s.maxBounces==2 && discPath && discTerminal);
             status.stage="special_verdict_"+weapon+"_"+specialShotIndex;
@@ -224,6 +241,24 @@ namespace Wildstone.Networking
                 throw new InvalidOperationException("Peers disagree on special projectile verdict.");
             if(specialAck<0) specialAck=now;
             s.verified=now-specialAck>=.1; return false;
+        }
+        // The host holds forward input from its first sight of the stun until 0.4 s after it ends. Both peers read the
+        // replicated authoritative position: no travel while stunned, then travel once released. Recomputed every frame,
+        // because the client's StunUntil can briefly lag the stun event.
+        bool ProbeStunnedMovement(SpecialProjectileShot s,SpecialProjectileShot r,CombatState target,ArenaMatch model,Vector3 targetPoint)
+        {
+            int release=s.stunUntil+WeaponCatalog.Ticks(.4f,model.TickRate);
+            if(status.role=="host") stunProbeHeld=model.Tick<release;
+            if(model.Tick<s.stunUntil)
+            {
+                if(s.probeStunnedSamples++==0) s.probeOrigin=target.Feet;
+                s.probeStunnedTravel=Mathf.Max(s.probeStunnedTravel,HorizontalDistance(target.Feet,s.probeOrigin));
+                return false;
+            }
+            if(model.Tick<release) return false;
+            s.probeReleasedTravel=HorizontalDistance(target.Feet,s.probeStunnedSamples>0?s.probeOrigin:targetPoint);
+            var host=status.role=="host"?s:r;
+            return host.probeStunnedSamples>=2 && host.probeStunnedTravel<.05f && s.probeStunnedTravel<.05f && s.probeReleasedTravel>.3f;
         }
         GameObject SpecialWall(string label,float z)
         {
@@ -234,7 +269,7 @@ namespace Wildstone.Networking
         {
             if(specialWallA!=null) Destroy(specialWallA);
             if(specialWallB!=null) Destroy(specialWallB);
-            specialWallA=specialWallB=null;
+            specialWallA=specialWallB=null; stunProbeHeld=false;
         }
     }
 }

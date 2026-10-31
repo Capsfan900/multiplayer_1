@@ -59,8 +59,13 @@ namespace Wildstone.Networking.Editor
                     go.GetComponent<FusionPlayer>().VisualRoot=visual;
                     var root=go.AddComponent<HitboxRoot>(); root.Offset=new Vector3(0,.9f,0); root.BroadRadius=1.2f;
                     var hitbox=go.AddComponent<Hitbox>(); hitbox.Type=HitboxTypes.Box;
-                    hitbox.BoxExtents=new Vector3(.35f,.9f,.35f); hitbox.Offset=new Vector3(0,.9f,0);
-                    root.Hitboxes=new[]{hitbox};
+                    float top=Wildstone.Combat.CombatRules.BodyTop(1.8f), half=Wildstone.Combat.CombatRules.BodyHalfWidth;
+                    hitbox.BoxExtents=new Vector3(half,top*.5f,half); hitbox.Offset=new Vector3(0,top*.5f,0);
+                    // Head sphere child; FusionPlayer moves its offset with the authoritative capsule height each tick.
+                    var headObject=new GameObject("Head hitbox"); headObject.layer=MotorTuning.PlayerLayer; headObject.transform.SetParent(go.transform,false);
+                    var head=headObject.AddComponent<Hitbox>(); head.Type=HitboxTypes.Sphere;
+                    head.SphereRadius=Wildstone.Combat.CombatRules.HeadRadius; head.Offset=new Vector3(0,1.8f-Wildstone.Combat.CombatRules.HeadDrop,0);
+                    root.Hitboxes=new[]{hitbox,head};
                 }
                 new NetworkObjectBaker().Bake(go);
                 if(PrefabUtility.SaveAsPrefabAsset(go,"Assets/Wildstone/Resources/"+name+".prefab")==null)

@@ -55,6 +55,21 @@ namespace Wildstone.Tests
             Step(dt:1);
             Assert.That(Quaternion.Angle(hand.rotation,rest),Is.LessThan(.01f));
         }
+        // Guns point along the replicated aim with their top up, not barrel-down from a socket axis mismatch.
+        [Test] public void HeldGunBarrelFollowsAimTopUp()
+        {
+            player.Aim=Quaternion.Euler(10,35,0)*Vector3.forward;
+            foreach(var kind in new[]{WeaponKind.LineDriver,WeaponKind.LaserPistol,WeaponKind.LaserSniper,WeaponKind.LaserSMG,WeaponKind.LaserShotgun})
+            {
+                player.SelectedSpecial=kind!=WeaponKind.LineDriver; player.SpecialWeapon=kind; Step(); Step();
+                var model=hand.GetChild(hand.childCount-1);
+                var grip=GripAttachment.Find(model,"Grip"); var muzzle=GripAttachment.Find(model,"Muzzle");
+                var barrel=(muzzle.position-grip.position).normalized;
+                string context=kind+" grip fwd "+grip.forward+" up "+grip.up+" barrel "+barrel;
+                Assert.That(Vector3.Angle(barrel,player.Aim),Is.LessThan(30),context);
+                Assert.That(Vector3.Dot(grip.up,Vector3.up),Is.GreaterThan(.7f),context);
+            }
+        }
         [Test] public void LateObservedReloadUsesTimerAndReturnsToAimAtCompletion()
         {
             var rest=hand.rotation;

@@ -75,6 +75,17 @@ namespace Wildstone.Tests
             Assert.That(match.BindPlayer(1, player, 1, 0), Is.True);
             Assert.That(match.Begin(), Is.True);
             var combat = match.Model.Find(1);
+            // A predicting client resimulates from these snapshots, so the motor carries the stun's end tick itself.
+            Assert.That(CombatRules.Stun(combat, match.Model.Tick, match.Model.TickRate), Is.True);
+            int stunned = match.Model.Tick + 2;
+            float stunDeadline = Time.realtimeSinceStartup + 5;
+            while (match.Model.Tick < stunned && Time.realtimeSinceStartup < stunDeadline) yield return null;
+            Assert.That((bool)player.State.Suppressed, Is.True);
+            Assert.That(player.State.SuppressedUntil - player.State.Tick, Is.EqualTo(combat.StunUntil - match.Model.Tick));
+            stunDeadline = Time.realtimeSinceStartup + 5;
+            while (match.Model.Tick < combat.StunUntil && Time.realtimeSinceStartup < stunDeadline) yield return null;
+            Assert.That((bool)player.State.Suppressed, Is.False);
+            Assert.That(player.State.SuppressedUntil, Is.Zero);
             combat.ShieldCharges = 1; combat.GrenadeAmmo = 1;
             var request = new FusionCombatAction
             {

@@ -1,10 +1,15 @@
 #if WILDSTONE_SMOKE
 using System;
 using Fusion;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using Wildstone.Combat;
+using Wildstone.Game;
 using Wildstone.Match;
 using Wildstone.Movement;
+using Wildstone.UI;
 
 namespace Wildstone.Networking
 {
@@ -151,7 +156,8 @@ namespace Wildstone.Networking
                 metrics.hitFireSequence=checked(shooter.LastActionSequence+1);
                 var packet=FusionCombatAction.FromCombat(new CombatAction {Participant=shooter.Participant,
                     ConnectionGeneration=shooter.ConnectionGeneration,LifeGeneration=shooter.LifeGeneration,AuthorityGeneration=model.AuthorityGeneration,
-                    Sequence=metrics.hitFireSequence,Kind=CombatActionKind.Fire,Direction=(target.Eye-shooter.Eye).normalized,PickupId=-1});
+                    // Chest aim keeps this body-damage fixture clear of the revision-4 head sphere near eye height.
+                    Sequence=metrics.hitFireSequence,Kind=CombatActionKind.Fire,Direction=(target.Feet+Vector3.up*.9f-shooter.Eye).normalized,PickupId=-1});
                 metrics.hitFireSent=true; combatHitFireBegan=now; WriteOutput(); combatAvatar.RPC_Combat(packet);
             }
             if(status.role=="host" && !peer.combat.hitFireSent) { status.stage="combat_wait_target_shot"; return false; }
@@ -225,6 +231,26 @@ namespace Wildstone.Networking
             public int movementSamples,coverSequence,coverAmmo,coverShots,coverHits;
             public float movingDistance,movingSpeed,movingFireDistance,movingFireSpeed,coverBaselineHealth,coverHealth;
             public string coverShotId="";
+            public RewindMetrics rewind=new RewindMetrics();
+        }
+        // Host-only lag-compensation diagnosis per accepted hitscan query (one per pellet); not a smoke verdict.
+        [Serializable] sealed class RewindMetrics
+        {
+            public int queries,clamped;
+            public float meanMs,maxMs,requestedMeanMs,requestedMaxMs;
+            public void Add(FusionHitscanRecord r)
+            {
+                float age=r.RewindSeconds*1000,requested=r.RequestedRewindSeconds*1000;
+                queries++; if(r.Clamped) clamped++;
+                meanMs+=(age-meanMs)/queries; requestedMeanMs+=(requested-requestedMeanMs)/queries;
+                maxMs=Math.Max(maxMs,age); requestedMaxMs=Math.Max(requestedMaxMs,requested);
+            }
+        }
+        void RecordRewind(FusionHitscanRecord record)
+        {
+            // Fixtures advance only after both peers verify, so every query lands on the weapon being exercised.
+            if(status.lasers!=null && laserIndex<status.lasers.Length) status.lasers[laserIndex].rewind.Add(record);
+            else if(status.gunplay!=null && gunplayIndex<status.gunplay.Length) status.gunplay[gunplayIndex].rewind.Add(record);
         }
         int laserIndex;
         bool MovingLaserScenario=>status.scenario=="laser-moving-cover";
@@ -245,6 +271,7 @@ namespace Wildstone.Networking
                 foreach(var avatar in FindObjectsByType<FusionPlayer>())
                     if(avatar.Runner==runner && avatar.Initialized && avatar.Participant==presentation.LocalParticipantId && avatar.Object.InputAuthority==runner.LocalPlayer) combatAvatar=avatar;
                 if(combatMatch==null || combatAvatar==null) throw new InvalidOperationException("Laser fixture is missing admitted network objects.");
+                FusionCombatWorld.SmokeShotResolved+=RecordRewind;
             }
             if(peer?.lasers==null || peer.lasers.Length!=LaserWeapons.Length) return false;
             if(laserIndex==LaserWeapons.Length) return true;
@@ -283,7 +310,7 @@ namespace Wildstone.Networking
                 m.pickupGeneration=pickup.Generation; m.pickupSequence=shooter.LastActionSequence+1; m.pickupSent=true;
                 SendLaserAction(model,shooter,m.pickupSequence,CombatActionKind.Pickup,Vector3.forward,pickup.Id,pickup.Generation);
             }
-            m.picked=m.picked || client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==spec.Ammo && pickup.Generation==host.pickupGeneration+1 && pickup.AvailableTick>model.Tick;
+            m.picked=m.picked || client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==WeaponCatalog.PickupAmmo(weapon) && pickup.Generation==host.pickupGeneration+1 && pickup.AvailableTick>model.Tick;
             if(!m.picked || !remote.picked) return false;
             // Explicit selection exercises the production equip RPC even though pickup auto-selects.
             if(status.role=="client" && !m.equipSent)
@@ -346,9 +373,9 @@ namespace Wildstone.Networking
                 m.hitCount++; m.eventDamage+=e.Amount; m.hitIds+=e.ToCombat().Id+";";
             }
             float expected=spec.Damage*WeaponCatalog.HitscanPellets(weapon);
-            if(m.ammo<spec.Ammo-1 || m.shotCount>1 || m.hitCount>WeaponCatalog.HitscanPellets(weapon) || m.damage>expected+.001f || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
+            if(m.ammo<WeaponCatalog.PickupAmmo(weapon)-1 || m.shotCount>1 || m.hitCount>WeaponCatalog.HitscanPellets(weapon) || m.damage>expected+.001f || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
                 throw new InvalidOperationException("Laser shot duplicated ammo, damage or events.");
-            m.observed=m.ammo==spec.Ammo-1 && m.shotCount==1 && m.hitCount==WeaponCatalog.HitscanPellets(weapon) && Mathf.Abs(m.damage-expected)<.001f && Mathf.Abs(m.eventDamage-expected)<.001f;
+            m.observed=m.ammo==WeaponCatalog.PickupAmmo(weapon)-1 && m.shotCount==1 && m.hitCount==WeaponCatalog.HitscanPellets(weapon) && Mathf.Abs(m.damage-expected)<.001f && Mathf.Abs(m.eventDamage-expected)<.001f;
             status.stage="laser_verdict_"+weapon;
             if(!m.observed || !remote.observed) return false;
             if(m.shotId!=remote.shotId || m.hitIds!=remote.hitIds || m.life!=remote.life || m.targetLife!=remote.targetLife) throw new InvalidOperationException("Peers disagree on laser event identity.");
@@ -402,14 +429,264 @@ namespace Wildstone.Networking
             m.coverSequence=client.coverSequence; m.coverAmmo=shooter.SpecialAmmo; m.coverHealth=target.Health;
             m.coverShots=CountSmokeShots(shooter.Participant,shooter.LifeGeneration,m.coverSequence,out m.coverShotId);
             m.coverHits=CountSmokeHits(shooter.Participant,shooter.LifeGeneration,m.coverSequence,target.Participant,target.LifeGeneration,out _,out _);
-            if(m.coverHits!=0 || m.coverHealth!=m.coverBaselineHealth || m.coverShots>1 || m.coverAmmo<spec.Ammo-2 ||
+            if(m.coverHits!=0 || m.coverHealth!=m.coverBaselineHealth || m.coverShots>1 || m.coverAmmo<WeaponCatalog.PickupAmmo(LaserWeapons[laserIndex])-2 ||
                 shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
                 throw new InvalidOperationException("Cover shot damaged its protected target or duplicated ammunition/events.");
-            m.coverObserved=m.coverShots==1 && m.coverAmmo==spec.Ammo-2 && shooter.LastActionSequence==m.coverSequence;
+            m.coverObserved=m.coverShots==1 && m.coverAmmo==WeaponCatalog.PickupAmmo(LaserWeapons[laserIndex])-2 && shooter.LastActionSequence==m.coverSequence;
             if(!m.coverObserved || !remote.coverObserved) return false;
             if(m.coverShotId!=remote.coverShotId || m.coverSequence!=remote.coverSequence || m.coverHealth!=remote.coverHealth)
                 throw new InvalidOperationException("Peers disagree on the blocked moving-target verdict.");
             m.verified=true; WriteOutput(); return false;
+        }
+        // Revision-4 gunplay diagnostic: production pickup/equip/fire RPCs plus the real ADS input bit.
+        // Sniper no-scope vs scoped spread, pistol body vs head damage, and SMG held fire at host cadence.
+        [Serializable] sealed class GunplayMetrics
+        {
+            public string weapon,autoShotIds="",autoHitIds="";
+            public bool pickupPlaced,pickupSent,picked,equipSent,equipped,fixturePlaced,ready,verified,autoStarted,autoDone,autoObserved;
+            public int pickupGeneration,pickupSequence,equipSequence,shooter,life,target,targetLife,step,resetStep=-1;
+            public int autoFirst,autoLast,autoShots,autoHits,autoMinSpacing,autoAmmo,autoRequests,autoFirstRequestTick=-1,autoStampOffset;
+            public float autoDamage,autoHealth,autoMeanSpacing;
+            public bool[] stepSent=new bool[2],stepObserved=new bool[2],headshots=new bool[2];
+            public int[] sequences=new int[2];
+            public float[] spreads=new float[2],damages=new float[2],directionErrors=new float[2];
+            public string[] shotIds={"",""},hitIds={"",""};
+            public RewindMetrics rewind=new RewindMetrics();
+        }
+        static readonly WeaponKind[] GunplayWeapons={WeaponKind.LaserSniper,WeaponKind.LaserPistol,WeaponKind.LaserSMG};
+        int gunplayIndex,gunplaySequence;
+        bool gunplayAim;
+        double gunplayBegan=-1,gunplayStable=-1,gunplayAutoUntil=-1,gunplaySettled=-1;
+        PracticeInput gunplayTrigger;
+        Keyboard gunplayKeyboard;
+        InputSettings.BackgroundBehavior gunplayBackground;
+        readonly List<CombatActionKind> gunplayCommands=new List<CombatActionKind>();
+        static bool GunplayAims(WeaponKind weapon,int step) => weapon==WeaponKind.LaserPistol || (weapon==WeaponKind.LaserSniper && step==1);
+        static bool GunplayHead(WeaponKind weapon,int step) => weapon==WeaponKind.LaserPistol && step==1;
+        static int GunplayFireMargin(ArenaMatch model) => WeaponCatalog.Ticks(.4f,model.TickRate);
+        bool DriveGunplay(ArenaMatch model,NetworkRunner runner,Status peer,double now)
+        {
+            if(status.gunplay==null)
+            {
+                status.gunplay=new GunplayMetrics[GunplayWeapons.Length];
+                for(int i=0;i<GunplayWeapons.Length;i++) status.gunplay[i]=new GunplayMetrics {weapon=GunplayWeapons[i].ToString()};
+                foreach(var candidate in FindObjectsByType<FusionMatch>()) if(candidate.Runner==runner && candidate.Initialized) combatMatch=candidate;
+                foreach(var avatar in FindObjectsByType<FusionPlayer>())
+                    if(avatar.Runner==runner && avatar.Initialized && avatar.Participant==presentation.LocalParticipantId && avatar.Object.InputAuthority==runner.LocalPlayer) combatAvatar=avatar;
+                if(combatMatch==null || combatAvatar==null) throw new InvalidOperationException("Gunplay fixture is missing admitted network objects.");
+                FusionCombatWorld.SmokeShotResolved+=RecordRewind;
+                if(status.role=="client") { combatSession=menu.Session; combatSession.InputRequested+=SmokeGunplayInput; }
+            }
+            if(peer?.gunplay==null || peer.gunplay.Length!=GunplayWeapons.Length) return false;
+            if(gunplayIndex==GunplayWeapons.Length) return true;
+            var m=status.gunplay[gunplayIndex]; var remote=peer.gunplay[gunplayIndex];
+            if(m.verified && remote.verified)
+            {
+                gunplayAim=false; gunplayIndex++; gunplayBegan=gunplayStable=gunplayAutoUntil=gunplaySettled=-1; WriteOutput();
+                return gunplayIndex==GunplayWeapons.Length;
+            }
+            if(gunplayBegan<0) gunplayBegan=now;
+            if(now-gunplayBegan>30) throw new TimeoutException("Gunplay fixture timed out: "+m.weapon+"@"+status.stage);
+            var weapon=GunplayWeapons[gunplayIndex]; var spec=WeaponCatalog.Get(weapon);
+            var shooter=status.role=="client"?presentation.LocalPlayer:RemotePlayer(model);
+            var target=status.role=="host"?presentation.LocalPlayer:RemotePlayer(model);
+            if(shooter==null || target==null || !shooter.Alive || !target.Alive) throw new InvalidOperationException("Gunplay fixture lost a living participant.");
+            if(m.life!=0 && (m.shooter!=shooter.Participant || m.life!=shooter.LifeGeneration || m.target!=target.Participant || m.targetLife!=target.LifeGeneration))
+                throw new InvalidOperationException("Gunplay fixture changed participant or life identity.");
+            m.shooter=shooter.Participant; m.life=shooter.LifeGeneration; m.target=target.Participant; m.targetLife=target.LifeGeneration;
+            PickupState pickup=null;
+            foreach(var item in model.Pickups) if(WeaponCatalog.FromPickup(item.Item)==weapon) { pickup=item; break; }
+            if(pickup==null) throw new InvalidOperationException("Map is missing gunplay pickup: "+weapon);
+            var host=status.role=="host"?m:remote; var client=status.role=="client"?m:remote;
+            status.stage="gunplay_pickup_"+weapon;
+            if(status.role=="host" && !m.pickupPlaced)
+            {
+                // Diagnostic-only placement; inventory comes only from the real pickup RPC.
+                LaserAvatar(runner,shooter.Participant).Teleport(pickup.Position+Vector3.right,0);
+                m.pickupGeneration=pickup.Generation; m.pickupPlaced=true; WriteOutput();
+            }
+            if(!host.pickupPlaced) return false;
+            if(status.role=="client" && !m.pickupSent)
+            {
+                if((shooter.Feet-pickup.Position).sqrMagnitude>4 || pickup.Generation!=host.pickupGeneration) return false;
+                m.pickupGeneration=pickup.Generation; m.pickupSequence=shooter.LastActionSequence+1; m.pickupSent=true;
+                SendLaserAction(model,shooter,m.pickupSequence,CombatActionKind.Pickup,Vector3.forward,pickup.Id,pickup.Generation);
+            }
+            m.picked=m.picked || client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==WeaponCatalog.PickupAmmo(weapon) && pickup.Generation==host.pickupGeneration+1;
+            if(!m.picked || !remote.picked) return false;
+            if(status.role=="client" && !m.equipSent)
+            {
+                m.equipSequence=shooter.LastActionSequence+1; m.equipSent=true;
+                SendLaserAction(model,shooter,m.equipSequence,CombatActionKind.SelectSpecial,Vector3.forward);
+            }
+            m.equipped=m.equipped || client.equipSent && shooter.LastActionSequence>=client.equipSequence && shooter.SelectedSpecial && shooter.SpecialWeapon==weapon;
+            if(!m.equipped || !remote.equipped) return false;
+            var targetPoint=new Vector3(-30,.02f,-12); var shooterPoint=new Vector3(-30,.02f,-10);
+            if(status.role=="host" && !m.fixturePlaced)
+            {
+                if(Physics.Raycast(shooterPoint+Vector3.up*.9f,Vector3.back,2,MotorTuning.WorldMask,QueryTriggerInteraction.Ignore))
+                    throw new InvalidOperationException("Gunplay fixture corridor is occluded.");
+                LaserAvatar(runner,target.Participant).Teleport(targetPoint,0);
+                LaserAvatar(runner,shooter.Participant).Teleport(shooterPoint,180);
+                m.fixturePlaced=true; WriteOutput();
+            }
+            status.stage="gunplay_history_"+weapon;
+            if(!host.fixturePlaced || !m.ready && ((shooter.Feet-shooterPoint).sqrMagnitude>.04f || (target.Feet-targetPoint).sqrMagnitude>.04f)) { gunplayStable=-1; return false; }
+            if(gunplayStable<0) gunplayStable=now;
+            if(!m.ready) { if(now-gunplayStable<1) return false; m.ready=true; WriteOutput(); }
+            if(!remote.ready) return false;
+            return weapon==WeaponKind.LaserSMG?DriveGunplayAuto(model,m,remote,host,client,shooter,target,spec,now):
+                DriveGunplaySteps(model,m,remote,host,client,shooter,target,weapon,spec);
+        }
+        void GunplayReset(GunplayMetrics m,CombatState target,int step)
+        {
+            if(status.role!="host" || m.resetStep==step) return;
+            // Diagnostic-only health restore so every verdict starts from full health without a death.
+            var authoritative=combatMatch.Model.Find(target.Participant); authoritative.Health=WeaponCatalog.Health; authoritative.Shield=0;
+            m.resetStep=step; WriteOutput();
+        }
+        bool DriveGunplaySteps(ArenaMatch model,GunplayMetrics m,GunplayMetrics remote,GunplayMetrics host,GunplayMetrics client,
+            CombatState shooter,CombatState target,WeaponKind weapon,WeaponSpec spec)
+        {
+            int step=m.step;
+            if(step>=2) { if(!m.verified) { m.verified=true; WriteOutput(); } return false; }
+            bool aim=GunplayAims(weapon,step), head=GunplayHead(weapon,step);
+            status.stage="gunplay_"+weapon+"_"+step;
+            GunplayReset(m,target,step);
+            if(host.resetStep<step) return false;
+            gunplayAim=status.role=="client" && aim;
+            if(status.role=="client" && !m.stepSent[step])
+            {
+                // Wait until the replicated state acknowledges the previous step, or the next send would reuse its sequence.
+                // The predicted tick leads the host's, so a send right at the cooldown edge is rejected there: keep a margin.
+                if(target.Health!=WeaponCatalog.Health || shooter.AdsProgress!=(aim?1:0) || shooter.Bloom!=0 || model.Tick<shooter.FireReadyTick+GunplayFireMargin(model) ||
+                    (step>0 && shooter.LastActionSequence<m.sequences[step-1])) return false;
+                var point=head?CombatRules.HeadCenter(target.Feet,target.CapsuleHeight):target.Feet+Vector3.up*.9f;
+                m.sequences[step]=shooter.LastActionSequence+1; m.stepSent[step]=true;
+                SendLaserAction(model,shooter,m.sequences[step],CombatActionKind.Fire,(point-shooter.Eye).normalized);
+            }
+            if(!client.stepSent[step]) return false;
+            int sequence=client.sequences[step]; m.sequences[step]=sequence;
+            int shots=0,hits=0; FusionCombatEvent shot=default,hit=default;
+            for(int i=0;i<combatMatch.EventRing.Length;i++)
+            {
+                var e=combatMatch.EventRing[i];
+                if(e.Sequence<1 || e.Action.Participant!=shooter.Participant || e.Action.LifeGeneration!=shooter.LifeGeneration || e.Action.Sequence!=sequence) continue;
+                if(e.Kind==CombatEventKind.Shot) { shots++; shot=e; }
+                if(e.Kind==CombatEventKind.Hit) { hits++; hit=e; }
+            }
+            if(shots>1 || hits>1) throw new InvalidOperationException("Gunplay shot duplicated events.");
+            if(shots==1 && hits==1 && !m.stepObserved[step])
+            {
+                var evt=shot.ToCombat(); var direction=WeaponCatalog.ShotDirection(evt,0);
+                float expectedSpread=WeaponCatalog.SpreadDegrees(weapon,aim?1:0,0), expectedDamage=spec.Damage*(head?WeaponCatalog.HeadshotMultiplier(weapon):1);
+                m.spreads[step]=shot.Amount; m.damages[step]=hit.Amount; m.headshots[step]=hit.Headshot;
+                m.directionErrors[step]=Vector3.Angle(direction,evt.Vector.normalized);
+                m.shotIds[step]=evt.Id; m.hitIds[step]=hit.ToCombat().Id;
+                if(shot.Amount!=expectedSpread || Mathf.Abs(hit.Amount-expectedDamage)>.001f || (bool)hit.Headshot!=head || hit.Target!=target.Participant ||
+                    (expectedSpread==0 && direction!=evt.Vector.normalized) || m.directionErrors[step]>expectedSpread+.05f)
+                    throw new InvalidOperationException("Gunplay verdict mismatch: "+weapon+" step "+step+" spread "+shot.Amount+" damage "+hit.Amount+" head "+(bool)hit.Headshot);
+                m.stepObserved[step]=true; WriteOutput();
+            }
+            if(!m.stepObserved[step] || !remote.stepObserved[step]) return false;
+            if(remote.shotIds[step]!=m.shotIds[step] || remote.hitIds[step]!=m.hitIds[step] || remote.damages[step]!=m.damages[step] ||
+                remote.spreads[step]!=m.spreads[step] || remote.headshots[step]!=m.headshots[step] || remote.directionErrors[step]!=m.directionErrors[step])
+                throw new InvalidOperationException("Peers disagree on the gunplay verdict for "+weapon+" step "+step);
+            m.step++; WriteOutput(); return false;
+        }
+        bool DriveGunplayAuto(ArenaMatch model,GunplayMetrics m,GunplayMetrics remote,GunplayMetrics host,GunplayMetrics client,
+            CombatState shooter,CombatState target,WeaponSpec spec,double now)
+        {
+            status.stage="gunplay_auto";
+            GunplayReset(m,target,0);
+            if(host.resetStep<0) return false;
+            gunplayAim=false;
+            if(status.role=="client" && !m.autoStarted)
+            {
+                if(target.Health!=WeaponCatalog.Health || shooter.AdsProgress!=0 || shooter.Bloom!=0 || model.Tick<shooter.FireReadyTick+GunplayFireMargin(model)) return false;
+                m.autoStarted=true; m.autoFirst=gunplaySequence=shooter.LastActionSequence+1; gunplayAutoUntil=now+.6; WriteOutput();
+            }
+            if(status.role=="client" && !m.autoDone)
+            {
+                // Held trigger through the shipped client path: a synthetic key held on a real PracticeInput, sampled each
+                // frame and scheduled on the coordinator's request tick; only the host's cooldown accepts or rejects.
+                if(gunplayTrigger==null)
+                {
+                    gunplayBackground=InputSystem.settings.backgroundBehavior;
+                    InputSystem.settings.backgroundBehavior=InputSettings.BackgroundBehavior.IgnoreFocus;
+                    gunplayKeyboard=InputSystem.AddDevice<Keyboard>("SmokeTrigger");
+                    var settings=new LocalSettings(); settings.Bindings[PracticeInput.FireIndex]="<Keyboard>/j";
+                    gunplayTrigger=new PracticeInput(settings);
+                    InputSystem.QueueStateEvent(gunplayKeyboard,new KeyboardState(Key.J));
+                    m.autoLast=gunplaySequence-1;
+                }
+                gunplayTrigger.Sample(true);
+                int requestTick=combatMatch.NextActionTick;
+                gunplayTrigger.ConsumeActions(gunplayCommands,requestTick,model.TickRate,shooter,now<gunplayAutoUntil);
+                foreach(var kind in gunplayCommands)
+                    if(kind==CombatActionKind.Fire)
+                    {
+                        if(m.autoFirstRequestTick<0) m.autoFirstRequestTick=requestTick;
+                        SendLaserAction(model,shooter,gunplaySequence,CombatActionKind.Fire,(target.Feet+Vector3.up*.9f-shooter.Eye).normalized);
+                        m.autoLast=gunplaySequence++; m.autoRequests++;
+                    }
+                if(now<gunplayAutoUntil) return false;
+                StopGunplayTrigger(); m.autoDone=true; WriteOutput();
+            }
+            if(!client.autoDone) return false;
+            int shots=0,hits=0,firstTick=-1,lastTick=-1,spacing=int.MaxValue; float damage=0,firstSpread=-1,previousSpread=-1; bool growing=true;
+            string shotIds="",hitIds="";
+            for(int sequence=client.autoFirst;sequence<=client.autoLast;sequence++)
+                for(int i=0;i<combatMatch.EventRing.Length;i++)
+                {
+                    var e=combatMatch.EventRing[i];
+                    if(e.Sequence<1 || e.Action.Participant!=shooter.Participant || e.Action.LifeGeneration!=shooter.LifeGeneration || e.Action.Sequence!=sequence) continue;
+                    if(e.Kind==CombatEventKind.Shot)
+                    {
+                        shots++; shotIds+=e.ToCombat().Id+";";
+                        int gap=lastTick>=0?e.Tick-lastTick:0;
+                        if(lastTick>=0) spacing=Math.Min(spacing,gap); else firstTick=e.Tick;
+                        lastTick=e.Tick;
+                        // Bloom only decays after BloomDelaySeconds without a shot: a slow emulated trigger (a 19-tick gap
+                        // on a 25 fps client) may let it shrink, so growth is required only across gaps inside that delay.
+                        if(firstSpread<0) firstSpread=e.Amount;
+                        else if(shots<=5 && e.Amount<=previousSpread && gap<=WeaponCatalog.Ticks(WeaponCatalog.BloomDelaySeconds,model.TickRate)) growing=false;
+                        previousSpread=e.Amount;
+                    }
+                    if(e.Kind==CombatEventKind.Hit)
+                    {
+                        if(e.Target!=target.Participant || e.Headshot || e.Weapon!=WeaponKind.LaserSMG) throw new InvalidOperationException("SMG chest hit had the wrong target, weapon or head flag.");
+                        hits++; damage+=e.Amount; hitIds+=e.ToCombat().Id+";";
+                    }
+                }
+            if(shots!=m.autoShots || hits!=m.autoHits) { m.autoShots=shots; m.autoHits=hits; gunplaySettled=now; }
+            if(gunplaySettled<0) gunplaySettled=now;
+            m.autoDamage=damage; m.autoHealth=target.Health; m.autoAmmo=shooter.SpecialAmmo; m.autoMinSpacing=spacing; m.autoShotIds=shotIds; m.autoHitIds=hitIds;
+            m.autoMeanSpacing=shots>1?(lastTick-firstTick)/(float)(shots-1):0;
+            // Host stamp minus the client's request tick for the first shot: how far the D036 request clock leads or trails.
+            m.autoStampOffset=firstTick>=0 && client.autoFirstRequestTick>=0?firstTick-client.autoFirstRequestTick:0;
+            if(now-gunplaySettled<1) return false;
+            // A 0.6 s hold spans eight shots at the interval. The D036 slack lets one gap shrink by up to twice the slack
+            // (late then early) but never the whole run by more than one slack; the mean must stay within a tick of it.
+            int interval=WeaponCatalog.Ticks(spec.Interval,model.TickRate),slack=WeaponCatalog.Ticks(WeaponCatalog.FireSlackSeconds,model.TickRate);
+            if(shots<7 || shots>8 || hits!=shots || Mathf.Abs(damage-spec.Damage*shots)>.001f || Mathf.Abs(target.Health-(WeaponCatalog.Health-spec.Damage*shots))>.001f ||
+                shooter.SpecialAmmo!=WeaponCatalog.PickupAmmo(WeaponKind.LaserSMG)-shots || spacing<interval-2*slack || lastTick-firstTick<(shots-1)*interval-slack || m.autoMeanSpacing>interval+1 ||
+                firstSpread!=WeaponCatalog.SpreadDegrees(WeaponKind.LaserSMG,0,0) || !growing)
+                throw new InvalidOperationException("SMG held fire verdict mismatch: shots "+shots+" of "+client.autoRequests+" requests, hits "+hits+" damage "+damage+
+                    " spacing "+spacing+" mean "+m.autoMeanSpacing+" ammo "+shooter.SpecialAmmo);
+            if(!m.autoObserved) { m.autoObserved=true; WriteOutput(); }
+            if(!remote.autoObserved) return false;
+            if(remote.autoShots!=m.autoShots || remote.autoShotIds!=m.autoShotIds || remote.autoHitIds!=m.autoHitIds || remote.autoDamage!=m.autoDamage)
+                throw new InvalidOperationException("Peers disagree on SMG held fire events.");
+            if(!m.verified) { m.verified=true; WriteOutput(); }
+            return false;
+        }
+        void SmokeGunplayInput(NetworkInput output)
+        {
+            if(status.role!="client" || combatAvatar==null || combatSession?.Runner==null) return;
+            combatInputSequence=checked(Math.Max(combatInputSequence,combatAvatar.LastSampleSequence)+1);
+            output.Set(new FusionInput {Present=true,Sequence=combatInputSequence,Generation=combatAvatar.State.Generation,
+                Yaw=combatAvatar.State.Yaw,Pitch=combatAvatar.State.Pitch,Held=gunplayAim?MotorButtons.Aim:MotorButtons.None});
         }
         FusionPlayer LaserAvatar(NetworkRunner runner,int participant)
         {
@@ -422,9 +699,15 @@ namespace Wildstone.Networking
                 LifeGeneration=shooter.LifeGeneration,AuthorityGeneration=model.AuthorityGeneration,Sequence=sequence,Kind=kind,Direction=direction,PickupId=pickup,PickupGeneration=generation}));
             WriteOutput();
         }
+        void StopGunplayTrigger()
+        {
+            gunplayTrigger?.Dispose(); gunplayTrigger=null;
+            if(gunplayKeyboard!=null) { InputSystem.RemoveDevice(gunplayKeyboard); gunplayKeyboard=null; InputSystem.settings.backgroundBehavior=gunplayBackground; }
+        }
         void StopCombatInput()
         {
-            if(combatSession!=null) { combatSession.InputRequested-=SmokeCombatInput; combatSession.InputRequested-=SmokeLaserMovingInput; }
+            StopGunplayTrigger(); FusionCombatWorld.SmokeShotResolved-=RecordRewind;
+            if(combatSession!=null) { combatSession.InputRequested-=SmokeCombatInput; combatSession.InputRequested-=SmokeLaserMovingInput; combatSession.InputRequested-=SmokeGunplayInput; combatSession.InputRequested-=SmokeStunProbeInput; combatSession.InputRequested-=SmokeStunClientInput; }
             if(laserCover!=null) Destroy(laserCover);
             if(projectileCover!=null) Destroy(projectileCover);
             CleanupGrenadeFixture(); StopSpecialProjectiles();

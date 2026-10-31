@@ -1,5 +1,7 @@
+using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Wildstone.Combat;
 using Wildstone.Maps;
 using Wildstone.Match;
@@ -30,8 +32,173 @@ namespace Wildstone.Tests
             for(int i=0;i<200;i++) effects.Play(shot,match,false,Vector3.zero);
             Assert.That(root.GetComponentsInChildren<Transform>(true).Length,Is.EqualTo(objects));
             Assert.That(match.Projectiles.Count,Is.Zero);
-            effects.AnimateTransient(Time.realtimeSinceStartup+10);
+            effects.AnimateTransient(Time.unscaledTime+10);
             foreach(var line in root.GetComponentsInChildren<LineRenderer>(true)) if(line.name.StartsWith("Burst ")) Assert.That(line.enabled,Is.False);
+        }
+
+        // A ready pickup shows a full bright ring; a taken one shows a dim arc that refills with the timer.
+        [Test] public void PickupPadsShowReadinessAndRefillWithTheRespawn()
+        {
+            Object.DestroyImmediate(root);
+            match=new ArenaMatch(new ArenaDefinition { Id="effects",Spawns=System.Array.Empty<ArenaSpawn>(),
+                Pickups=new[]{ new ArenaPickup { Item="laser-pistol",Position=new Vector3(0,.45f,4) },new ArenaPickup { Item="shield",Position=new Vector3(3,.45f,4) } },
+                ZoneRoute=new[]{Vector3.zero,Vector3.forward*8,Vector3.right*8} },practice:true);
+            root=new GameObject("WeaponEffectsTest"); effects=root.AddComponent<ArenaEffects>(); effects.Initialize(catalog,match);
+            LineRenderer Ring(int id) => root.transform.Find("Pickup ring "+id).GetComponent<LineRenderer>();
+            effects.Present(match,false);
+            Assert.That(Ring(0).enabled && Ring(0).loop,Is.True);
+            Assert.That(Ring(0).positionCount,Is.EqualTo(ArenaEffects.PickupRingPoints));
+            Assert.That(Ring(0).GetPosition(0).y,Is.EqualTo(.03f).Within(.001f),"The ring sits on the floor under the floating item.");
+            int full=WeaponCatalog.Ticks(WeaponCatalog.PickupSeconds,match.TickRate);
+            match.Pickups[0].AvailableTick=match.Tick+full*3/4;
+            effects.Present(match,false);
+            int quarter=Ring(0).positionCount;
+            Assert.That(Ring(0).loop,Is.False);
+            Assert.That(Ring(0).startColor.r,Is.LessThan(.5f),"The refill arc is dim.");
+            Assert.That(root.transform.Find("Pickup track 0").GetComponent<LineRenderer>().enabled,Is.True,"The dark track still marks the pad.");
+            match.Pickups[0].AvailableTick=match.Tick+full/4;
+            effects.Present(match,false);
+            Assert.That(Ring(0).positionCount,Is.GreaterThan(quarter).And.LessThan(ArenaEffects.PickupRingPoints));
+            Assert.That(Ring(1).loop && Ring(1).startColor.r>.5f,Is.True,"Other pads are unaffected.");
+        }
+
+        // A health pack is drawn larger on a wider ring than other pickups so it reads from across the room.
+        [Test] public void HealthPackStandsOutFromOtherPickups()
+        {
+            Object.DestroyImmediate(root);
+            match=new ArenaMatch(new ArenaDefinition { Id="effects",Spawns=System.Array.Empty<ArenaSpawn>(),
+                Pickups=new[]{ new ArenaPickup { Item="laser-pistol",Position=new Vector3(0,.45f,4) },new ArenaPickup { Item="health",Position=new Vector3(3,.45f,4) } },
+                ZoneRoute=new[]{Vector3.zero,Vector3.forward*8,Vector3.right*8} },practice:true);
+            root=new GameObject("WeaponEffectsTest"); effects=root.AddComponent<ArenaEffects>(); effects.Initialize(catalog,match);
+            effects.Present(match,false);
+            var pistol=root.transform.Find("Pickup 0 laser-pistol"); var health=root.transform.Find("Pickup 1 health");
+            Assert.That(health.localScale.x,Is.EqualTo(pistol.localScale.x*ArenaEffects.HealthPickupScale).Within(1e-4f));
+            Assert.That(root.transform.Find("Pickup ring 1").GetComponent<LineRenderer>().widthMultiplier,
+                Is.GreaterThan(root.transform.Find("Pickup ring 0").GetComponent<LineRenderer>().widthMultiplier*1.5f));
+        }
+        Material ZonePart(string name) => root.transform.Find(name).GetComponent<Renderer>().sharedMaterial;
+        static float HueGap(Color a,Color b)
+        {
+            Color.RGBToHSV(a,out float ha,out _,out _); Color.RGBToHSV(b,out float hb,out _,out _);
+            return Mathf.Abs(Mathf.DeltaAngle(ha*360,hb*360));
+        }
+
+        // The idle zone was palette grey on grey/ivory stone; it is now a saturated accent that no team or the danger cue wears.
+        [Test] public void IdleZoneIsASaturatedAccentApartFromTeamAndDangerHues()
+        {
+            var idle=effects.ZoneColor(-1,false);
+            Color.RGBToHSV(idle,out _,out float saturation,out _);
+            Assert.That(saturation,Is.GreaterThan(.6f),"Idle "+idle+" is not palette grey.");
+            var rivals=new System.Collections.Generic.List<Color>(Wildstone.UI.ArenaHud.TeamTints) { catalog.Danger.GetColor("_BaseColor"),effects.ZoneColor(-1,true) };
+            foreach(var rival in rivals) Assert.That(HueGap(idle,rival),Is.GreaterThan(35f),"Idle "+idle+" against "+rival);
+        }
+
+        // An owned zone wears its captor's tint in every part (the HUD arrow's, so world and HUD agree); contested stays warm.
+        [Test] public void OwnedZonePaintsTheCaptorTeamTintAndContestedStaysWarm()
+        {
+            for(int team=0;team<4;team++)
+            {
+                effects.Present(match,false,team,false);
+                var tint=Wildstone.UI.ArenaHud.TeamTints[team];
+                foreach(var name in new[]{ "Hot zone floor","Hot zone curtain","Hot zone beacon" })
+                {
+                    var c=ZonePart(name).GetColor("_BaseColor");
+                    Assert.That(Mathf.Abs(c.r-tint.r)+Mathf.Abs(c.g-tint.g)+Mathf.Abs(c.b-tint.b),Is.LessThan(.01f),name+" team "+team);
+                }
+            }
+            effects.Present(match,false,2,true);
+            var warm=ZonePart("Hot zone curtain").GetColor("_BaseColor");
+            Assert.That(warm.r,Is.GreaterThan(.9f).And.GreaterThan(warm.g)); Assert.That(warm.g,Is.GreaterThan(warm.b));
+            foreach(var tint in Wildstone.UI.ArenaHud.TeamTints) Assert.That(HueGap(warm,tint),Is.GreaterThan(20f),"Contested is not read as a team: "+tint);
+        }
+
+        // Painted, not added: curtain and beacon blend over the scene on a darker, wider band (like the pickup rings), and the floor
+        // decal carries a dark track band outside its rim, so ivory stone and sky cannot erase the zone.
+        [Test] public void ZoneIsPaintedOverADarkerWiderBandInsteadOfAdded()
+        {
+            effects.Present(match,false);
+            float painted=(float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha;
+            Assert.That(catalog.ZoneCurtain.GetFloat("_DstBlend"),Is.EqualTo(painted),"The curtain asset is premultiplied-over, not additive.");
+            Assert.That(catalog.ZoneCurtain.IsKeywordEnabled("_FADING_ON"),Is.True,"Standing inside the pillar does not tint the screen.");
+            Assert.That(ZonePart("Hot zone curtain").GetFloat("_DstBlend"),Is.EqualTo(painted));
+            Assert.That(ZonePart("Hot zone beacon").GetFloat("_DstBlend"),Is.EqualTo(painted));
+            var shade=ZonePart("Hot zone beacon shade");
+            Assert.That(shade.renderQueue,Is.LessThan(ZonePart("Hot zone beacon").renderQueue),"The dark band draws first.");
+            Assert.That(ZonePart("Hot zone curtain shade").renderQueue,Is.LessThan(ZonePart("Hot zone curtain").renderQueue));
+            var dark=shade.GetColor("_BaseColor");
+            Assert.That(Mathf.Max(dark.r,Mathf.Max(dark.g,dark.b)),Is.LessThan(.1f)); Assert.That(dark.a,Is.InRange(.3f,.8f));
+            Assert.That(ZonePart("Hot zone curtain").GetColor("_BaseColor").a,Is.LessThanOrEqualTo(.6f),"A player behind the boundary still reads through the curtain.");
+            var beacon=root.transform.Find("Hot zone beacon"); var beaconShade=root.transform.Find("Hot zone beacon shade");
+            Assert.That(beacon.localScale.x*2,Is.InRange(1f,1.5f),"A beacon 1-1.5 m wide, not the old 0.44 m wire.");
+            Assert.That(beaconShade.localScale.x,Is.GreaterThan(beacon.localScale.x),"The dark edge frames the hue.");
+            Assert.That(root.transform.Find("Hot zone curtain shade").localScale.y,Is.GreaterThan(root.transform.Find("Hot zone curtain").localScale.y));
+            var floor=root.transform.Find("Hot zone floor");
+            Assert.That(ZonePart("Hot zone floor").GetFloat("_Track"),Is.EqualTo(ArenaEffects.ZoneTrack).And.GreaterThan(0));
+            Assert.That(floor.localScale.x,Is.EqualTo((MovingZone.Radius+ArenaEffects.ZoneTrack)*2).Within(.001f),"The decal box holds the zone and its track band.");
+        }
+
+        // Reduced motion freezes the contested flicker and curtain flash; the zone is still drawn at full strength.
+        [Test] public void ReducedMotionHoldsTheContestedZoneStill()
+        {
+            effects.Present(match,true,1,true);
+            Assert.That(ZonePart("Hot zone floor").GetFloat("_Pulse"),Is.Zero);
+            Assert.That(ZonePart("Hot zone floor").GetFloat("_Clock"),Is.Zero);
+            Assert.That(ZonePart("Hot zone curtain").GetColor("_BaseColor").a,Is.EqualTo(.45f).Within(.001f),"Held mid-flash, not flickering.");
+            Assert.That(root.transform.Find("Hot zone curtain").gameObject.activeSelf,Is.True);
+            effects.Present(match,false,1,true);
+            Assert.That(ZonePart("Hot zone floor").GetFloat("_Pulse"),Is.EqualTo(1));
+        }
+
+        // A shielded player wears a shell sized to its capsule that dims as the shield drains; a stunned one a crackling halo.
+        [Test] public void ShieldShellAndStunHaloFollowTheirPlayers()
+        {
+            match.AddPlayer(1,0,1,1,Vector3.zero); match.AddPlayer(2,1,1,1,Vector3.forward*5); match.Begin();
+            var shielded=match.Find(2);
+            shielded.Shield=WeaponCatalog.Shield;
+            effects.Present(match,false);
+            var shell=root.transform.Find("Shield shell 1");
+            Assert.That(shell.gameObject.activeSelf,Is.True);
+            Assert.That(root.transform.Find("Shield shell 0").gameObject.activeSelf,Is.False,"Only the shielded player has a shell.");
+            Assert.That(shell.position.x,Is.EqualTo(0).Within(.001f)); Assert.That(shell.position.z,Is.EqualTo(5).Within(.001f));
+            float standing=shell.localScale.y;
+            float Strength() { var block=new MaterialPropertyBlock(); shell.GetComponent<Renderer>().GetPropertyBlock(block); return block.GetFloat("_Strength"); }
+            float full=Strength();
+            shielded.Shield=WeaponCatalog.Shield*.2f; shielded.CapsuleHeight=.9f;
+            effects.Present(match,false);
+            Assert.That(Strength(),Is.LessThan(full),"The shell dims as the shield drains.");
+            Assert.That(shell.localScale.y,Is.LessThan(standing),"A sliding player's shell crouches with the capsule.");
+            shielded.Shield=0; shielded.StunUntil=match.Tick+60;
+            effects.Present(match,false);
+            Assert.That(shell.gameObject.activeSelf,Is.False);
+            var halo=root.transform.Find("Stun 1").GetComponent<LineRenderer>();
+            Assert.That(halo.enabled && halo.loop,Is.True);
+            Assert.That(halo.positionCount,Is.EqualTo(ArenaEffects.StunPoints));
+            Assert.That(Vector3.Distance(halo.GetPosition(0),shielded.Eye),Is.LessThan(.6f),"The halo rings the head.");
+        }
+
+        // A broken shield's shell flares and swells for a moment, then clears; reduced motion skips the pop.
+        [UnityTest] public IEnumerator BrokenShieldShellPopsThenClears()
+        {
+            match.AddPlayer(1,0,1,1,Vector3.zero); match.Begin();
+            var player=match.Find(1);
+            player.Shield=WeaponCatalog.Shield;
+            effects.Present(match,false);
+            var shell=root.transform.Find("Shield shell 0");
+            float steady=shell.localScale.x;
+            float Strength() { var block=new MaterialPropertyBlock(); shell.GetComponent<Renderer>().GetPropertyBlock(block); return block.GetFloat("_Strength"); }
+            var broken=new CombatEvent(CombatEventKind.ShieldBroken,new CombatAction { Participant=2,LifeGeneration=1,Sequence=1 },match.Tick,target:1);
+            player.Shield=0;
+            effects.Play(broken,match,true,Vector3.zero); effects.Present(match,false);
+            Assert.That(shell.gameObject.activeSelf,Is.False,"Reduced motion: the shell simply goes.");
+            effects.Play(broken,match,false,Vector3.zero); effects.Present(match,false);
+            Assert.That(shell.gameObject.activeSelf,Is.True);
+            Assert.That(Strength(),Is.GreaterThan(1),"The breaking shell flares brighter than a full shield.");
+            yield return new WaitForSecondsRealtime(ArenaEffects.ShellBreakSeconds*.5f);
+            effects.Present(match,false);
+            Assert.That(shell.localScale.x,Is.GreaterThan(steady),"It swells as it breaks.");
+            yield return new WaitForSecondsRealtime(ArenaEffects.ShellBreakSeconds);
+            effects.Present(match,false);
+            Assert.That(shell.gameObject.activeSelf,Is.False);
         }
 
         [Test] public void ImpactWeaponContextIsIsolatedByLife()
@@ -51,25 +218,85 @@ namespace Wildstone.Tests
             effects.Play(new CombatEvent(CombatEventKind.Shot,new CombatAction { Participant=1,LifeGeneration=1,Sequence=1 },0,position:Vector3.up*100,vector:Vector3.forward,weapon:weapon),match,false,Vector3.zero);
             int active=0;
             foreach(var line in root.GetComponentsInChildren<LineRenderer>(true)) if(line.name.StartsWith("Burst ") && line.enabled)
-            { active++; Assert.That(line.positionCount,Is.InRange(2,24)); }
+            {
+                active++; Assert.That(line.positionCount,Is.InRange(2,24));
+                if(weapon==WeaponKind.LaserSword)
+                {
+                    Assert.That(line.textureMode,Is.EqualTo(LineTextureMode.Stretch));
+                    Assert.That(line.widthMultiplier,Is.InRange(.02f,.6f));
+                    Assert.That(line.widthCurve.Evaluate(0)+line.widthCurve.Evaluate(1),Is.LessThan(.01f),"The slash tapers to points.");
+                    Assert.That(line.widthCurve.Evaluate(.5f),Is.EqualTo(1).Within(.01f),"Full width mid-swing.");
+                }
+            }
             if(weapon==WeaponKind.Grenade) Assert.That(active,Is.Zero,"Thrown grenades use their projectile/fuse, not a gun muzzle flash.");
-            else Assert.That(active,Is.InRange(1,weapon==WeaponKind.LaserShotgun?12:6));
+            else Assert.That(active,Is.InRange(1,weapon==WeaponKind.LaserShotgun?16:6));
+            // Lasers draw a dark sheath under the glow so they read against bright stone and sky.
+            bool laser=WeaponCatalog.IsHitscan(weapon);
+            int sheaths=0;
+            foreach(var line in root.GetComponentsInChildren<LineRenderer>(true))
+                if(line.name.StartsWith("Burst ") && line.enabled && line.sharedMaterial.name=="Weapon beam sheath")
+                { sheaths++; Assert.That(line.sharedMaterial.renderQueue,Is.LessThan(line.sharedMaterial.shader.renderQueue)); }
+            Assert.That(sheaths,Is.EqualTo(laser?WeaponCatalog.HitscanPellets(weapon):0));
+        }
+
+        [Test] public void SwordBladeSweepsThenExpiresAndReducedMotionStaysStill()
+        {
+            var assets=Object.Instantiate(catalog);
+            var blade=new Material(catalog.Beam);
+            assets.VfxBlade=blade;
+            Object.DestroyImmediate(root);
+            root=new GameObject("WeaponEffectsTest"); effects=root.AddComponent<ArenaEffects>(); effects.Initialize(assets,match);
+            try
+            {
+                int objects=root.GetComponentsInChildren<Transform>(true).Length;
+                var shot=new CombatEvent(CombatEventKind.Shot,new CombatAction { Participant=1,LifeGeneration=1,Sequence=1 },0,position:Vector3.up*100,vector:Vector3.forward,weapon:WeaponKind.LaserSword);
+                float now=Time.unscaledTime;
+                effects.Play(shot,match,false,Vector3.zero);
+                var fringe=root.transform.Find("Burst 0").GetComponent<LineRenderer>();
+                var core=root.transform.Find("Burst 1").GetComponent<LineRenderer>();
+                Assert.That(fringe.sharedMaterial,Is.SameAs(blade));
+                Assert.That(fringe.textureMode,Is.EqualTo(LineTextureMode.Stretch));
+                Assert.That(fringe.widthMultiplier,Is.EqualTo(.38f).Within(.001f));
+                Assert.That(Vector3.Distance(fringe.GetPosition(0),shot.Position),Is.LessThan(WeaponCatalog.Get(WeaponKind.LaserSword).Range),"The smear sits inside the sword's reach.");
+                int early=fringe.positionCount;
+                effects.AnimateTransient(now+.06f);
+                Assert.That(fringe.positionCount,Is.GreaterThan(early).And.EqualTo(17));
+                Assert.That(core.positionCount,Is.EqualTo(17));
+                Assert.That(fringe.GetPosition(0).x,Is.GreaterThan(fringe.GetPosition(16).x),"The mask's bright head leads the left-to-right swing.");
+                Assert.That(fringe.widthMultiplier,Is.EqualTo(.38f).Within(.001f),"Hold the smear through the sweep.");
+                effects.AnimateTransient(now+.12f);
+                Assert.That(fringe.startColor.a,Is.InRange(.5f,.7f),"The held ribbon fades rather than shrinking to a wire.");
+                effects.AnimateTransient(now+.21f);
+                Assert.That(fringe.enabled || core.enabled,Is.False);
+                effects.Play(shot,match,true,Vector3.zero);
+                var reduced=root.transform.Find("Burst 2").GetComponent<LineRenderer>();
+                var end=reduced.GetPosition(reduced.positionCount-1);
+                effects.AnimateTransient(now+.04f);
+                Assert.That(reduced.GetPosition(reduced.positionCount-1),Is.EqualTo(end));
+                Assert.That(root.transform.Find("Burst 3").GetComponent<LineRenderer>().enabled,Is.False);
+                effects.ResetPresentation();
+                assets.VfxBlade=null;
+                effects.Play(shot,match,false,Vector3.zero);
+                Assert.That(root.transform.Find("Burst 3").GetComponent<LineRenderer>().sharedMaterial,Is.SameAs(catalog.Beam),"Old catalogs retain the beam fallback.");
+                Assert.That(root.GetComponentsInChildren<Transform>(true).Length,Is.EqualTo(objects));
+            }
+            finally { Object.DestroyImmediate(root); Object.DestroyImmediate(assets); Object.DestroyImmediate(blade); }
         }
 
         [Test] public void ShotgunFanMatchesSimulationDirectionsAndEachPelletUsesItsOwnHit()
         {
             var action=new CombatAction { Participant=1,LifeGeneration=1,Sequence=1 };
-            var shot=new CombatEvent(CombatEventKind.Shot,action,0,position:Vector3.up*100,vector:Vector3.forward,weapon:WeaponKind.LaserShotgun);
+            var shot=new CombatEvent(CombatEventKind.Shot,action,0,position:Vector3.up*100,vector:Vector3.forward,amount:WeaponCatalog.SpreadDegrees(WeaponKind.LaserShotgun,0,0),weapon:WeaponKind.LaserShotgun);
             var hits=new CombatEvent[WeaponCatalog.HitscanPellets(shot.Weapon)];
             for(int pellet=0;pellet<hits.Length;pellet++)
-                hits[pellet]=new CombatEvent(CombatEventKind.Hit,action,0,position:shot.Position+WeaponCatalog.HitscanDirection(shot.Weapon,shot.Vector,pellet)*(3+pellet),subIndex:pellet,weapon:shot.Weapon);
+                hits[pellet]=new CombatEvent(CombatEventKind.Hit,action,0,position:shot.Position+WeaponCatalog.ShotDirection(shot,pellet)*(3+pellet),subIndex:pellet,weapon:shot.Weapon);
             effects.Play(shot,match,false,Vector3.zero,hits);
             for(int pellet=0;pellet<hits.Length;pellet++)
             {
                 var line=GripAttachment.Find(root.transform,"Burst "+pellet).GetComponent<LineRenderer>();
                 Assert.That(line.positionCount,Is.EqualTo(2));
                 Assert.That(Vector3.Distance(line.GetPosition(1),hits[pellet].Position),Is.LessThan(.0001f));
-                Assert.That(Vector3.Dot((line.GetPosition(1)-line.GetPosition(0)).normalized,WeaponCatalog.HitscanDirection(shot.Weapon,shot.Vector,pellet)),Is.GreaterThan(.99999f));
+                Assert.That(Vector3.Dot((line.GetPosition(1)-line.GetPosition(0)).normalized,WeaponCatalog.ShotDirection(shot,pellet)),Is.GreaterThan(.99999f));
             }
         }
 
@@ -92,13 +319,64 @@ namespace Wildstone.Tests
             finally { Object.DestroyImmediate(wall); }
         }
 
+        // A beam keeps a readable width far from the viewer and stays slim beside the lens; striking a wall sparks.
+        [Test] public void BeamWidensAwayFromTheViewerAndSparksOnTheWallItStrikes()
+        {
+            var viewer=new GameObject("Viewer",typeof(Camera)) { tag="MainCamera" };
+            var wall=GameObject.CreatePrimitive(PrimitiveType.Cube);
+            try
+            {
+                Vector3 eye=Vector3.up*100; viewer.transform.position=eye;
+                wall.layer=0; wall.transform.position=eye+Vector3.forward*20; wall.transform.localScale=new Vector3(4,4,.5f);
+                Physics.SyncTransforms();
+                var sparks=GripAttachment.Find(root.transform,"Vfx Sparks").GetComponent<ParticleSystem>();
+                int before=sparks.particleCount;
+                var shot=new CombatEvent(CombatEventKind.Shot,new CombatAction { Participant=1,LifeGeneration=1,Sequence=1 },0,position:eye,vector:Vector3.forward,weapon:WeaponKind.LineDriver);
+                effects.Play(shot,match,false,Vector3.zero,null,eye+new Vector3(.2f,-.2f,.5f));
+                var glow=GripAttachment.Find(root.transform,"Burst 0").GetComponent<LineRenderer>();
+                Assert.That(glow.GetPosition(1).z,Is.EqualTo(eye.z+19.75f).Within(.01f),"Beam ends on the wall face.");
+                Assert.That(glow.widthCurve.Evaluate(1),Is.GreaterThan(glow.widthCurve.Evaluate(0)*4));
+                int wallSparks=sparks.particleCount-before;
+                effects.Play(new CombatEvent(CombatEventKind.Shot,new CombatAction { Participant=1,LifeGeneration=1,Sequence=2 },0,position:eye,vector:Vector3.back,weapon:WeaponKind.LineDriver),match,false,Vector3.zero);
+                int airSparks=sparks.particleCount-before-wallSparks;
+                Assert.That(wallSparks,Is.GreaterThan(airSparks),"Only the shot that ends on a wall adds strike sparks to the muzzle sparks.");
+                var burn=GripAttachment.Find(root.transform,"Scorch "+ArenaVfx.ScorchCapacity);
+                Assert.That(burn.gameObject.activeSelf,Is.True,"The wall keeps a burn where the beam stopped.");
+                Assert.That(burn.position.z,Is.EqualTo(eye.z+19.75f).Within(.01f));
+                Assert.That(Vector3.Angle(burn.up,Vector3.back),Is.LessThan(1),"The burn projects along the wall normal.");
+                Assert.That(GripAttachment.Find(root.transform,"Scorch "+(ArenaVfx.ScorchCapacity+1)).gameObject.activeSelf,Is.False,"A shot into open air leaves no burn.");
+            }
+            finally { Object.DestroyImmediate(wall); Object.DestroyImmediate(viewer); }
+        }
+
+        // Laser burns cycle their own ring and expire sooner, so sustained fire never erases a blast scorch.
+        [Test] public void LaserBurnsAreBoundedAndNeverEvictBlastScorches()
+        {
+            var vfx=root.GetComponentInChildren<ArenaVfx>();
+            var ground=GameObject.CreatePrimitive(PrimitiveType.Cube);
+            try
+            {
+                ground.transform.position=new Vector3(0,-50.5f,0); ground.transform.localScale=new Vector3(10,1,10);
+                Physics.SyncTransforms();
+                vfx.Scorch(new Vector3(0,-50,0),1);
+                for(int i=0;i<ArenaVfx.BurnCapacity*3;i++) vfx.Burn(new Vector3(i,2,5),Vector3.back,.1f);
+                int Active(int from,int count) { int n=0; for(int i=from;i<from+count;i++) if(GripAttachment.Find(root.transform,"Scorch "+i).gameObject.activeSelf) n++; return n; }
+                Assert.That(Active(0,ArenaVfx.ScorchCapacity),Is.EqualTo(1),"The blast scorch survives.");
+                Assert.That(Active(ArenaVfx.ScorchCapacity,ArenaVfx.BurnCapacity),Is.EqualTo(ArenaVfx.BurnCapacity));
+                vfx.Animate(Time.unscaledTime+ArenaVfx.BurnSeconds+.1f);
+                Assert.That(Active(ArenaVfx.ScorchCapacity,ArenaVfx.BurnCapacity),Is.Zero,"Burns cool off first.");
+                Assert.That(Active(0,ArenaVfx.ScorchCapacity),Is.EqualTo(1));
+            }
+            finally { Object.DestroyImmediate(ground); }
+        }
+
         [Test] public void RingStartsAtItsAnimationOriginInsteadOfPoppingToASmallerRadius()
         {
             Vector3 center=Vector3.up*100;
             effects.Play(new CombatEvent(CombatEventKind.Impulse,default,0,position:center),match,false,Vector3.zero);
             var line=GripAttachment.Find(root.transform,"Burst 0").GetComponent<LineRenderer>();
             Assert.That(Vector3.Distance(line.GetPosition(0),center),Is.EqualTo(.8f*.35f).Within(.0001f));
-            effects.AnimateTransient(Time.realtimeSinceStartup);
+            effects.AnimateTransient(Time.unscaledTime);
             Assert.That(Vector3.Distance(line.GetPosition(0),center),Is.GreaterThanOrEqualTo(.8f*.35f-.0001f));
         }
 

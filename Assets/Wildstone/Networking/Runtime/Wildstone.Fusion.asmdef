@@ -1,7 +1,7 @@
 {
   "name": "Wildstone.Fusion",
   "rootNamespace": "Wildstone.Networking",
-  "references": ["Wildstone.Runtime", "Fusion.Unity", "Photon.Realtime"],
+  "references": ["Wildstone.Runtime", "Fusion.Unity", "Photon.Realtime", "Unity.InputSystem"],
   "allowUnsafeCode": true,
   "autoReferenced": true
 }

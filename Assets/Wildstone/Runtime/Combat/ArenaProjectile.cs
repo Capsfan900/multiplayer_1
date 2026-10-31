@@ -9,9 +9,11 @@ namespace Wildstone.Combat
         public int OwnerTeam, ExpireTick, Bounces, HitMask;
         public Vector3 Position, Velocity;
         public float Travel;
+        // D037: a Push Lens took ownership once; Action is then the push (keeping the launch Tick that anchors lifetime).
+        public bool Deflected;
         public ArenaProjectile Copy() => (ArenaProjectile)MemberwiseClone();
         internal void CopyFrom(ArenaProjectile other)
-        { Action=other.Action; Weapon=other.Weapon; OwnerTeam=other.OwnerTeam; ExpireTick=other.ExpireTick; Bounces=other.Bounces; HitMask=other.HitMask; Position=other.Position; Velocity=other.Velocity; Travel=other.Travel; }
+        { Action=other.Action; Weapon=other.Weapon; OwnerTeam=other.OwnerTeam; ExpireTick=other.ExpireTick; Bounces=other.Bounces; HitMask=other.HitMask; Position=other.Position; Velocity=other.Velocity; Travel=other.Travel; Deflected=other.Deflected; }
         public bool Valid(int tick) => Action.Participant>=1 && Action.Participant<=8 && Action.Sequence>=0 && Action.LifeGeneration>=1 &&
             Action.ConnectionGeneration>=1 && Action.AuthorityGeneration>=1 && Action.Tick>=0 && Action.Tick<=tick && OwnerTeam>=0 && OwnerTeam<4 &&
             (Weapon==WeaponKind.PulseLobber || Weapon==WeaponKind.ReboundDisc || Weapon==WeaponKind.Grenade || Weapon==WeaponKind.StunGun) &&

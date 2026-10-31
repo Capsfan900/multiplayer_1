@@ -126,9 +126,11 @@ namespace Wildstone.Tests
                 int hosts=0,team=-1; bool ready=false; string joined=null;
                 bridge.HostMatch+=()=>hosts++; bridge.Join+=code=>joined=code;
                 bridge.Team+=value=>team=value; bridge.SetReady+=value=>ready=value;
+                int rematches=0; bridge.RematchRequested+=()=>rematches++;
                 bridge.HostRoom(); bridge.Connect("ROOM1");
-                bridge.SelectTeam(3); bridge.ToggleReady();
+                bridge.SelectTeam(3); bridge.ToggleReady(); bridge.Rematch();
                 Assert.That(hosts,Is.EqualTo(1)); Assert.That(joined,Is.EqualTo("ROOM1")); Assert.That(team,Is.EqualTo(3)); Assert.That(ready,Is.True);
+                Assert.That(rematches,Is.EqualTo(1));
             }
             finally { Object.DestroyImmediate(owner); }
         }

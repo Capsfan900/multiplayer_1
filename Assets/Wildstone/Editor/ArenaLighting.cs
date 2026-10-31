@@ -27,17 +27,19 @@ namespace Wildstone.Editor
                     var settings = AssetDatabase.LoadAssetAtPath<LightingSettings>(path);
                     if (settings == null)
                     {
-                        settings = new LightingSettings
-                        {
-                            bakedGI = true, realtimeGI = false,
-                            lightmapper = LightingSettings.Lightmapper.ProgressiveCPU,
-                            mixedBakeMode = MixedLightingMode.IndirectOnly,
-                            lightmapResolution = 8, lightmapMaxSize = 1024,
-                            directSampleCount = 64, indirectSampleCount = 256,
-                            environmentSampleCount = 128, maxBounces = 3
-                        };
+                        settings = new LightingSettings();
                         AssetDatabase.CreateAsset(settings, path);
                     }
+                    // D028: denser lightmaps with baked contact AO; GPU falls back to CPU where unsupported.
+                    settings.bakedGI = true; settings.realtimeGI = false;
+                    settings.lightmapper = LightingSettings.Lightmapper.ProgressiveGPU;
+                    settings.mixedBakeMode = MixedLightingMode.IndirectOnly;
+                    settings.lightmapResolution = 16; settings.lightmapMaxSize = 2048;
+                    settings.directSampleCount = 64; settings.indirectSampleCount = 256;
+                    settings.environmentSampleCount = 128; settings.maxBounces = 3;
+                    settings.ao = true; settings.aoMaxDistance = 1.2f;
+                    settings.aoExponentIndirect = 1; settings.aoExponentDirect = 0;
+                    EditorUtility.SetDirty(settings);
                     Lightmapping.lightingSettings = settings;
                     if (!Lightmapping.Bake() || LightmapSettings.lightmaps.Length == 0)
                         throw new InvalidOperationException("Lighting bake produced no lightmaps for " + id);

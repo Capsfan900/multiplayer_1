@@ -26,6 +26,17 @@ namespace Wildstone.Tests
             Assert.That(input.Move, Is.EqualTo(Input.Move));
         }
 
+        [Test]
+        public void AimBitIsAcceptedFromTheWireButNeverReachesTheMotor()
+        {
+            var sample = Input; sample.Held = MotorButtons.Jump | MotorButtons.Aim; sample.Pressed = MotorButtons.Aim | MotorButtons.Dash;
+            var input = FusionMotorInput.Schedule(true, sample, State, 12, out int consumed);
+            Assert.That(input.Present, Is.True); Assert.That(consumed, Is.EqualTo(1234));
+            Assert.That(input.Held, Is.EqualTo(MotorButtons.Jump)); Assert.That(input.Pressed, Is.EqualTo(MotorButtons.Dash));
+            sample.Held = (MotorButtons)16;
+            Assert.That(FusionMotorInput.Schedule(true, sample, State, 12, out _).Present, Is.False, "Bits above Aim stay invalid.");
+        }
+
         [TestCase(false, 12), TestCase(true, 1234), TestCase(true, 1235)]
         public void MissingRepeatedOrOlderSampleCannotRefreshHoldOrRepeatAnEdge(bool available, int consumedBefore)
         {

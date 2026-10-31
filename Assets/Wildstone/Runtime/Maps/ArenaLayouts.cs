@@ -33,7 +33,9 @@ namespace Wildstone.Maps
             kit.Pick("laser-pistol", -6, 0, -8);
             kit.Pick("laser-shotgun", 6, 0, -8);
             kit.Pick("laser-sniper", 0, 4, 24);
+            kit.Pick("laser-smg", 0, 0, 3);
             kit.Utilities(14, 18);
+            kit.HealthPacks(V(-28.5f, 0, 2), V(28.5f, 0, 2), V(0, 0, -24), V(0, 0, 14));
             return kit.Finish(new[] { V(0, 0, -8), V(20, 0, -8), V(20, 0, -4), V(20, 4, 12),
                 V(20, 4, 22), V(-20, 4, 22), V(-20, 4, 12), V(-20, 0, -4), V(-20, 0, -8) });
         }
@@ -59,7 +61,9 @@ namespace Wildstone.Maps
             kit.Pick("laser-pistol", -28, 0, -6);
             kit.Pick("laser-shotgun", 28, 0, 6);
             kit.Pick("laser-sniper", 0, 4, 10);
+            kit.Pick("laser-smg", 0, 4, -10);
             kit.Utilities(26, 7);
+            kit.HealthPacks(V(-36, 0, 0), V(36, 0, 0), V(0, 4, -17), V(0, 4, 17));
             return kit.Finish(new[] { V(-28, 0, -14), V(-20, 0, -14), V(-6, 4, -14), V(0, 4, -14),
                 V(0, 4, 14), V(6, 4, 14), V(20, 0, 14), V(28, 0, 14), V(28, 0, -14),
                 V(20, 0, -14), V(6, 4, -14), V(0, 4, -14), V(0, 4, 14), V(-6, 4, 14),
@@ -89,7 +93,9 @@ namespace Wildstone.Maps
             kit.Pick("laser-pistol", -19, 0, -20);
             kit.Pick("laser-shotgun", 14, 4, 14);
             kit.Pick("laser-sniper", -8, 4, 26);
+            kit.Pick("laser-smg", 19, 0, -20);
             kit.Utilities(14, 22);
+            kit.HealthPacks(V(-29, 0, -8), V(29, 0, -8), V(0, 0, -32), V(0, 0, 22));
             return kit.Finish(new[] { V(-24, 0, -21), V(20, 0, -21), V(20, 0, -16), V(20, 4, 0),
                 V(20, 4, 22), V(-25, 4, 22), V(-25, 4, 12), V(-25, 0, -4), V(-25, 0, -21) });
         }
@@ -104,12 +110,13 @@ namespace Wildstone.Maps
             private readonly List<ArenaPickup> pickups = new List<ArenaPickup>();
             public Kit(string id, string name, float width, float depth)
             {
-                map = new ArenaDefinition { Id = id, DisplayName = name, Revision = 2, Minimum = V(-width / 2, -2, -depth / 2), Maximum = V(width / 2, 24, depth / 2) };
+                map = new ArenaDefinition { Id = id, DisplayName = name, Revision = 6, Minimum = V(-width / 2, -2, -depth / 2), Maximum = V(width / 2, 24, depth / 2) };
                 Slab("Foundation", 0, 0, 0, width, depth, 2, StoneTone.Ash);
-                Box("South boundary", 0, 3, -depth / 2 + .5f, width, 6, 1);
-                Box("North boundary", 0, 3, depth / 2 - .5f, width, 6, 1);
-                Box("West boundary", -width / 2 + .5f, 3, 0, 1, 6, depth);
-                Box("East boundary", width / 2 - .5f, 3, 0, 1, 6, depth);
+                // 8 m: a jump from the +4 m floors (2.4 m apex) cannot reach the top. At 6 m it put players on the perimeter.
+                Box("South boundary", 0, 4, -depth / 2 + .5f, width, 8, 1);
+                Box("North boundary", 0, 4, depth / 2 - .5f, width, 8, 1);
+                Box("West boundary", -width / 2 + .5f, 4, 0, 1, 8, depth);
+                Box("East boundary", width / 2 - .5f, 4, 0, 1, 8, depth);
             }
             public void Box(string name, float x, float y, float z, float sx, float sy, float sz, StoneTone tone = StoneTone.Ivory) =>
                 pieces.Add(new ArenaPiece { Name = name, Position = V(x, y, z), Size = V(sx, sy, sz), Tone = tone });
@@ -126,11 +133,14 @@ namespace Wildstone.Maps
             }
             public void CornerStarts(float x, float z)
             {
+                // Each seat faces the shelter's way out: the gap between the front screen's outer end (x + 2) and the
+                // boundary wall. Facing the arena centre put the screens' inside corner a few metres ahead.
+                float opening = (map.Maximum.x + 1 - x) / 2;
                 int team = 0;
                 foreach (int sx in new[] { -1, 1 }) foreach (int sz in new[] { -1, 1 })
                 {
                     for (int seat = 0; seat < 2; seat++) spawns.Add(new ArenaSpawn { Team = team,
-                        Position = V(sx * x, .02f, sz * (z - seat * 2)), Yaw = (float)(Math.Atan2(-sx * x, -sz * z) * 180 / Math.PI) });
+                        Position = V(sx * x, .02f, sz * (z - seat * 2)), Yaw = (float)(Math.Atan2(sx * opening, -sz * (4 - seat * 2)) * 180 / Math.PI) });
                     Box("Arrival side screen " + team, sx * (x - 4), 1.6f, sz * (z - 1), 1, 3.2f, 6, StoneTone.Charcoal);
                     Box("Arrival front screen " + team, sx * (x - 1), 1.6f, sz * (z - 4), 6, 3.2f, 1, StoneTone.Charcoal);
                     team++;
@@ -141,6 +151,11 @@ namespace Wildstone.Maps
             {
                 Pick("blink", -x, 0, -z); Pick("shield", x, 0, -z);
                 Pick("grenade", -x, 0, z); Pick("grenade", x, 0, z);
+            }
+            // Map revision 6: one pack at each edge's midpoint, so every pack sits between two corner starts.
+            public void HealthPacks(params Vector3[] floors)
+            {
+                foreach (var floor in floors) Pick("health", floor.x, floor.y, floor.z);
             }
             public ArenaDefinition Finish(Vector3[] route)
             {

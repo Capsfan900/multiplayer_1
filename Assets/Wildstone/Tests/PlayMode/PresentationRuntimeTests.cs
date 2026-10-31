@@ -14,7 +14,7 @@ namespace Wildstone.Tests
     public sealed class PresentationRuntimeTests
     {
         [Test]
-        public void OverlayTracksSettingsFovAndRestoresOnlyItsCameraMaskBit()
+        public void OverlayKeepsItsOwnFovAndRestoresOnlyItsCameraMaskBit()
         {
             var catalog=Resources.Load<PresentationCatalog>("WildstonePresentation");
             Assert.That(catalog,Is.Not.Null,"Build presentation assets first.");
@@ -30,7 +30,10 @@ namespace Wildstone.Tests
                 Assert.That(cameras.Length,Is.EqualTo(2));
                 var overlay=cameras[1];
                 Assert.That(overlay,Is.Not.SameAs(world));
-                Assert.That(overlay.fieldOfView,Is.EqualTo(105).Within(.001f));
+                // D028: the viewmodel has its own projection, so a wide settings FOV no longer stretches the gun.
+                Assert.That(overlay.fieldOfView,Is.EqualTo(WeaponView.ViewmodelFieldOfView).Within(.001f));
+                world.fieldOfView=80; view.SyncProjection(world);
+                Assert.That(overlay.fieldOfView,Is.EqualTo(WeaponView.ViewmodelFieldOfView).Within(.001f));
                 world.cullingMask^=1<<9;
                 view.Teardown(world);
                 Assert.That((world.cullingMask&(1<<11)),Is.EqualTo(original&(1<<11)));

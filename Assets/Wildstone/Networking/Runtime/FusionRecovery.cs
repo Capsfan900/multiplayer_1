@@ -302,7 +302,7 @@ namespace Wildstone.Networking
                 }
                 var lobby=lobbyObject.GetComponent<FusionLobby>();
                 foreach(var player in replacement.ActivePlayers)
-                    if(!lobby.Admit(player))
+                    if(!lobby.Admit(player) && lobby.Rejection!=FusionLobby.IdentityPending)
                     {
                         if(player==replacement.LocalPlayer) throw new InvalidOperationException("Replacement host identity could not be rebound.");
                         replacement.Disconnect(player);

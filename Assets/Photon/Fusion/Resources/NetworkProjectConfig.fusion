@@ -5,7 +5,7 @@
     "PeerMode": 0,
     "LagCompensation": {
         "Enabled": true,
-        "HitboxBufferLengthInMs": 200,
+        "HitboxBufferLengthInMs": 300,
         "HitboxDefaultCapacity": 512,
         "CachedStaticCollidersSize": 64
     },

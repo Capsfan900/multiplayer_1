@@ -50,9 +50,10 @@ namespace Wildstone.Editor
         {
             var camera=scene.GetRootGameObjects().SelectMany(go=>go.GetComponentsInChildren<Camera>(true)).FirstOrDefault();
             if(camera==null) camera=new GameObject("Main Camera",typeof(Camera),typeof(AudioListener)).GetComponent<Camera>();
-            camera.tag="MainCamera"; camera.nearClipPlane=.04f; camera.farClipPlane=250; camera.fieldOfView=90;
+            camera.tag="MainCamera"; camera.nearClipPlane=.04f; camera.farClipPlane=1500; camera.fieldOfView=90;
             var cameraData=camera.GetUniversalAdditionalCameraData();
             cameraData.renderType=CameraRenderType.Base; cameraData.renderPostProcessing=true;
+            cameraData.antialiasing=AntialiasingMode.SubpixelMorphologicalAntiAliasing; cameraData.antialiasingQuality=AntialiasingQuality.High;
             // Existing saved lights and their children belong to the author, not this builder.
             var existing=scene.GetRootGameObjects().SelectMany(go=>go.GetComponentsInChildren<PracticeSession>(true)).FirstOrDefault();
             var root=existing!=null?existing.gameObject:new GameObject("Wildstone");

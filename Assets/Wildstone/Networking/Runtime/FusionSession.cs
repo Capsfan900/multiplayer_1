@@ -36,7 +36,11 @@ namespace Wildstone.Networking
         internal long LastPublishedTick => recovery.LastPublishedTick;
         readonly ContentVersion content;
         readonly byte[] contentToken;
-        readonly byte[] reconnectCredential = new byte[32];
+        // One random secret per app run, like the guest ID; never persisted or logged. Each room derives its own credential from it,
+        // so leaving and rejoining a room reclaims the held seat, while another room's host learns nothing that works here.
+        static readonly byte[] appRunSecret = NewSecret();
+        readonly byte[] reconnectCredential;
+        static byte[] NewSecret() { var secret = new byte[32]; using (var random = RandomNumberGenerator.Create()) random.GetBytes(secret); return secret; }
         static readonly Dictionary<NetworkRunner, FusionSession> owners = new Dictionary<NetworkRunner, FusionSession>();
         public NetworkRunner Runner => runner;
         public FusionLobby Lobby { get; private set; }
@@ -69,7 +73,7 @@ namespace Wildstone.Networking
             recovery=new FusionRecovery(this);
             this.content = content;
             contentToken = ContentToken(content);
-            using (var random = RandomNumberGenerator.Create()) random.GetBytes(reconnectCredential);
+            using (var mac = new HMACSHA256(appRunSecret)) reconnectCredential = mac.ComputeHash(Encoding.UTF8.GetBytes(matchId));
         }
 
         // Keep the random guest ID for this app lifetime. It identifies a Photon peer, never a verified account.
@@ -157,10 +161,10 @@ namespace Wildstone.Networking
                     Lobby = spawned.GetComponent<FusionLobby>();
                     if (Lobby == null) throw new InvalidOperationException("Registered lobby component is missing.");
                     foreach (var player in owned.ActivePlayers)
-                        if (!Lobby.Admit(player))
+                        if (!Lobby.Admit(player) && Lobby.Rejection != FusionLobby.IdentityPending)
                         {
                             if (player == owned.LocalPlayer) throw new InvalidOperationException("Host guest admission failed.");
-                            owned.Disconnect(player);
+                            LogRemoval(Lobby.Rejection, Lobby.Phase); owned.Disconnect(player);
                         }
                 }
                 return true;
@@ -419,6 +423,9 @@ namespace Wildstone.Networking
             if (!Current(r) || SimulationFrozen || !TryReadCredential(token, content, out _)) { request.Refuse(); return; }
             request.Accept();
         }
+        // Host-side reason for removing a peer, written to the player log. Fixed codes only: no player, user or session IDs.
+        internal static void LogRemoval(string reason, SessionPhase phase) =>
+            Debug.LogWarning("WILDSTONE HOST REMOVED PEER reason=" + (reason ?? "unknown") + " phase=" + phase);
         public void OnShutdown(NetworkRunner r, ShutdownReason reason)
         {
             if(!Current(r)) return;
@@ -478,7 +485,7 @@ namespace Wildstone.Networking
         {
             // Startup callbacks can precede EnterLobby/spawn; StartCore admits all current players afterward.
             if (!Current(r) || !r.IsServer || Lobby == null) return;
-            if (SimulationFrozen || !Lobby.Admit(player)) r.Disconnect(player);
+            if (SimulationFrozen || !Lobby.Admit(player) && Lobby.Rejection != FusionLobby.IdentityPending) { LogRemoval(SimulationFrozen ? "simulation-frozen" : Lobby.Rejection, Lobby.Phase); r.Disconnect(player); }
             Changed?.Invoke();
         }
         public void OnPlayerLeft(NetworkRunner r, PlayerRef player)

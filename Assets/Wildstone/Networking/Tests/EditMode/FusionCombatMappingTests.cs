@@ -62,7 +62,7 @@ namespace Wildstone.Tests
         public void ExpandedSpecialRoundTripsWithoutChangingEnumIds(WeaponKind kind)
         {
             var player=new CombatState {Participant=1,Team=0,LifeGeneration=1,ConnectionGeneration=1,
-                SpecialWeapon=kind,SpecialAmmo=WeaponCatalog.Get(kind).Ammo,SelectedSpecial=true};
+                SpecialWeapon=kind,SpecialAmmo=WeaponCatalog.PickupAmmo(kind),SelectedSpecial=true};
             var restored=FusionCombatState.FromCombat(player).ToCombat();
             Assert.That(CombatRules.ValidPlayer(restored),Is.True);
             Assert.That(restored.SpecialWeapon,Is.EqualTo(kind)); Assert.That(restored.SpecialAmmo,Is.EqualTo(player.SpecialAmmo));

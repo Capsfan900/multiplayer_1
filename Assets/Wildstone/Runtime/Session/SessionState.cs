@@ -115,6 +115,19 @@ namespace Wildstone.Session
             EvaluateOpposition(now);
         }
 
+        // Host rematch: the same room, seats, teams and reconnect holds return to the lobby; readiness and match deadlines restart.
+        // The caller verifies the match finished normally; an aborted round has already ended the session.
+        public bool ReturnToLobby(double now)
+        {
+            if (!Time(now) || Phase != SessionPhase.Running) return false;
+            Tick(now);
+            if (Phase != SessionPhase.Running) return false;
+            seats.ClearReadiness(true);
+            AbsenceDeadline = 0; oppositionStableSince = -1; absenceResolvedAt = 0;
+            Phase = SessionPhase.Lobby;
+            return true;
+        }
+
         public void Leave() => End(SessionPhase.Closed);
         public bool Complete(long authorityGeneration)
         {

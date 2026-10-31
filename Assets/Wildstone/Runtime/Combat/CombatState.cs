@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Wildstone.Combat
 {
     public enum CombatActionKind { Fire, Reload, SelectStarter, SelectSpecial, Grenade, Blink, Shield, Pickup }
-    public enum CombatEventKind { Accepted, Rejected, Shot, Hit, ShieldActivated, ShieldBroken, ShieldExpired, Stunned, Blink, Impulse, Pickup, Death, Respawn, Explosion, Ricochet }
+    public enum CombatEventKind { Accepted, Rejected, Shot, Hit, ShieldActivated, ShieldBroken, ShieldExpired, Stunned, Blink, Impulse, Pickup, Death, Respawn, Explosion, Ricochet, Deflected }
     [Serializable] public struct CombatAction
     {
         // Participant must be supplied by the authenticated transport adapter, never copied from an RPC payload.
@@ -24,6 +24,10 @@ namespace Wildstone.Combat
         public Vector3 Feet, Aim=Vector3.forward, SupportPoint, SupportNormal=Vector3.up;
         public bool Supported;
         public int DiscontinuityTick=-1;
+        // Revision 4: AimHeld is the latest movement-input ADS request; progress/bloom advance per authoritative tick.
+        public bool AimHeld;
+        public float AdsProgress, Bloom;
+        public int BloomRecoverTick;
         public PendingAttack Pending;
         internal PendingAttack AttackStorage=new PendingAttack();
         public CombatState Copy() { var p=(CombatState)MemberwiseClone(); p.AttackStorage=Pending?.Copy()??new PendingAttack(); p.Pending=Pending==null?null:p.AttackStorage; return p; }
@@ -45,18 +49,21 @@ namespace Wildstone.Combat
         public readonly WeaponKind Weapon;
         public readonly int Tick, Target, TargetLife, SubIndex;
         public readonly Vector3 Position, Vector;
+        // Shot: Amount is the spread half-angle at fire time, so peers reproduce directions with WeaponCatalog.ShotDirection.
         public readonly float Amount;
         public readonly string Reason;
+        public readonly bool Headshot;
         public string Id => Action.AuthorityGeneration+":"+Action.Participant+":"+Action.LifeGeneration+":"+Action.Sequence+":"+Tick+":"+(int)Kind+":"+Target+":"+TargetLife+":"+SubIndex;
-        public CombatEvent(CombatEventKind kind,CombatAction action,int tick,int target=0,int targetLife=0,Vector3 position=default,Vector3 vector=default,float amount=0,string reason=null,int subIndex=0,WeaponKind weapon=WeaponKind.None)
-        { Kind=kind; Action=action; Weapon=weapon; Tick=tick; Target=target; TargetLife=targetLife; Position=position; Vector=vector; Amount=amount; Reason=reason; SubIndex=subIndex; }
+        public CombatEvent(CombatEventKind kind,CombatAction action,int tick,int target=0,int targetLife=0,Vector3 position=default,Vector3 vector=default,float amount=0,string reason=null,int subIndex=0,WeaponKind weapon=WeaponKind.None,bool headshot=false)
+        { Kind=kind; Action=action; Weapon=weapon; Tick=tick; Target=target; TargetLife=targetLife; Position=position; Vector=vector; Amount=amount; Reason=reason; SubIndex=subIndex; Headshot=headshot; }
     }
     public readonly struct CombatHit
     {
         public readonly int Participant;
         public readonly Vector3 Point, Normal;
         public readonly float Distance;
-        public CombatHit(int participant,Vector3 point,Vector3 normal,float distance) { Participant=participant; Point=point; Normal=normal; Distance=distance; }
+        public readonly bool Head;
+        public CombatHit(int participant,Vector3 point,Vector3 normal,float distance,bool head=false) { Participant=participant; Point=point; Normal=normal; Distance=distance; Head=head; }
     }
     public interface ICombatWorld
     {
