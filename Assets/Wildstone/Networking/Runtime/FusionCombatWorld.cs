@@ -23,7 +23,8 @@ namespace Wildstone.Networking
     // Host-only historical hitscan; support, Blink and travelling collisions remain on the authoritative timeline.
     public sealed class FusionCombatWorld : ICombatWorld,IHitscanCombatWorld
     {
-        public const float MaximumRewindSeconds=.150f;
+        // D040 proposal: 250 ms covers a 200 ms round trip plus interpolation; the Fusion hitbox buffer keeps 300 ms.
+        public const float MaximumRewindSeconds=.250f;
         readonly NetworkRunner runner;
         readonly UnityCombatWorld present;
         readonly Dictionary<int,Binding> participants=new Dictionary<int,Binding>();

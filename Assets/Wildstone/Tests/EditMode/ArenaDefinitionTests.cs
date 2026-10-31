@@ -35,6 +35,17 @@ namespace Wildstone.Tests
             var map = Valid(); map.Spawns[0].Team = 1;
             Assert.That(map.Validate(), Has.Some.Contains("Team 0 needs two"));
         }
+        // Pickup reach is 2.5 m, so packs at least 5 m from every other item never share a reach circle or a prompt.
+        [Test] public void EveryArenaOffersFourSpacedHealthPacks()
+        {
+            foreach(var map in ArenaLayouts.CreateAll())
+            {
+                Assert.That(System.Array.FindAll(map.Pickups,p=>p.Item=="health").Length,Is.EqualTo(4),map.Id);
+                for(int i=0;i<map.Pickups.Length;i++) for(int j=0;j<map.Pickups.Length;j++)
+                    if(i!=j && map.Pickups[i].Item=="health")
+                        Assert.That(Vector3.Distance(map.Pickups[i].Position,map.Pickups[j].Position),Is.GreaterThan(5f),map.Id+" health near "+map.Pickups[j].Item);
+            }
+        }
         [Test] public void EveryArenaOffersTheFourLaserWeaponPickups()
         {
             foreach(var map in ArenaLayouts.CreateAll())

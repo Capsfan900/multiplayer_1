@@ -5,7 +5,7 @@ Code namespaces, asset folders and the `WildstoneArena.exe` build name keep the 
 
 Public GitHub repository: [Capsfan900/multiplayer_1](https://github.com/Capsfan900/multiplayer_1).
 Download Windows development previews from [Releases](https://github.com/Capsfan900/multiplayer_1/releases).
-Current snapshot: [Better Bean Battles / 07d8cc8](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261030-07d8cc8).
+Current snapshot: [Laser arsenal and first-person polish / e9e091f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-e9e091f).
 Extract the entire player ZIP and run `WildstoneArena.exe`. Downloads are public.
 These are development previews,
 not accepted online multiplayer releases. See [build workflow](docs/TOOLING.md#github-builds-and-private-releases).

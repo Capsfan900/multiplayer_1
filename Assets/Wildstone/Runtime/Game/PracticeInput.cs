@@ -13,10 +13,10 @@ namespace Wildstone.Game
         public const int FireIndex=7, GrenadeIndex=11, AimIndex=15;
         public readonly InputAction[] Actions=new InputAction[LocalSettings.ActionNames.Length];
         readonly List<CombatActionKind> pending=new List<CombatActionKind>();
-        readonly MotorInputBuffer movement=new MotorInputBuffer();
+        readonly MotorInputBuffer movement;
         readonly bool adsToggle;
         MotorButtons pressed;
-        bool fireHeld,repeatBlocked,aimHeld,aimToggled;
+        bool fireHeld,repeatBlocked,aimHeld,aimToggled,bufferedFire;
         int nextFireTick,nextEmptyTick,lastCombatTick=-1,combatLife,combatConnection;
         WeaponKind combatWeapon;
         static readonly CombatActionKind[] kinds={CombatActionKind.Fire,CombatActionKind.Reload,CombatActionKind.SelectStarter,CombatActionKind.SelectSpecial,CombatActionKind.Grenade,CombatActionKind.Blink,CombatActionKind.Shield,CombatActionKind.Pickup};
@@ -26,8 +26,13 @@ namespace Wildstone.Game
         public bool Aiming => adsToggle?aimToggled:aimHeld;
         // Increments whenever local input requests an ADS-dropping change (reload, grenade, weapon switch, new life).
         public int AdsDrops { get; private set; }
-        public PracticeInput(LocalSettings settings)
+        // Counts Blink presses so the HUD can tell a refused Blink (charge still held after the round trip) from no press.
+        public int BlinkPresses { get; private set; }
+        // Rebinding replaces the input object; the online movement sequence must keep rising, or host and client drop
+        // every later sample as stale (PLAYTEST-FIX-LATER #1).
+        public PracticeInput(LocalSettings settings,PracticeInput previous=null)
         {
+            movement=previous?.movement??new MotorInputBuffer();
             adsToggle=settings.AdsToggle;
             for(int i=0;i<Actions.Length;i++)
             {
@@ -45,7 +50,8 @@ namespace Wildstone.Game
             if(index>=4 && index<=6) pressed|=(MotorButtons)(1<<(index-4));
             else if(index==AimIndex) { if(adsToggle) aimToggled=!aimToggled; }
             else if(index==GrenadeIndex) GrenadeHeld=true;
-            else if(index>=FireIndex && pending.Count<32) pending.Add(kinds[index-FireIndex]);
+            else if(index>=FireIndex && pending.Count<32)
+            { var kind=kinds[index-FireIndex]; pending.Add(kind); if(kind==CombatActionKind.Blink) BlinkPresses++; }
         }
         void ReleaseGrenade()
         {
@@ -79,9 +85,9 @@ namespace Wildstone.Game
         {
             if(!active || player==null) { Clear(); destination.Clear(); return; }
             bool changed=lastCombatTick>=0 && (tick<lastCombatTick || player.LifeGeneration!=combatLife || player.ConnectionGeneration!=combatConnection);
-            if(changed) { pending.Clear(); nextFireTick=nextEmptyTick=0; repeatBlocked=true; GrenadeHeld=false; }
+            if(changed) { pending.Clear(); nextFireTick=nextEmptyTick=0; repeatBlocked=true; GrenadeHeld=false; bufferedFire=false; }
             var weapon=CombatRules.CurrentWeapon(player);
-            if(changed || (lastCombatTick>=0 && weapon!=combatWeapon)) DropAim();
+            if(changed || (lastCombatTick>=0 && weapon!=combatWeapon)) { DropAim(); bufferedFire=false; }
             lastCombatTick=tick; combatLife=player.LifeGeneration; combatConnection=player.ConnectionGeneration; combatWeapon=weapon;
             ConsumeActions(destination);
             for(int i=0;i<destination.Count;i++)
@@ -122,13 +128,31 @@ namespace Wildstone.Game
                 destination.Add(CombatActionKind.Fire);
                 nextFireTick=(tick-nextFireTick<=slack?nextFireTick:tick)+interval;
             }
+            // A semi-automatic press up to FireBufferSeconds before the expected ready tick waits and fires once at
+            // ready, instead of reaching the host early and being refused (PLAYTEST-FIX-LATER #8).
+            if(!automatic && weapon!=WeaponKind.None)
+            {
+                int semi=WeaponCatalog.Ticks(WeaponCatalog.Get(weapon).Interval,rate), ready=Math.Max(nextFireTick,player.FireReadyTick-slack);
+                if(pressedFire)
+                {
+                    if(tick<ready && ready-tick<=WeaponCatalog.Ticks(WeaponCatalog.FireBufferSeconds,rate))
+                    { destination.RemoveAll(kind=>kind==CombatActionKind.Fire); bufferedFire=true; }
+                    else if(tick>=ready) { nextFireTick=tick+semi; bufferedFire=false; }
+                }
+                else if(bufferedFire && tick>=ready)
+                {
+                    bufferedFire=false;
+                    if((ammo>0 || weapon==WeaponKind.LaserSword) && !player.Suppressed(tick) && player.ReloadUntil<=tick && player.Pending==null)
+                    { destination.Add(CombatActionKind.Fire); nextFireTick=(tick-ready<=slack?ready:tick)+semi; }
+                }
+            }
         }
         void DropAim() { aimToggled=false; AdsDrops++; }
         // Keep the monotonic movement sequence when a local menu clears held input.
         public void Clear()
         {
             movement.Sample(Vector2.zero,MotorButtons.None); movement.Consume(0,1,0,0); pressed=MotorButtons.None; pending.Clear();
-            fireHeld=false; repeatBlocked=true; nextFireTick=nextEmptyTick=0; lastCombatTick=-1; aimHeld=false; aimToggled=false; GrenadeHeld=false;
+            fireHeld=false; repeatBlocked=true; bufferedFire=false; nextFireTick=nextEmptyTick=0; lastCombatTick=-1; aimHeld=false; aimToggled=false; GrenadeHeld=false;
         }
         public void Dispose() { GrenadeHeld=false; foreach(var action in Actions) action?.Dispose(); }
     }

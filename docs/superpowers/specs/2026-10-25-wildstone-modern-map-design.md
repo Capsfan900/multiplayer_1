@@ -192,3 +192,20 @@ combat owner defines ammo/behavior; default layouts, saved catalog and scene met
 must agree. Native support/clearance checks cover the new pickup locations.
 Map revision 4 raises the outer walls from 6 m to 8 m (see the outer-wall rule
 above) and needs a fresh bake.
+Map revision 6 (D039, user request) adds four health packs per arena, one at the
+midpoint of each edge so that every pack lies between two corner starts:
+
+| Map | Health packs (x, floor, z) |
+| --- | --- |
+| Atrium | (±28.5, 0, 2), (0, 0, −24), (0, 0, 14) |
+| Split Gallery | (±36, 0, 0), (0, 4, ±17) |
+| Terrace Steps | (±29, 0, −8), (0, 0, −32), (0, 0, 22) |
+
+Every pack is more than 5 m from every other pickup, twice the 2.5 m reach, so
+reach circles and prompts never overlap
+(`ArenaDefinitionTests.EveryArenaOffersFourSpacedHealthPacks`). Revision 5 was an
+unshipped intermediate: its Atrium north pack sat 4.5 m below the sniper. Mean
+walking distance to the four packs (teams 0 / 1 / 2 / 3): Atrium 45 / 47 / 45 / 48 m,
+Split Gallery 50 / 50 / 51 / 51 m, Terrace Steps 45 / 57 / 46 / 55 m. Terrace
+Steps keeps the northern-start imbalance described above. Geometry is unchanged;
+the scenes were rebuilt and rebaked for the new catalog.

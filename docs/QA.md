@@ -6,39 +6,6 @@ separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
 
-### 2026-10-30 current-state public preview release
-
-User-requested [Better Bean Battles preview](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261030-07d8cc8), captured while another agent
-continued authoring. Game source commit: `07d8cc8176c5328f556f008a40a3de2862b78a32`.
-Snapshot: 1865 nonignored files, with source/copy SHA-256 equality
-verified before acceptance at `2026-10-31T02:52:30Z`. Later edits are excluded.
-This release record changes documentation only after the frozen game-source commit;
-it does not change the player inputs. No live authoring file, index, branch or running
-Editor was modified by this release operation.
-
-- Build root: `D:/WildstoneBuilds/release-20261030-225213/source`.
-- Command: `./Tools/Unity/Invoke-Unity.ps1 -Action BuildWindows -TimeoutMinutes 30`.
-  Unity `6000.5.10f1` succeeded with `WILDSTONE BUILD OK`; log:
-  `Artifacts/Unity/BuildWindows-20261030-225312-389.log` under that build root.
-  Initial fresh-import Fusion assembly/settings diagnostics appear in that log;
-  the completed build passed and the tracked source tree remained clean.
-- Existing public Photon app settings were supplied separately. Ignored local
-  service credentials were excluded; no Host/Join connection was tested here.
-- Fresh `WildstoneArena.exe -batchmode -nographics -logFile <release-startup.log>`
-  stayed alive for 15 seconds, with zero runtime exception/assertion matches;
-  only the owned player was terminated. Record: `D:/WildstoneBuilds/release-20261030-225213/startup-result.json`.
-- `BetterBeanBattles-Windows-x64-preview-20261030-07d8cc8.zip`: 75098659 bytes, 200 files, ZIP CRC
-  passed; executable/player data present; Unity backup/debug folders excluded.
-  SHA-256: `7f1859522cbea94b406652112430dd5d92044bd5d24579f0b2b74fffcf12825d`.
-- Delivery records beside the isolated source: `source-capture.json`,
-  `release-manifest.json`, `release-notes.md`, startup log and ZIP/checksum.
-  GitHub publication is checked separately against the manifest/checksum.
-- This is a local development preview build, not a GitHub Actions execution.
-  Full suites, physical-input/visual/listening checks and external-network
-  multiplayer acceptance were not repeated. Historical tests below remain
-  historical evidence. Full MVP acceptance remains open.
-
-
 ### 2026-10-29 menu backdrop, motion and music (managed only)
 
 `pwsh -File Tools/QA/Compile-Managed.ps1 -Scope All -RunManagedTests` on the
@@ -2334,47 +2301,548 @@ playable `058fa3dd…` build has none of this code. Commands are in [TOOLING](TO
   Every moving-cover and gunplay run held its stability phase for exactly 10 s on
   both peers.
 
-## 2026-10-30 grenade in hand, muzzle lamp and HUD backing (not yet captured)
+## 2026-10-30 weapon read fixes: grenade in hand, sniper rail, sword slash, title fit
 
-Scope: three clear defects from the 19:20 captures (`Artifacts/Visual/20261030-192033-554`).
-The GPU was in use, so none of this has been captured yet. It must not go into a
-playable build until it has.
+Scope: clear defects from the 19:20 captures (`Artifacts/Visual/20261030-192033-554`
+weapons, `192136-972` default) and from the first captures of the fixes. All of this
+is presentation only.
 - **Grenade in hand.** In `weapon-grenade-0/1` the viewmodel stayed on the Line
   Driver with no grenade.
   - While the throw key is held with a grenade, the support hand now leaves the gun
-    and holds the grenade, scaled to 0.08 m.
-  - The host's `Accepted` still starts the throw. The grenade leaves the hand during
-    the swing.
-  - Values are in the [character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md)
+    and holds the grenade, scaled to 0.08 m. The host's `Accepted` still starts the
+    throw, and the grenade leaves the hand during the swing.
+  - The first capture (`223550-837`) showed the grenade half behind the HUD vitals
+    panel, so the hold point moved up and toward the centre. Values are in the
+    [character spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md)
     arms row.
-  - The capture set gains `weapon-grenade-aim`: the key held, with the arc and
-    nothing thrown.
-- **Muzzle lamp.** `weapon-pulselobber-0` and `weapon-plasma-impact` show a pink wash
-  on the floor under the Lobber. Every muzzle lamp is dimmer and shorter now; values
-  are in the [rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md)
-  effects row.
-- **HUD backing.** In `weapon-lasersniper-0` the scope lens and cyan ring showed
-  through the ammo panel and muddied the count. Both bottom panels now use the score
-  chips' 0.72 backing ([UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md)).
+  - In `224547-655` the grenade sits in the palm with the fingers wrapped over it,
+    clear of the vitals panel, in `weapon-grenade-aim` (key held, arc shown, nothing
+    thrown) and the throw frames. The armoured forearm crosses the ability chips.
+  - `weapon-grenade-blast` also shows a grenade in hand. That frame plays the throw's
+    `Accepted` and the explosion together; in play they are at least 1.5 s apart.
+- **Muzzle lamp.** `weapon-pulselobber-0` and `weapon-plasma-impact` showed a pink
+  wash on the floor under the Lobber. Every muzzle lamp is dimmer and shorter now
+  ([rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md) effects
+  row). In daylight the Line Driver frames are visually unchanged.
+- **HUD backing.** In `weapon-lasersniper-0` the scope and cyan ring showed through
+  the ammo panel. Both bottom panels now use the score chips' 0.72 backing
+  ([UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md)).
+- **Sniper rail.** The shooter's own rail read as a hairline. The beam texture is
+  above half brightness across only the middle 22% of its width, so the visible core
+  was about 2.5 px. Glow and core went from .15/.045 m to .26/.075 m (rendering spec
+  "Shot reads" row).
+  - `weapon-lasersniper-0`: about 7 px at the muzzle, was 5.
+  - `firefight-lasersniper-00` (`224651-778` against `192204-695`): a broader band
+    with a visible sheath from muzzle to head.
+  - `firefight-incoming-sniper`: heavier, a bright band about 60 px wide where it
+    passes the lens. It reads as a strong threat without hiding the view.
+- **Sword slash.** The swing drew two constant-width lines across the whole view.
+  Both arcs are now crescents, pointed at the tips and full width mid-swing, with a
+  wider glow (rendering spec sword row).
+  - Weapon-mode frames are taken at least 0.04 s after the effect starts, plus a slow
+    setup frame, so a 0.2 s arc is captured already thinned. Measured on the same
+    delay, the arc is thinner toward the screen edges and 2–4 px thicker mid-swing.
+  - Its full width has not been seen. The firefight mode, which records true ages,
+    has no sword sequence.
+- **Title fit after the rename.** The two-line "BETTER BEAN / BATTLES" title made the
+  720p title column scroll. On ultrawide it pushed Quit below the fold; there the
+  footer note was already hidden before the rename.
+  - The hero face went from 80 to 64 px, and the menu column's vertical padding from
+    4% to 3% of the width.
+  - In `225632-729`, `title-720` fits with no scroller. `title-ultrawide` shows Quit
+    again; the footer note still needs a scroll, as before the rename.
+- **Kill banner.** At 63% down, in 15 px text on a 0.62 pill, the banner ran into the
+  Line Driver's muzzle and the red streak word was faint. It now sits at 59% in 17 px
+  text on a 0.8 pill ([UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md)).
+  In `weapon-kill-banner` (`233051-805`) it clears the muzzle and `DOUBLE` reads
+  clearly.
+- **Pulse Lobber lines (not changed).** Thin orange lines from the bell and across the
+  plasma blast are the faint 4-point star in `T_VfxFlare`, enlarged by big flashes:
+  0.55 m at the near-camera bell and about 3.5 m for the blast. They last 0.09–0.12 s
+  and were already in the 19:20 frames.
 - **Checks.**
   - New `FirstPersonWeaponMotionTests.HeldGrenadeShowsInTheSupportHandAndLeavesItDuringTheThrow`:
     - no grenade without the key;
-    - while held, a 0.08 m grenade centred on the left grip, in the lower-left of the
-      view, with the hand off the gun;
-    - still held 0.2 s after release;
-    - gone mid-swing;
+    - while held, a 0.08 m grenade centred on the left grip, left of centre and
+      between 20% and 60% of the view height (clear of the HUD vitals), with the hand
+      off the gun;
+    - still held 0.2 s after release, gone mid-swing;
     - both hands back on the gun afterwards.
   - The first run also failed `MuzzleUsesAuthoredSocketAndFourReusedElementsExpireAndReset`:
     the grenade model's own `Muzzle` marker answered a lookup over the whole camera.
-    The held copy's parts are now renamed. Production lookups were already scoped to
-    the weapon.
-  - Suites: EditMode 506/508, 2 explicit skips (`EditMode-20261030-211234-651`);
-    PlayMode 170/171, 1 explicit skip (`PlayMode-20261030-211303-852`). Smoke build
-    `BuildSmoke-20261030-211333-865`.
-- **Still to do.** Capture the weapons set and compare it with `192033-554`:
-  `weapon-grenade-aim`, `weapon-grenade-0/1`, `weapon-pulselobber-0/1`,
-  `weapon-plasma-impact` and `weapon-lasersniper-0/1`. The hold pose and the hand
-  rotation are untested starting values.
+    The held copy's parts are renamed. Production lookups were already scoped to the
+    weapon.
+  - `WeaponEffectsTests.EveryWeaponHasBoundedDistinctShotGeometry(LaserSword)` now
+    asserts the crescent: zero width at both tips, full width mid-swing.
+  - `Invoke-VisualCheck.ps1 -Weapons` expects 35 captures (was 34).
+  - Suites on the final source: EditMode 506/508, 2 explicit skips
+    (`EditMode-20261030-232935-787`); PlayMode 170/171, 1 explicit skip
+    (`PlayMode-20261030-233001-749`). Smoke build `BuildSmoke-20261030-233029-250`.
+    The title captures (`225632-729`) ran on `BuildSmoke-20261030-225428-178`, before
+    the kill-banner change.
+    The weapons (`224547-655`) and firefight (`224651-778`) captures ran on
+    `BuildSmoke-20261030-224504-369`, which differs from the final source only in the
+    title size and menu padding.
+  - Frame time on `224504-369`, idle GPU, Chrome and MSI Afterburner running
+    (`Perf-20261030-224917-718` and `224952-250`): Ultra mean 1.96/2.02 ms, p99
+    2.78/2.99 ms; Low mean 1.71/1.68 ms, p99 2.48/2.34 ms. Against the last valid pair
+    (`182822-933`/`182849-555`: Ultra 1.77/1.86, p99 2.62/3.15; Low 1.61/1.66, p99
+    2.19/2.35), Ultra means are about 0.15 ms higher and p99 is in the same range.
+- **Limits.** Captures are fixtures, not play. The grenade hold, rail and slash
+  widths are proposed values pending a human look in motion.
+
+## 2026-10-30 late-night playable build
+
+Scope: a playable build with the
+[weapon read fixes](#2026-10-30-weapon-read-fixes-grenade-in-hand-sniper-rail-sword-slash-title-fit)
+on top of the [20:15 build](#2026-10-30-online-rematch-and-night-playable-build).
+- **Build.** `BuildWindows-20261030-233237-714` wrote `Artifacts/Unity/Windows`, from
+  the same source as smoke build `BuildSmoke-20261030-233029-250` and its suites. Its
+  content hash over 200 files is
+  `db84d55e47435b57190fccab8036e5c9e0a7100864615a6bf64a0f18ee63a0fb`. Its `app.info`
+  names "Better Bean Battles".
+- **Archive.** The 20:15 build `058fa3dd…` it replaced is kept at
+  `D:/WildstoneArchive/mvp-2/Artifacts/Unity/Windows-058fa3dd`.
+- **Startup.** A 15-second headless start
+  (`Artifacts/Unity/WindowsStartup-20261030-2334.log`) logged no exception or error.
+  That proves startup only.
+- **Limits.** Not yet played.
+
+## 2026-10-30 30-minute capacity soak
+
+Scope: the first full-length run of the eight-process connection and memory soak
+(`./Tools/QA/Invoke-NetworkSmoke.ps1 -Scenario capacity -SoakSeconds 1800 -TimeoutSeconds 2100`).
+Smoke build `BuildSmoke-20261030-225428-178`, baseline profile, real Photon, one PC.
+Nothing else used the CPU during the run.
+- **Result.** Passed, `Artifacts/Smoke/20261030-225821-320-capacity-baseline`. All
+  eight peers kept coherent players, seats and four teams of two for 1800 s with no
+  recovery or authority change. Each ran 216,005 SDK ticks (120 Hz).
+- **Time split.** 480 s Running, then 1320 s on Results. The peers send no gameplay
+  actions, so this is not a gameplay soak.
+- **Memory** (Windows process counters, start to end of the hold, about 3,030
+  samples each):
+  - host: working set +5.5 MB (324 to 329 MB), private bytes flat (447 MB);
+  - clients: working set +4.5 to +8.0 MB, private bytes +1.0 to +11.0 MB, from about
+    440 MB.
+  - Only the start and end values are kept, so whether this growth levels off or
+    keeps climbing is not known.
+- **Traffic** (Running): host 125 KB/s out and 34 KB/s in; each client 17.8 KB/s in
+  and 4.8 KB/s out. The Results figures are the same. SDK remote RTT averaged 11 ms
+  (4.6–87.6 ms), 13,272 samples.
+- **Limits.** One PC, baseline profile, no gameplay actions and mostly Results time.
+  This is not the backlog's gameplay soak, a two-hour soak or external-network
+  evidence.
+- **Rerun with the memory series** (`20261030-233817-422-capacity-baseline`): stopped
+  by hand after about 2 minutes, because a Better Bean Battles window was open and
+  eight peers would have competed with it. No result.
+
+## 2026-10-30 stun end on a predicting client
+
+Scope: the open question from the
+[stun probe](#2026-10-30-smoke-harness-peer-reads-stun-probe-and-late-attacks),
+whether a stunned player on a client machine unfreezes on time.
+- **Cause.** The host sent only a "suppressed" flag in the movement snapshot. A
+  client predicts its own player from the last snapshot, so it stayed frozen after the
+  stun ended until the host's unsuppressed snapshot arrived, about one round trip
+  late, and then jumped forward by the movement it had missed.
+- **Fix.** The snapshot now also carries the movement tick the stun ends
+  (`SuppressedUntil`). The motor clears a stun-only suppression on that tick by itself,
+  so the client's prediction releases on the same tick as the host. Death,
+  disconnection, warm-up and match end still lift only from the host. Host movement
+  is unchanged. The movement snapshot grows by one 4-byte word (99 to 100; the
+  player object 105 to 106).
+- **Checks.**
+  - `ArenaMotorTests.StunSuppressionLiftsAtItsEndTickWithoutAHostUpdate`: with no
+    host update, input is ignored before the end tick and moves the player from it.
+  - `FusionMatchRunnerTests`: on a real single-peer runner the host's end tick
+    matches the stun's remaining match ticks, and both values clear when the stun
+    ends.
+  - Suites: EditMode 506/508 (`EditMode-20261030-234337-141`), PlayMode 171/172
+    (`PlayMode-20261030-234403-158`), smoke build `BuildSmoke-20261030-234431-909`.
+- **Real Photon regressions** on that build, all passed:
+  - special-projectiles baseline `234543-472` and adverse150 `234618-583`. The host
+    target sampled 60–64 times while stunned with 0.00 m of travel, then 3.47 m by
+    0.4 s after the stun, the same as before the change;
+  - combat baseline `234649-950`, reconnect baseline `234715-153`, rematch baseline
+    `234747-520`;
+  - gunplay adverse150 `234805-553`, projectile-combat adverse150 `234839-026`.
+- **Limits.** No run makes a client the stun target, so the on-time release on a
+  client is shown by the motor and host checks, not by a two-process measurement.
+  The start of a stun still corrects a client back to where the host stunned it;
+  only the host decides a hit.
+
+## 2026-10-31 stunned client, two-process proof
+
+Scope: the open limit of the [stun end fix](#2026-10-30-stun-end-on-a-predicting-client),
+whether a stunned player on a client machine releases on time. New smoke scenario
+`stun-client` (smoke builds only).
+- **Fixture.** The host moves the client's player onto open ground at (-30, 0, -15).
+  The client then holds forward input. Once the client reports more than 1 m of
+  movement, the host applies the production stun rule (`CombatRules.Stun`) to it,
+  standing in for a Stun Gun bolt; the bolt's flight is not under test. The client
+  reads its own predicted movement state every frame and the host reads its
+  authoritative copy.
+- **Gates.**
+  - Release tick (client): the last tick it saw stunned is before the stun's end
+    tick, and the first tick it saw free is at or after it. This holds at any frame
+    rate, because one frame can advance several ticks.
+  - Travel while stunned (both peers): under 0.05 m in the last 0.15 s before the
+    end tick. A stun removes input, not momentum, so a full-speed runner coasts
+    about 8 cm in the first 0.15 s. The first run measured from 0.15 s after the
+    stun and failed on that coast: host 0.066 m, client 0.13 m.
+  - After release (both peers): over 0.3 m by 0.4 s after the stun ends.
+  - Snap (client): its largest per-frame jump after release is under 0.5 m.
+- **Results.** Smoke build `BuildSmoke-20261031-000845-774`, both runs passed:
+
+  | Run | Measured RTT | Client end / last stunned / first free tick | Stunned travel | Travel 0.4 s after | Largest frame step |
+  |---|---|---|---|---|---|
+  | baseline `000914-501` | 10–14 ms | 140 / 139 / 140 | 0.00 m both | 3.86 m both | 0.092 m |
+  | adverse150 `000941-364` | 163–164 ms | 117 / 116 / 117 | 0.00 m both | 3.86 / 3.95 m | 0.092 m |
+
+  At 150 ms the client still releases on the stun's last tick, not a round trip
+  late. Its largest step after release is one 120 Hz tick at run speed, so there
+  is no catch-up jump.
+- **Harness fixes found by the first runs.** The worker's fixture was missing from
+  the player's injected-profile allow-list (`FusionSmokeNetworkProfile`), so the
+  adverse150 host refused to start. The release check is now frame-rate
+  independent and the travel window is measured as described above.
+- **Limits.** The stun is injected on the host, not fired as a bolt. At 150 ms the
+  start of a stun still pulls the client back to where the host stunned it. In
+  this run the client had predicted more than 1 m of travel and was put back
+  0.045 m from its start (`movingTravel`), because the host's copy had barely
+  moved. Only the host decides a hit. This is not external-network acceptance.
+
+## 2026-10-31 gameplay soak
+
+Scope: BACKLOG row 6's gameplay soak, with the
+[allocation figures](TOOLING.md) added to the capacity runner. Eight real Photon
+processes on one PC, `capacity -Gameplay`. Every peer moves, fires at the nearest
+enemy every 0.4 s and reloads, and the host rematches 3 s into Results.
+- **100 s, 30 s rounds** (`-SoakSeconds 100 -RoundSeconds 30`):
+  - `20261030-235611-905` passed: 4 rounds, 169–180 shots, 4–7 deaths per peer.
+    About 16 GC collections/s, most of them from the harness reading every peer's
+    status file and searching the scene every frame.
+  - The harness now reads peer files twice a second and counts avatars from a
+    reused list. The next run (`20261031-000031-778`) failed: the host asked a
+    stopped runner for its objects (`NullReferenceException` in
+    `NetworkRunner.GetAllBehaviours`). The count now runs only while the runner is
+    running.
+  - `20261031-000157-468` passed: 4 rounds (3 rematches); 169–183 shots, 1–4
+    reloads and 5–8 deaths per peer; 90 s running and about 1 s between rounds.
+    - GC: 0.39–0.43 collections/s per peer.
+    - Managed heap: 17.6–23.0 MB at the start, 19.9–23.6 MB at the end.
+    - Working set: +14.4 to +17.4 MB over 100 s (319–327 MB at the start).
+    - Traffic: host 431 KB/s out and 43 KB/s in while running; each client
+      about 62 KB/s in and 6 KB/s out.
+- **Two hours** (`-SoakSeconds 7200`, full 480 s rounds, pinned smoke build
+  `Smoke-20261031-040856-508`): failed at about 46 min
+  (`20261031-001150-322-capacity-gameplay-baseline`). At host tick 330145 the host
+  threw "Eight-player capacity coherence was lost during the soak"
+  (`FusionSmokeDriver.Capacity.cs:104`) outside a round transition. No host peer
+  removal was logged. The run overlapped Unity batch work on the same PC from
+  about 00:37.
+  - **Diagnosis (2026-10-31, from the peer logs and status files).** Seven of the
+    eight `Connected` flags went false together. The host status shows 1 connected
+    of 8 players, 8 avatars and the session still running. The clients' runner
+    ticks froze at 329787–329788, the host's recovery publish missed around tick
+    330012, and every client then threw "SDK ticks stopped advancing". The peak
+    remote RTT reached about 6.9 s. This points to a machine-wide stall of about
+    3 s while the Unity batch ran, rather than a game desync (moderate confidence).
+    Why a 3 s stall dropped peers when `ConnectionTimeout` is 10 s is still open.
+  - **Diagnostics added.** The host logs `WILDSTONE PEER LEFT participant=…
+    generation=… tick=…` (no identity or credential data) when it retires a peer.
+    The capacity runner records the largest frame gap (`maxFrameGapSeconds`). A lost
+    coherence after a gap over 2 s fails as "environment stalled"; otherwise the
+    error includes the connected count and the largest gap. Next: rerun the two
+    hours with nothing else running on the PC.
+- **Limits.** One PC and loopback-near latency. Bots fire at the nearest enemy with
+  perfect aim; they are not human movement. Working set is still rising at 100 s,
+  so only the two-hour series can show whether it levels off.
+
+## 2026-10-31 firefight sword and range captures, fixture FOV
+
+- **Captures.** `Invoke-VisualCheck.ps1 -Firefight` (`20261031-000530-632`) passed
+  with 67 PNGs.
+  - The Laser Sword slash at true ages: `firefight-lasersword-00/01/02/04/06/09/14/20`.
+  - A strafing soldier straight ahead at 15, 30 and 45 m, Line Driver held,
+    nothing fired: `firefight-range-15m/30m/45m`.
+- **Sword read.** The slash read as a thin cyan streak, not a blade: one line
+  ribbon drawn with the laser beam material, whose mask is a narrow core.
+  - A Codex worker added a smear with the in-repo `T_VfxBlade` mask and a white
+    core, revealed left to right.
+  - It still read as a wisp, for two reasons. The mask is a comet with its bright
+    head 30% along, mapped start to end, so the tail led the swing. The 2.1 m arc
+    also passed behind the target, which stands inside the 2.3 m reach.
+  - The fringe is now drawn front to back, so the head leads, and the smear sits
+    1 m from the eye at the same angles.
+  - `20261031-002956-147` shows the cyan head crossing in front of the target's
+    helmet with the white edge trailing; compare `20261031-000530-632`. The values
+    are in the [rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md).
+  - Suites after the change: EditMode 507/509 (`EditMode-20261031-002215-192`) and
+    PlayMode 172/173 (`PlayMode-20261031-002854-060`). PlayMode adds
+    `SwordBladeSweepsThenExpiresAndReducedMotionStaysStill`.
+- **Capture warm-up.** Twice under the soak's CPU load, the first recorded shot's
+  next frame took 38 ms and failed the age gate. The firefight mode now fires one
+  unrecorded Line Driver shot during its settle time.
+- **Range read.** The soldier measures about 43, 22 and 15 px tall at 720p. It stays
+  a dark, visible silhouette against the ivory stone at all three ranges.
+- **Fixture FOV.** These and all the motion, weapon and firefight fixtures were taken
+  at a 90-degree vertical FOV, the value before the FOV setting became 100 degrees
+  horizontal (67.7 degrees vertical at 16:9). The world in those captures is drawn
+  smaller than players see it; the perf fixture already used the real default.
+  Fixtures now use the game's default. Captures before this change, including the
+  numbers above, understate on-screen size by about 1.5x. `-Weapons`
+  (`20261031-001737-238`) and `-Firefight` (`20261031-002956-147`) passed at the
+  corrected view. The new map card also appears in weapon fixtures, whose clock
+  stays at 8:00.
+
+## 2026-10-31 map name card
+
+The tester asked whether the build had "the same map 3 times". It has three maps,
+but they share one stone kit and the same corner spawn structure, so the first view
+of every map is nearly identical. The default static captures show this
+(`20261031-001003-622`: `atrium-720`, `split-gallery-1080`, `terrace-steps-720-large-ui`).
+- **Change.** Each round opens with the map's name in a graphite card under the
+  score strip for 3 s. It fades over the last 0.5 s; with reduced motion it cuts
+  instead. The bottom-left hint line keeps the name ("SPLIT GALLERY · ESC MENU").
+  Both strings are cached per map, so nothing allocates per frame.
+- **Checks.** `MenuPresentationTests.EachRoundOpensOnTheMapNameThenClears`;
+  `atrium-720` shows the card at 7:59.
+- **Limits.** This names the map; it does not make the maps look different. A
+  per-map identity pass (accents, landmarks, spawn views) is a proposal awaiting the
+  owner.
+
+## 2026-10-31 playable build
+
+Scope: a playable build with the
+[stunned-client release fix](#2026-10-31-stunned-client-two-process-proof), the
+[sword slash smear and fixture FOV fix](#2026-10-31-firefight-sword-and-range-captures-fixture-fov)
+and the [map name card](#2026-10-31-map-name-card), on top of the
+[late-night build](#2026-10-30-late-night-playable-build).
+- **Build.** `BuildWindows-20261031-003132-589` wrote `Artifacts/Unity/Windows` from
+  the same source as smoke build `BuildSmoke-20261031-002925-892`. Its content hash
+  over 200 files is
+  `5ac42eedb29413c5a134573dd7414ac8ac1ec66d00c8f636d76090b52583410b`. Its `app.info`
+  names "Better Bean Battles".
+- **Suites on that source.** EditMode 507/509, 2 explicit skips
+  (`EditMode-20261031-003057-977`). PlayMode 172/173, 1 explicit skip
+  (`PlayMode-20261031-002854-060`).
+- **Captures on that source.** Firefight `20261031-002956-147` (67 PNGs). The
+  weapons (`001737-238`) and default (`001003-622`) runs and the frame-time sample
+  (`Perf-20261031-001030-612`) came from earlier smoke builds the same night; the
+  later changes were the sword smear tuning and the firefight warm-up shot, which
+  only the firefight run shows.
+- **Archive.** The 23:33 build `db84d55e…` it replaced is kept at
+  `D:/WildstoneArchive/mvp-2/Artifacts/Unity/Windows-db84d55e`; the copy re-hashes
+  to the same value.
+- **Startup.** A 15-second headless start
+  (`Artifacts/Unity/WindowsStartup-20261031-0032.log`) logged no exception or error.
+  That proves startup only.
+- **Compatibility.** The stun fix adds a networked field, so both players should use
+  this build. Mixing it with `db84d55e…` is untested.
+- **Limits.** Not yet played.
+
+## 2026-10-31 HUD string allocations
+
+Scope: the HUD rebuilt about 20 strings every frame (scores, clock, health, ammo,
+item labels, zone distance, kill feed) and walked pickups through a boxed
+enumerator. Each label now rebuilds its string only when the value it shows
+changes. Not in the `5ac42eed…` build.
+- **Checks.** New `PracticeSessionTests.SteadyHudRefreshAllocatesNoManagedBytes`:
+  64 refreshes of an unchanged HUD allocate 0 bytes, and a health change still
+  updates the label. EditMode 507/509 (`EditMode-20261031-003809-710`), PlayMode
+  173/174 (`PlayMode-20261031-003840-078`), smoke `BuildSmoke-20261031-003917-438`.
+- **Captures.** Default `20261031-004013-893` against `001003-622`: the in-game
+  frames differ in under 0.01% of pixels, the menu frames by the usual idle-pose
+  0.3–0.7%. Firefight `003957-269`: 67 PNGs.
+- **Frame sample** `Perf-20261031-004041-234` against `Perf-20261031-001030-612`:
+  - managed allocation 1,460 → 560 bytes per frame, gen0 collections 8 → 3 per tier;
+  - Ultra mean 1.74 → 1.98 ms, p99 2.49 → 3.27 ms; Low mean 1.60 → 1.81 ms,
+    p99 2.21 → 2.94 ms.
+  - The later sample ran while the eight-process two-hour soak loaded the CPU and
+    the earlier one did not, so the frame times are not comparable; a clean
+    resample follows the soak.
+
+## 2026-10-31 playtest fixes (D040)
+
+Scope: the user asked for the root-cause fixes in
+[PLAYTEST-FIX-LATER](PLAYTEST-FIX-LATER.md) to be implemented. Every value is a
+proposal ([D040](DECISIONS.md)). Contracts are in the
+[combat spec](superpowers/specs/2026-10-25-arena-combat-items-zone-design.md#2026-10-31-playtest-fixes-catalog-revision-5-d040),
+the [foundation spec](superpowers/specs/2026-10-25-multiplayer-foundation-design.md),
+the [UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md), the
+[rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md) and the
+[weapon spec](superpowers/specs/2026-10-25-characters-weapons-design-workflow.md).
+None of this is in the `5ac42eed…` build.
+- **Content.** `PreparePresentation-20261031-012811-444` regenerated the zone
+  materials. `PrepareNetworking-20261031-012821-499` rebuilt the avatar prefab with
+  the narrower torso box. Maps are unchanged, so there was no rebake.
+- **Suites.** EditMode 522/524, 2 explicit skips (`EditMode-20261031-013034-659`).
+  PlayMode 184/185, 1 explicit skip (`PlayMode-20261031-013100-314`).
+  - The first runs (`EditMode-20261031-012832-906`, `PlayMode-20261031-012901-980`)
+    failed 9 and 1 tests that pinned the old values: the 150 ms rewind interval, the
+    18-tick attack window, a one-magazine bound, and a disconnected-avatar fixture
+    that shot level at eye height. That fixture has no head hitbox, and its shot now
+    passes over the shorter torso box. The fixture now aims at the chest. The other
+    tests now assert the new bounds.
+  - The first `BuildSmoke-20261031-012931-011` failed to compile three smoke-only
+    lines with an out-of-scope `weapon`. `BuildSmoke-20261031-013128-803` passes.
+- **New checks.**
+  - Rules: `TorsoBoxStopsUnderTheHeadAndTurnsWithTheAvatar`,
+    `BlinkFollowsTheHorizontalAim`, `HostAcceptsAPickupWithinTheLagMargin`, the
+    scope-threshold asserts, and two-magazine pickup and restore.
+  - Practice: `NativeRaysUseTheOnlineTorsoAndHeadInsideTheCapsule`.
+  - Input: `EarlySemiAutomaticPressFiresOnceAtReady` and
+    `ApplyingSettingsKeepsTheOnlineMovementSequenceRising`.
+  - HUD: `DamageDirectionIsAFarArcNotAReticleMark`, `BlinkPickupPromptSaysWhatItDoes`,
+    `ZoneWaypointStaysOnScreenAndPointsTheWayToTurn`,
+    `RefusedBlinkShowsADenyCueButASpentOneDoesNot`.
+  - Weapon motion: `ShotCameraPunchWithoutMouseInputLeavesSwayAtZero` and
+    `MouseFlickSettlesWithoutOvershoot`.
+  - Zone: four `WeaponEffectsTests` on colour, blend, queue and reduced motion,
+    plus `HealthPackStandsOutFromOtherPickups`.
+  - Online: same-room seat reclaim, refused-checkpoint tolerance and the host-left
+    text.
+- **Final source.** The health pack scale and ring (see
+  [health packs](#2026-10-31-health-packs-d039)) and the soak diagnostics landed after
+  those suites. One batch reran everything on the final source (01:37–01:41):
+  - Compile, EditMode 522/524 with 2 explicit skips (`EditMode-20261031-013806-483`),
+    PlayMode 184/185 with 1 explicit skip (`PlayMode-20261031-013831-299`), smoke
+    `BuildSmoke-20261031-013859-019` (content identity `33076a46…`).
+  - Captures, all passing with clean player logs: weapons `20261031-013924-452`,
+    firefight `014027-390` (70 PNGs), motion `014037-971` and default `014100-485`.
+  - Frame sample `Perf-20261031-014127-553`, taken after the two-hour soak had
+    stopped: Ultra mean 1.71 ms, p99 2.71 ms; Low mean 1.55 ms, p99 2.39 ms; about
+    560 bytes managed allocation per frame and 3 gen0 collections per tier. The last
+    clean sample (`Perf-20261031-001030-612`, before the HUD fix) had Ultra 1.74 /
+    2.49 ms and Low 1.60 / 2.21 ms with 1,460 bytes. Means are slightly lower and p99
+    about 0.2 ms higher, within run-to-run spread; the allocation drop holds.
+- **What the captures show.**
+  - The free zone reads as a magenta floor and curtain on ivory stone
+    (`weapon-pickups`, `weapon-kill-banner`). A pickup behind the curtain takes its
+    tint: the health pack in `weapon-pickups` reads purple through it.
+  - The zone waypoint shows over the zone and at the screen edge (`atrium-1080`,
+    `split-gallery-720`). Its 1.5 px dark text outline ate the 14 px glyphs, so
+    "40 m" read as hollow magenta strokes. It now sits on a graphite chip, 44 px
+    in from the edge; see [the rerun](#2026-10-31-zone-waypoint-chip).
+  - The damage arc and the Blink refusal have no capture.
+- **Photon regression set** on smoke `Smoke-20261031-053905-337` (01:49–02:09). Final
+  verdict: all pass.
+  - Passed first time: gunplay baseline `20261031-014944-423` and adverse150
+    `015016-378`; laser moving cover regional80 `015049-253` and adverse150
+    `015124-199`; combat `015159-622`; laser combat `015223-778`; grenade combat
+    adverse150 `015321-911`; deflection adverse150 `015424-131`; stun-client
+    adverse150 `015503-622`; team switch `015536-057`; rematch `015559-626`; late
+    join `015617-090`; migration `015646-416`; migration crash `015714-110`.
+  - Projectile combat (`015253-527`) and special projectiles (`015352-247`) at
+    adverse150 failed on the harness, not the game. `Invoke-NetworkSmoke.ps1` still
+    pinned one-magazine ammo (Pulse Lobber 9 then 8, Disc 9, Stun 7–5), and both
+    peers agreed on the two-magazine counts (19/18, 19, 15–13). The deflection check
+    pinned 9 and 5 the same way. The script now derives all three from
+    `$specialMagazines` (mirrors `WeaponCatalog.SpecialMagazines`; grenades keep
+    one). Reruns pass: `015801-406` and `015828-604`. Deflection had already passed
+    with the corrected check.
+  - Reconnect failed 3 of 4 runs between 01:55 and 01:59 (`015526-707`,
+    `015859-431`, `015914-266`), each before any game logic. Photon answered
+    "Game does not exist" (32758) to a room the host had just created, or the
+    connect itself failed (`ExceptionOnConnect`). No other run tonight logged
+    either. Interleaved reruns then passed 3 of 3 on this build and 3 of 3 on the
+    pre-D040 smoke `Smoke-20261031-050730-903`, and `Invoke-ReconnectCycles.ps1
+    -Cycles 10` passed 10 of 10 (`20261031-020449-685-reconnect-cycles.json`). We
+    read it as a transient Photon cloud or network fault, not a D040 regression;
+    the seat-credential change never ran in the failed runs.
+  - **Rewind age with the 250 ms cap.** At regional80 no query is clamped any more
+    (0 of 20; requested 170–184 ms, before: all 20 clamped to 150 ms). At adverse150
+    every query is still clamped, now to 250 ms (requested 255–293 ms; before,
+    150 ms against 283 ms).
+
+    | Run | Profile | Queries | Clamped | Requested mean / max | Applied |
+    | --- | --- | --- | --- | --- | --- |
+    | gunplay `20261031-014944-423` | baseline | 11 | 0 | 74–78 / 78 ms | as requested |
+    | gunplay `20261031-015016-378` | adverse150 | 11 | 11 | 267–287 / 293 ms | 250 ms |
+    | laser moving cover `20261031-015049-253` | regional80 | 20 | 0 | 170–184 / 184 ms | as requested |
+    | laser moving cover `20261031-015124-199` | adverse150 | 20 | 20 | 255–280 / 283 ms | 250 ms |
+- **Limits.** Same-PC Photon with injected latency, not external networks. No human
+  playtest yet. Tests prove the rules and wiring, not feel.
+
+## 2026-10-31 health packs (D039)
+
+Scope: the user asked for health packs around each map. Not in the `5ac42eed…`
+build. Rules are in the
+[combat spec](superpowers/specs/2026-10-25-arena-combat-items-zone-design.md#2026-10-31-health-packs-d039)
+and positions in the [map spec](superpowers/specs/2026-10-25-wildstone-modern-map-design.md).
+- **Model.** `build_assets.py health-pickup` built `HealthPickup.fbx` (972
+  triangles; Blender re-import checks pass; hashes in
+  `ArtSource/health-pickup-export-manifest.json`).
+- **Content.** `Prepare-20261031-010228-772`, `PrepareNetworking-20261031-010241-074`,
+  `Bake-20261031-010252-221` (map revision 6).
+- **Suites.** EditMode 511/513, 2 explicit skips (`EditMode-20261031-010414-649`),
+  including the new `HealthPackRestoresUpToFullHealth` (two cases),
+  `FullHealthLeavesTheHealthPackInPlace` and
+  `EveryArenaOffersFourSpacedHealthPacks`, plus the traversal gate reaching every
+  pack from every start. PlayMode 173/174, 1 explicit skip
+  (`PlayMode-20261031-010438-361`). The first run (`EditMode-20261031-005155-744`)
+  failed the spacing test: Atrium's north pack sat 4.5 m below the sniper. It moved
+  to (0, 0, 14).
+- **Captures.** Default `20261031-010631-470` against `004013-893`: in-game frames
+  differ in at most 0.01% of pixels after the rebuild and rebake. Weapons
+  `20261031-010747-957`: `weapon-pickups` shows the pack about 10 m ahead.
+- **Finding.** At 10 m the pack read poorly: the 0.29 m canister was a few
+  pixels wide, its mint plus showed only side-on, and its pad ring was a thin
+  green-grey line beside the brighter shotgun refill disc. The model now draws at
+  1.8× with a .2 m ring (the [rendering spec](superpowers/specs/2026-10-25-unity-rendering-design.md)
+  has the values; `WeaponEffectsTests.HealthPackStandsOutFromOtherPickups`). In
+  weapons `20261031-013924-452` the pack is a box with a readable plus at about
+  10 m, compare `010747-957`. In that fixture the zone curtain is in front of it,
+  so it reads purple there.
+- **Limits.** No online pickup run and no human play yet. The 50 heal and 15 s
+  respawn are proposals.
+
+## 2026-10-31 zone waypoint chip
+
+Scope: the [D040 captures](#2026-10-31-playtest-fixes-d040) showed the zone
+waypoint's 14 px label drawn hollow: its 1.5 px dark text outline covered most of
+each glyph. The label now sits on an 80 px graphite chip (0.72, the bottom panels'
+backing) with no outline, and the edge margin is 44 px so the whole chip stays on
+screen. The contract is in the [UI spec](superpowers/specs/2026-10-25-ui-gameflow-design.md).
+- **Checks.** `MenuPresentationTests.ZoneWaypointStaysOnScreenAndPointsTheWayToTurn`
+  now also asserts a dark, mostly opaque chip. Compile
+  `Compile-20261031-021021-548`; EditMode 522/524 with 2 explicit skips
+  (`EditMode-20261031-021049-949`); PlayMode 184/185 with 1 explicit skip
+  (`PlayMode-20261031-021113-831`); smoke `BuildSmoke-20261031-021139-534`
+  (content identity `14d7f9da…`).
+- **Captures.** Weapons `20261031-021206-095` and default `20261031-021308-822`
+  pass with clean player logs. `atrium-1080` shows a solid magenta "◆ 40 m" on the
+  chip at the right edge; `weapon-pickups` shows "◆ 32 m" over the zone.
+- **Limits.** Presentation only; no Photon rerun, since no network code changed.
+
+## 2026-10-31 D040 playable build
+
+Scope: a playable build with everything since `5ac42eed…`: the
+[HUD string allocations](#2026-10-31-hud-string-allocations) fix,
+[health packs (D039)](#2026-10-31-health-packs-d039),
+[playtest fixes (D040)](#2026-10-31-playtest-fixes-d040), the
+[zone waypoint chip](#2026-10-31-zone-waypoint-chip) and the host's `WILDSTONE PEER
+LEFT` log line ([gameplay soak](#2026-10-31-gameplay-soak)).
+- **Build.** `BuildWindows-20261031-021446-901` wrote `Artifacts/Unity/Windows` from
+  the same source as smoke `BuildSmoke-20261031-021139-534`. `app.info` names
+  "Better Bean Battles".
+- **Hash.** The earlier hashes' exact recipe was not scripted and could not be
+  reproduced. From this build on: SHA-256 over one `relative/path  sha256` line per
+  file (lower-case hex, `\n` after each), sorted ordinally by forward-slash path,
+  skipping `*DoNotShip` folders. This build: 200 files,
+  `b563bab3ea2a4694f0af845e962d361fa8338041f5a4535390f903a2c4b96980`. By the
+  same method, the replaced `5ac42eed…` build is `42a88f1e…` and `db84d55e…` is
+  `c06166f4…`.
+- **Archive.** The replaced `5ac42eed…` build, never played, is kept at
+  `D:/WildstoneArchive/mvp-2/Artifacts/Unity/Windows-5ac42eed`.
+- **Startup.** A 15-second headless start
+  (`Artifacts/Unity/WindowsStartup-20261031-0215.log`) logged no exception or
+  error. That proves startup only.
+- **Compatibility.** Catalog revision 5 changes networked rules (ammo, hit shapes,
+  rewind and attack windows), so both players must use this build.
+- **Limits.** Not yet played. Every D040 and D039 value is a proposal for the
+  user's playtest.
 
 ## 2026-10-30 evening playable build
 

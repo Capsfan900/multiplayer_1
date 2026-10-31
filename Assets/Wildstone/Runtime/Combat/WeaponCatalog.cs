@@ -14,13 +14,23 @@ namespace Wildstone.Combat
     }
     public static class WeaponCatalog
     {
-        public const int Revision=4, StarterAmmo=24, DefaultTickRate=120, MaximumProjectiles=64;
+        public const int Revision=5, StarterAmmo=24, DefaultTickRate=120, MaximumProjectiles=64;
         public const float Health=100, Shield=60, ShieldSeconds=6, ReloadSeconds=1.2f, RespawnSeconds=3, PickupSeconds=15;
+        public const float HealthPack=50; // proposal: a claimed health pack restores this much, up to Health
+        // Clients choose and prompt within PickupReach of their predicted feet; the host's copy of a running player trails
+        // by about a round trip, so it accepts PickupLagMargin more (PLAYTEST-FIX-LATER #3).
+        public const float PickupReach=2.5f, PickupLagMargin=.5f;
+        // Revision 5 proposal (PLAYTEST-FIX-LATER #10): a special weapon pickup carries this many magazines as one count.
+        public const int SpecialMagazines=2;
+        public static int PickupAmmo(WeaponKind kind) =>
+            kind==WeaponKind.None?0:kind==WeaponKind.LineDriver || kind==WeaponKind.Grenade?Get(kind).Ammo:Get(kind).Ammo*SpecialMagazines;
         // Revision 4 proposed defaults (combat spec): bloom recovery starts after a short pause.
         public const float BloomDelaySeconds=.1f, BloomDecayPerSecond=2.5f;
         // D036 proposed default: a held automatic trigger may land this early or late on the host without losing or
         // shifting its cadence (send-frame and arrival jitter); the schedule carries, so the sustained rate never rises.
         public const float FireSlackSeconds=.025f;
+        // Proposal (PLAYTEST-FIX-LATER #8): an early semi-automatic press waits this long for the cooldown, then fires once.
+        public const float FireBufferSeconds=.2f;
         public static int Ticks(float seconds,int rate) => (int)Math.Ceiling(seconds*rate-0.00001);
         public static WeaponSpec Get(WeaponKind kind)
         {
@@ -112,6 +122,8 @@ namespace Wildstone.Combat
         {
             Cone(kind,out float hip,out float bloomDegrees,out float adsScale);
             ads=Unit(ads);
+            // The scope overlay appears at ScopeThreshold, so a scoped weapon is fully accurate from that point.
+            if(IsScoped(kind)) ads=Unit(ads/ScopeThreshold);
             return (hip+bloomDegrees*Unit(bloom))*(1+(adsScale-1)*ads);
         }
         // Gameplay field of view at the given ADS progress; presentation and look sensitivity use the same value.

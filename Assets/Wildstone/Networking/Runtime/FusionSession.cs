@@ -36,7 +36,11 @@ namespace Wildstone.Networking
         internal long LastPublishedTick => recovery.LastPublishedTick;
         readonly ContentVersion content;
         readonly byte[] contentToken;
-        readonly byte[] reconnectCredential = new byte[32];
+        // One random secret per app run, like the guest ID; never persisted or logged. Each room derives its own credential from it,
+        // so leaving and rejoining a room reclaims the held seat, while another room's host learns nothing that works here.
+        static readonly byte[] appRunSecret = NewSecret();
+        readonly byte[] reconnectCredential;
+        static byte[] NewSecret() { var secret = new byte[32]; using (var random = RandomNumberGenerator.Create()) random.GetBytes(secret); return secret; }
         static readonly Dictionary<NetworkRunner, FusionSession> owners = new Dictionary<NetworkRunner, FusionSession>();
         public NetworkRunner Runner => runner;
         public FusionLobby Lobby { get; private set; }
@@ -69,7 +73,7 @@ namespace Wildstone.Networking
             recovery=new FusionRecovery(this);
             this.content = content;
             contentToken = ContentToken(content);
-            using (var random = RandomNumberGenerator.Create()) random.GetBytes(reconnectCredential);
+            using (var mac = new HMACSHA256(appRunSecret)) reconnectCredential = mac.ComputeHash(Encoding.UTF8.GetBytes(matchId));
         }
 
         // Keep the random guest ID for this app lifetime. It identifies a Photon peer, never a verified account.

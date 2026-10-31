@@ -11,12 +11,13 @@ Material:
   m_Shader: {fileID: 4800000, guid: 01086a3ccbdc6a64b8202ecb2ba33ec7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _FADING_ON
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3000
+  m_CustomRenderQueue: 2990
   stringTagMap: {}
   disabledShaderPasses: []
   m_LockedProperties: 
@@ -36,14 +37,14 @@ Material:
     - _CameraFadingEnabled: 0
     - _CameraFarFadeDistance: 2
     - _CameraNearFadeDistance: 1
-    - _DstBlend: 1
+    - _DstBlend: 10
     - _FlipbookBlend: 0
     - _PeakCap: 8
     - _SoftFade: 0.15
     - _TopLight: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _CameraFadeParams: {r: 0, g: 1, b: 0, a: 0}
+    - _CameraFadeParams: {r: 1, g: 1, b: 0, a: 0}
     - _FlipbookTiles: {r: 1, g: 1, b: 0, a: 0}
     - _MaskChannel: {r: 1, g: 0, b: 0, a: 0}
     - _NoiseParams: {r: 0, g: 1, b: 1, a: 0}

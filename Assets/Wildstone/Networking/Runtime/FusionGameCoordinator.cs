@@ -27,6 +27,9 @@ namespace Wildstone.Networking
         FusionLobby subscribedLobby;
         int actionSequence;
         float nextPresentation, nextDiscovery;
+        // A refused 20 Hz snapshot keeps the last good model; refusals this long in a row end the match.
+        internal const double SnapshotRefusalSeconds=2;
+        double snapshotRefusedSince=-1;
         int eventCursor;
         readonly List<CombatEvent> presentationEvents = new List<CombatEvent>(FusionCombatEvent.Capacity);
         readonly Dictionary<int,Transform> renderPoses = new Dictionary<int,Transform>();
@@ -64,7 +67,7 @@ namespace Wildstone.Networking
             observedRunner=null; match=null; clientModel=null;
             avatars.Clear(); avatarNetworkIds.Clear(); motors.Clear(); renderPoses.Clear(); presentationEvents.Clear();
             discoveredMatches.Clear(); discoveredPlayers.Clear();
-            loading=loaded=loadAcknowledged=attached=false; loadDeadline=0; actionSequence=eventCursor=0; nextDiscovery=nextPresentation=0;
+            loading=loaded=loadAcknowledged=attached=false; loadDeadline=0; actionSequence=eventCursor=0; nextDiscovery=nextPresentation=0; snapshotRefusedSince=-1;
         }
         void Update()
         {
@@ -129,9 +132,8 @@ namespace Wildstone.Networking
                 if(!runner.IsServer && Time.unscaledTime>=nextPresentation)
                 {
                     nextPresentation=Time.unscaledTime+.05f;
-                    clientModel=clientModel??new ArenaMatch(presentation.Catalog.Find(mapId),120);
                     // shortcut: render snapshots allocate at 20 Hz; replace with reusable buffers before performance acceptance.
-                    if(!clientModel.TryRestore(match.CaptureSnapshot())) throw new InvalidOperationException("Invalid replicated match state.");
+                    ApplySnapshot(match.CaptureSnapshot(),Time.unscaledTime);
                 }
                 model=model??clientModel;
                 FusionPlayer local=null;
@@ -152,9 +154,24 @@ namespace Wildstone.Networking
             }
             catch(Exception exception)
             {
-                Debug.LogWarning("Online match stopped: "+exception.GetType().Name);
+                Debug.LogWarning("Online match stopped: "+exception.GetType().Name+": "+exception.Message);
                 CloseOnline();
             }
+        }
+        // TryRestore replaces nothing on refusal, so the previous model stays. Only a refusal streak of SnapshotRefusalSeconds throws.
+        internal void ApplySnapshot(MatchSnapshot snapshot,double now)
+        {
+            clientModel=clientModel??new ArenaMatch(presentation.Catalog.Find(mapId),120);
+            if(clientModel.TryRestore(snapshot,out var reason)) { snapshotRefusedSince=-1; return; }
+            if(snapshotRefusedSince<0) { snapshotRefusedSince=now; Debug.LogWarning("Replicated match snapshot refused: "+reason); }
+            if(now-snapshotRefusedSince>=SnapshotRefusalSeconds) throw new InvalidOperationException("Replicated match state refused for "+SnapshotRefusalSeconds+" s: "+reason);
+        }
+        // A client whose runner was destroyed or stopped, or whose lobby despawned, lost its host; the generic failure text would hide why.
+        bool HostLeft(bool localHost)
+        {
+            if(localHost || ReferenceEquals(observedRunner,null)) return false;
+            if(observedRunner==null || !observedRunner.IsRunning) return true;
+            return !ReferenceEquals(subscribedLobby,null) && (subscribedLobby==null || subscribedLobby.Object==null || !subscribedLobby.Object.IsValid);
         }
         void CloseOnline()
         {
@@ -168,7 +185,7 @@ namespace Wildstone.Networking
                 return;
             }
             var bridge=GetComponent<OnlineMenuBridge>();
-            bridge.Status="The online match could not continue. Return to the lobby and retry.";
+            bridge.Status=HostLeft(bridge.Host)?"Host left the match. Host or join a room to play again.":"The online match could not continue. Return to the lobby and retry.";
             menu.LeaveWithFailure(bridge.Status); ResetSession(); bridge.Refresh();
         }
         // Host-only: a normally finished match returns this room to its lobby with seats, teams and reconnect holds kept.
@@ -275,6 +292,8 @@ namespace Wildstone.Networking
             if(avatars.TryGetValue(participant,out var avatar) && avatar!=null && avatar.Object!=null)
                 avatar.Object.RemoveInputAuthority();
             if(!match.SetConnection(participant,generation,false)) throw new InvalidOperationException("Disconnected avatar could not retire.");
+            // Seat number and ticks only; never identity or credential data.
+            Debug.LogWarning($"WILDSTONE PEER LEFT participant={participant} generation={generation} tick={match.Model.Tick}");
         }
         void RefreshAvatars(NetworkRunner runner)
         {
@@ -319,9 +338,11 @@ namespace Wildstone.Networking
                     Kind=kind, Direction=Quaternion.Euler(presentation.View.Pitch,presentation.View.Yaw,0)*Vector3.forward,PickupId=-1 };
                 if(kind==CombatActionKind.Pickup)
                 {
-                    float distance=6.25f;
+                    // The model copy trails the predicted motor by up to a round trip plus 50 ms; choose from where you are.
+                    float distance=WeaponCatalog.PickupReach*WeaponCatalog.PickupReach;
+                    var feet=presentation.Motor!=null?presentation.Motor.CaptureState().Position:player.Feet;
                     foreach(var item in model.Pickups)
-                    { float next=(item.Position-player.Feet).sqrMagnitude; if(next<distance && item.AvailableTick<=model.Tick) { distance=next; action.PickupId=item.Id; action.PickupGeneration=item.Generation; } }
+                    { float next=(item.Position-feet).sqrMagnitude; if(next<distance && item.AvailableTick<=model.Tick) { distance=next; action.PickupId=item.Id; action.PickupGeneration=item.Generation; } }
                 }
                 local.RPC_Combat(FusionCombatAction.FromCombat(action));
             }

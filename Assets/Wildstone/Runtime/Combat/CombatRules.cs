@@ -32,6 +32,26 @@ namespace Wildstone.Combat
             float entry=along-(float)Math.Sqrt(Math.Max(0,HeadRadius*HeadRadius-miss));
             return along>=0 && entry<=length;
         }
+        // D040 proposal: the torso box (yawed with the avatar) stops under the head sphere, so a ray past the ear misses.
+        // Online it is the Fusion body Hitbox; Practice tests rays that cross the wider motor capsule against it.
+        public const float BodyHalfWidth=.27f;
+        public static float BodyTop(float capsuleHeight) => capsuleHeight-HeadDrop-HeadRadius;
+        public static bool RayHitsBody(Vector3 origin,Vector3 direction,float length,Vector3 feet,float yaw,float capsuleHeight,out float entry)
+        {
+            entry=0;
+            if(!Finite(origin) || !Direction(direction) || !Finite(length) || length<0 || !Finite(yaw)) return false;
+            var inverse=Quaternion.Euler(0,-yaw,0); Vector3 o=inverse*(origin-feet), d=inverse*direction.normalized;
+            Vector3 min=new Vector3(-BodyHalfWidth,0,-BodyHalfWidth), max=new Vector3(BodyHalfWidth,BodyTop(capsuleHeight),BodyHalfWidth);
+            float near=0, far=length;
+            for(int axis=0;axis<3;axis++)
+            {
+                if(Math.Abs(d[axis])<1e-7f) { if(o[axis]<min[axis] || o[axis]>max[axis]) return false; continue; }
+                float a=(min[axis]-o[axis])/d[axis], b=(max[axis]-o[axis])/d[axis];
+                near=Math.Max(near,Math.Min(a,b)); far=Math.Min(far,Math.Max(a,b));
+                if(near>far) return false;
+            }
+            entry=near; return true;
+        }
         public static WeaponKind CurrentWeapon(CombatState p) => p.SelectedSpecial?p.SpecialWeapon:WeaponKind.LineDriver;
         // ADS advances toward the held state; reloading, dying, disconnecting or a non-aiming weapon target zero.
         public static bool AdsTarget(CombatState p) => p.AimHeld && p.Alive && p.Connected && p.ReloadUntil==0 && WeaponCatalog.CanAim(CurrentWeapon(p));
@@ -63,7 +83,7 @@ namespace Wildstone.Combat
                 p.LastActionSequence< -1 || p.LastActionSequence>=int.MaxValue-2 || p.FireReadyTick<0 || p.GrenadeReadyTick<0 || p.ReloadUntil<0 || p.ShieldUntil<0 ||
                 p.StunUntil<0 || p.ImmunityUntil<p.StunUntil || p.RespawnTick<0 || p.DisconnectUntil<0 ||
                 !Enum.IsDefined(typeof(WeaponKind),p.SpecialWeapon) || p.SpecialWeapon==WeaponKind.LineDriver || p.SpecialWeapon==WeaponKind.Grenade) return false;
-            int ammo=p.SpecialWeapon==WeaponKind.None?0:WeaponCatalog.Get(p.SpecialWeapon).Ammo;
+            int ammo=WeaponCatalog.PickupAmmo(p.SpecialWeapon);
             if(p.SpecialAmmo<0 || p.SpecialAmmo>ammo || (p.SelectedSpecial && p.SpecialWeapon==WeaponKind.None) ||
                 (p.Alive && (p.Health<=0 || p.RespawnTick!=0)) || (!p.Alive && (p.Health!=0 || p.Shield!=0 || p.Pending!=null ||
                     p.SpecialWeapon!=WeaponKind.None || p.GrenadeAmmo!=0 || p.BlinkCharges!=0 || p.ShieldCharges!=0 || p.StunUntil!=0 || p.ImmunityUntil!=0 || p.ReloadUntil!=0 || p.AdsProgress!=0))) return false;

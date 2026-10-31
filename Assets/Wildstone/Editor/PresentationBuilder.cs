@@ -13,8 +13,8 @@ namespace Wildstone.Editor
         const string Output="Assets/Wildstone/Resources/Presentation/";
         const string CatalogPath="Assets/Wildstone/Resources/WildstonePresentation.asset";
         static readonly string[] WeaponNames={"LineDriver","PulseLobber","ReboundDisc","PushLens","Grenade","StunGun","LaserSword","LaserPistol","LaserShotgun","LaserSniper","LaserSMG"};
-        static readonly string[] MaterialNames={"MatteIvory","Graphite","SoftGrey","SignalCyan","SignalAmber","SignalCoral","SignalViolet","MatteCharcoalSuit","DeepCharcoal","HeadValue","TeamMark","OpticGlass"};
-        static readonly Color[] Colors={new Color(.76f,.73f,.66f),new Color(.105f,.115f,.125f),new Color(.32f,.34f,.35f),new Color(.13f,.68f,.74f),new Color(.95f,.43f,.12f),new Color(.84f,.30f,.24f),new Color(.55f,.39f,.80f),new Color(.19f,.21f,.22f),new Color(.105f,.12f,.13f),new Color(.28f,.30f,.31f),new Color(.70f,.70f,.66f),new Color(.05f,.09f,.10f)};
+        static readonly string[] MaterialNames={"MatteIvory","Graphite","SoftGrey","SignalCyan","SignalAmber","SignalCoral","SignalViolet","MatteCharcoalSuit","DeepCharcoal","HeadValue","TeamMark","OpticGlass","SignalMint"};
+        static readonly Color[] Colors={new Color(.76f,.73f,.66f),new Color(.105f,.115f,.125f),new Color(.32f,.34f,.35f),new Color(.13f,.68f,.74f),new Color(.95f,.43f,.12f),new Color(.84f,.30f,.24f),new Color(.55f,.39f,.80f),new Color(.19f,.21f,.22f),new Color(.105f,.12f,.13f),new Color(.28f,.30f,.31f),new Color(.70f,.70f,.66f),new Color(.05f,.09f,.10f),new Color(.30f,.86f,.50f)};
         static Material[] palette;
         public const float SignalGlow=1.2f;
         static readonly string[] SocketNames={"Grip","Muzzle","Sight","LeftHand"};
@@ -59,6 +59,7 @@ namespace Wildstone.Editor
             for(int i=0;i<WeaponNames.Length;i++) catalog.Weapons[i]=ModelPrefab(WeaponNames[i]);
             catalog.BlinkPickup=ModelPrefab("BlinkPickup");
             catalog.ShieldPickup=ModelPrefab("ShieldPickup");
+            catalog.HealthPickup=ModelPrefab("HealthPickup");
             // D028 effects: the ported vibegame1 Vfx shader with in-repo generated or credited textures (Art/VFX/CREDITS.md).
             catalog.Beam=Effect("Beam",new Color(.035f,.50f,1f),2);
             catalog.Pulse=Effect("Pulse",new Color(1f,.22f,.025f),2);
@@ -67,10 +68,15 @@ namespace Wildstone.Editor
             catalog.Stun=Effect("Stun",new Color(.025f,.85f,.42f),2);
             catalog.Blink=Effect("Blink",new Color(.65f,.52f,.94f),1.4f);
             catalog.Shield=Effect("Shield",new Color(.56f,.84f,.93f),1.4f);
+            catalog.Health=Effect("Health",new Color(.30f,.86f,.50f),1.4f);
             catalog.Danger=Effect("Danger",new Color(.98f,.57f,.20f),1.6f);
-            catalog.ZoneIdle=Effect("ZoneIdle",new Color(.65f,.66f,.67f));
+            // Zone: idle is a saturated magenta in the gap between the violet and crimson teams (ArenaHud.TeamTints), apart from
+            // the danger orange; an owned zone is painted in the captor's team tint at runtime (ArenaEffects.ZoneColor), so
+            // ZoneOwned is no longer read; contested stays a warm orange, more saturated so it holds over ivory.
+            catalog.ZoneIdle=Effect("ZoneIdle",new Color(.95f,.14f,.80f));
             catalog.ZoneOwned=Effect("ZoneOwned",new Color(.74f,.83f,.49f));
-            catalog.ZoneContested=Effect("ZoneContested",new Color(.95f,.62f,.32f));
+            catalog.ZoneContested=Effect("ZoneContested",new Color(1f,.50f,.12f));
+            catalog.VfxBlade=Vfx("VfxBlade",Color.white,"T_VfxBlade.png");
             catalog.VfxSpark=Vfx("VfxSpark",Color.white,"T_VfxSpark.png");
             catalog.VfxGlow=Vfx("VfxGlow",Color.white,"T_VfxFlare.png");
             catalog.VfxFire=Vfx("VfxFire",Color.white,"T_VfxFireBurst_8x8_PM.png",tiles:new Vector4(8,8,0,0),mask:new Vector4(1,0,.5f,0));
@@ -80,8 +86,14 @@ namespace Wildstone.Editor
             catalog.VfxShockwave=Vfx("VfxShockwave",Color.white,"T_VfxShockwave.png",mask:new Vector4(0,0,1,0),blend:false);
             catalog.Scorch=Decal("Scorch",new Color(.04f,.035f,.03f,1),1,"T_VfxScorch.png");
             catalog.ZoneDecal=Decal("ZoneDecal",Color.white,0,null);
-            catalog.ZoneCurtain=Vfx("ZoneCurtain",Color.white,"T_VfxStrip.png",blend:false);
+            // Painted, not additive (premultiplied over the scene, like the pickup rings): additive light cannot show over ivory
+            // stone and sky. Soft fade stays tight so the base is not eaten, and the camera-near fade keeps the beacon from
+            // tinting the screen when a player stands inside it.
+            catalog.ZoneCurtain=Vfx("ZoneCurtain",Color.white,"T_VfxStrip.png",occluding:true,blend:false);
+            catalog.ZoneCurtain.SetFloat("_SoftFade",.15f);
             catalog.ZoneCurtain.SetTexture("_NoiseMap",LoadVfx("T_VfxEnergy.png"));
+            catalog.ZoneCurtain.EnableKeyword("_FADING_ON");
+            catalog.ZoneCurtain.SetVector("_CameraFadeParams",new Vector4(1,1,0,0)); // clear within 1 m, solid from 2 m
             // Derez elimination: solid additive voxels and the dissolve body shader.
             catalog.VfxPixel=Vfx("VfxPixel",Color.white,null,blend:false);
             catalog.Derez=Material("Derez",new Color(.7f,.7f,.7f),"Wildstone/Derez");

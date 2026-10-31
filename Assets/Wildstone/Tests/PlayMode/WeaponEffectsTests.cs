@@ -62,6 +62,93 @@ namespace Wildstone.Tests
             Assert.That(Ring(1).loop && Ring(1).startColor.r>.5f,Is.True,"Other pads are unaffected.");
         }
 
+        // A health pack is drawn larger on a wider ring than other pickups so it reads from across the room.
+        [Test] public void HealthPackStandsOutFromOtherPickups()
+        {
+            Object.DestroyImmediate(root);
+            match=new ArenaMatch(new ArenaDefinition { Id="effects",Spawns=System.Array.Empty<ArenaSpawn>(),
+                Pickups=new[]{ new ArenaPickup { Item="laser-pistol",Position=new Vector3(0,.45f,4) },new ArenaPickup { Item="health",Position=new Vector3(3,.45f,4) } },
+                ZoneRoute=new[]{Vector3.zero,Vector3.forward*8,Vector3.right*8} },practice:true);
+            root=new GameObject("WeaponEffectsTest"); effects=root.AddComponent<ArenaEffects>(); effects.Initialize(catalog,match);
+            effects.Present(match,false);
+            var pistol=root.transform.Find("Pickup 0 laser-pistol"); var health=root.transform.Find("Pickup 1 health");
+            Assert.That(health.localScale.x,Is.EqualTo(pistol.localScale.x*ArenaEffects.HealthPickupScale).Within(1e-4f));
+            Assert.That(root.transform.Find("Pickup ring 1").GetComponent<LineRenderer>().widthMultiplier,
+                Is.GreaterThan(root.transform.Find("Pickup ring 0").GetComponent<LineRenderer>().widthMultiplier*1.5f));
+        }
+        Material ZonePart(string name) => root.transform.Find(name).GetComponent<Renderer>().sharedMaterial;
+        static float HueGap(Color a,Color b)
+        {
+            Color.RGBToHSV(a,out float ha,out _,out _); Color.RGBToHSV(b,out float hb,out _,out _);
+            return Mathf.Abs(Mathf.DeltaAngle(ha*360,hb*360));
+        }
+
+        // The idle zone was palette grey on grey/ivory stone; it is now a saturated accent that no team or the danger cue wears.
+        [Test] public void IdleZoneIsASaturatedAccentApartFromTeamAndDangerHues()
+        {
+            var idle=effects.ZoneColor(-1,false);
+            Color.RGBToHSV(idle,out _,out float saturation,out _);
+            Assert.That(saturation,Is.GreaterThan(.6f),"Idle "+idle+" is not palette grey.");
+            var rivals=new System.Collections.Generic.List<Color>(Wildstone.UI.ArenaHud.TeamTints) { catalog.Danger.GetColor("_BaseColor"),effects.ZoneColor(-1,true) };
+            foreach(var rival in rivals) Assert.That(HueGap(idle,rival),Is.GreaterThan(35f),"Idle "+idle+" against "+rival);
+        }
+
+        // An owned zone wears its captor's tint in every part (the HUD arrow's, so world and HUD agree); contested stays warm.
+        [Test] public void OwnedZonePaintsTheCaptorTeamTintAndContestedStaysWarm()
+        {
+            for(int team=0;team<4;team++)
+            {
+                effects.Present(match,false,team,false);
+                var tint=Wildstone.UI.ArenaHud.TeamTints[team];
+                foreach(var name in new[]{ "Hot zone floor","Hot zone curtain","Hot zone beacon" })
+                {
+                    var c=ZonePart(name).GetColor("_BaseColor");
+                    Assert.That(Mathf.Abs(c.r-tint.r)+Mathf.Abs(c.g-tint.g)+Mathf.Abs(c.b-tint.b),Is.LessThan(.01f),name+" team "+team);
+                }
+            }
+            effects.Present(match,false,2,true);
+            var warm=ZonePart("Hot zone curtain").GetColor("_BaseColor");
+            Assert.That(warm.r,Is.GreaterThan(.9f).And.GreaterThan(warm.g)); Assert.That(warm.g,Is.GreaterThan(warm.b));
+            foreach(var tint in Wildstone.UI.ArenaHud.TeamTints) Assert.That(HueGap(warm,tint),Is.GreaterThan(20f),"Contested is not read as a team: "+tint);
+        }
+
+        // Painted, not added: curtain and beacon blend over the scene on a darker, wider band (like the pickup rings), and the floor
+        // decal carries a dark track band outside its rim, so ivory stone and sky cannot erase the zone.
+        [Test] public void ZoneIsPaintedOverADarkerWiderBandInsteadOfAdded()
+        {
+            effects.Present(match,false);
+            float painted=(float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha;
+            Assert.That(catalog.ZoneCurtain.GetFloat("_DstBlend"),Is.EqualTo(painted),"The curtain asset is premultiplied-over, not additive.");
+            Assert.That(catalog.ZoneCurtain.IsKeywordEnabled("_FADING_ON"),Is.True,"Standing inside the pillar does not tint the screen.");
+            Assert.That(ZonePart("Hot zone curtain").GetFloat("_DstBlend"),Is.EqualTo(painted));
+            Assert.That(ZonePart("Hot zone beacon").GetFloat("_DstBlend"),Is.EqualTo(painted));
+            var shade=ZonePart("Hot zone beacon shade");
+            Assert.That(shade.renderQueue,Is.LessThan(ZonePart("Hot zone beacon").renderQueue),"The dark band draws first.");
+            Assert.That(ZonePart("Hot zone curtain shade").renderQueue,Is.LessThan(ZonePart("Hot zone curtain").renderQueue));
+            var dark=shade.GetColor("_BaseColor");
+            Assert.That(Mathf.Max(dark.r,Mathf.Max(dark.g,dark.b)),Is.LessThan(.1f)); Assert.That(dark.a,Is.InRange(.3f,.8f));
+            Assert.That(ZonePart("Hot zone curtain").GetColor("_BaseColor").a,Is.LessThanOrEqualTo(.6f),"A player behind the boundary still reads through the curtain.");
+            var beacon=root.transform.Find("Hot zone beacon"); var beaconShade=root.transform.Find("Hot zone beacon shade");
+            Assert.That(beacon.localScale.x*2,Is.InRange(1f,1.5f),"A beacon 1-1.5 m wide, not the old 0.44 m wire.");
+            Assert.That(beaconShade.localScale.x,Is.GreaterThan(beacon.localScale.x),"The dark edge frames the hue.");
+            Assert.That(root.transform.Find("Hot zone curtain shade").localScale.y,Is.GreaterThan(root.transform.Find("Hot zone curtain").localScale.y));
+            var floor=root.transform.Find("Hot zone floor");
+            Assert.That(ZonePart("Hot zone floor").GetFloat("_Track"),Is.EqualTo(ArenaEffects.ZoneTrack).And.GreaterThan(0));
+            Assert.That(floor.localScale.x,Is.EqualTo((MovingZone.Radius+ArenaEffects.ZoneTrack)*2).Within(.001f),"The decal box holds the zone and its track band.");
+        }
+
+        // Reduced motion freezes the contested flicker and curtain flash; the zone is still drawn at full strength.
+        [Test] public void ReducedMotionHoldsTheContestedZoneStill()
+        {
+            effects.Present(match,true,1,true);
+            Assert.That(ZonePart("Hot zone floor").GetFloat("_Pulse"),Is.Zero);
+            Assert.That(ZonePart("Hot zone floor").GetFloat("_Clock"),Is.Zero);
+            Assert.That(ZonePart("Hot zone curtain").GetColor("_BaseColor").a,Is.EqualTo(.45f).Within(.001f),"Held mid-flash, not flickering.");
+            Assert.That(root.transform.Find("Hot zone curtain").gameObject.activeSelf,Is.True);
+            effects.Present(match,false,1,true);
+            Assert.That(ZonePart("Hot zone floor").GetFloat("_Pulse"),Is.EqualTo(1));
+        }
+
         // A shielded player wears a shell sized to its capsule that dims as the shield drains; a stunned one a crackling halo.
         [Test] public void ShieldShellAndStunHaloFollowTheirPlayers()
         {
@@ -135,6 +222,8 @@ namespace Wildstone.Tests
                 active++; Assert.That(line.positionCount,Is.InRange(2,24));
                 if(weapon==WeaponKind.LaserSword)
                 {
+                    Assert.That(line.textureMode,Is.EqualTo(LineTextureMode.Stretch));
+                    Assert.That(line.widthMultiplier,Is.InRange(.02f,.6f));
                     Assert.That(line.widthCurve.Evaluate(0)+line.widthCurve.Evaluate(1),Is.LessThan(.01f),"The slash tapers to points.");
                     Assert.That(line.widthCurve.Evaluate(.5f),Is.EqualTo(1).Within(.01f),"Full width mid-swing.");
                 }
@@ -148,6 +237,50 @@ namespace Wildstone.Tests
                 if(line.name.StartsWith("Burst ") && line.enabled && line.sharedMaterial.name=="Weapon beam sheath")
                 { sheaths++; Assert.That(line.sharedMaterial.renderQueue,Is.LessThan(line.sharedMaterial.shader.renderQueue)); }
             Assert.That(sheaths,Is.EqualTo(laser?WeaponCatalog.HitscanPellets(weapon):0));
+        }
+
+        [Test] public void SwordBladeSweepsThenExpiresAndReducedMotionStaysStill()
+        {
+            var assets=Object.Instantiate(catalog);
+            var blade=new Material(catalog.Beam);
+            assets.VfxBlade=blade;
+            Object.DestroyImmediate(root);
+            root=new GameObject("WeaponEffectsTest"); effects=root.AddComponent<ArenaEffects>(); effects.Initialize(assets,match);
+            try
+            {
+                int objects=root.GetComponentsInChildren<Transform>(true).Length;
+                var shot=new CombatEvent(CombatEventKind.Shot,new CombatAction { Participant=1,LifeGeneration=1,Sequence=1 },0,position:Vector3.up*100,vector:Vector3.forward,weapon:WeaponKind.LaserSword);
+                float now=Time.unscaledTime;
+                effects.Play(shot,match,false,Vector3.zero);
+                var fringe=root.transform.Find("Burst 0").GetComponent<LineRenderer>();
+                var core=root.transform.Find("Burst 1").GetComponent<LineRenderer>();
+                Assert.That(fringe.sharedMaterial,Is.SameAs(blade));
+                Assert.That(fringe.textureMode,Is.EqualTo(LineTextureMode.Stretch));
+                Assert.That(fringe.widthMultiplier,Is.EqualTo(.38f).Within(.001f));
+                Assert.That(Vector3.Distance(fringe.GetPosition(0),shot.Position),Is.LessThan(WeaponCatalog.Get(WeaponKind.LaserSword).Range),"The smear sits inside the sword's reach.");
+                int early=fringe.positionCount;
+                effects.AnimateTransient(now+.06f);
+                Assert.That(fringe.positionCount,Is.GreaterThan(early).And.EqualTo(17));
+                Assert.That(core.positionCount,Is.EqualTo(17));
+                Assert.That(fringe.GetPosition(0).x,Is.GreaterThan(fringe.GetPosition(16).x),"The mask's bright head leads the left-to-right swing.");
+                Assert.That(fringe.widthMultiplier,Is.EqualTo(.38f).Within(.001f),"Hold the smear through the sweep.");
+                effects.AnimateTransient(now+.12f);
+                Assert.That(fringe.startColor.a,Is.InRange(.5f,.7f),"The held ribbon fades rather than shrinking to a wire.");
+                effects.AnimateTransient(now+.21f);
+                Assert.That(fringe.enabled || core.enabled,Is.False);
+                effects.Play(shot,match,true,Vector3.zero);
+                var reduced=root.transform.Find("Burst 2").GetComponent<LineRenderer>();
+                var end=reduced.GetPosition(reduced.positionCount-1);
+                effects.AnimateTransient(now+.04f);
+                Assert.That(reduced.GetPosition(reduced.positionCount-1),Is.EqualTo(end));
+                Assert.That(root.transform.Find("Burst 3").GetComponent<LineRenderer>().enabled,Is.False);
+                effects.ResetPresentation();
+                assets.VfxBlade=null;
+                effects.Play(shot,match,false,Vector3.zero);
+                Assert.That(root.transform.Find("Burst 3").GetComponent<LineRenderer>().sharedMaterial,Is.SameAs(catalog.Beam),"Old catalogs retain the beam fallback.");
+                Assert.That(root.GetComponentsInChildren<Transform>(true).Length,Is.EqualTo(objects));
+            }
+            finally { Object.DestroyImmediate(root); Object.DestroyImmediate(assets); Object.DestroyImmediate(blade); }
         }
 
         [Test] public void ShotgunFanMatchesSimulationDirectionsAndEachPelletUsesItsOwnHit()

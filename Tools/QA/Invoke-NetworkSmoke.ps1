@@ -1,14 +1,20 @@
 param(
-    [ValidateSet('basic','reconnect','migration','migration-crash','combat','laser-combat','laser-moving-cover','projectile-combat','grenade-combat','special-projectiles','deflection','gunplay','capacity','late-join','team-switch','rematch')][string]$Scenario = 'basic',
+    [ValidateSet('basic','reconnect','migration','migration-crash','combat','laser-combat','laser-moving-cover','projectile-combat','grenade-combat','special-projectiles','deflection','stun-client','gunplay','capacity','late-join','team-switch','rematch')][string]$Scenario = 'basic',
     [ValidateSet('baseline','regional80','adverse150')][string]$NetworkProfile = 'baseline',
     [string]$Executable,
     [ValidateRange(30,2400)][int]$TimeoutSeconds = 150,
-    [ValidateRange(10,1800)][int]$SoakSeconds = 10
+    [ValidateRange(10,7200)][int]$SoakSeconds = 10,
+    # Capacity only: every peer moves and fires and the host rematches each round; RoundSeconds smoke-finishes rounds early.
+    [switch]$Gameplay,
+    [ValidateRange(0,480)][int]$RoundSeconds = 0
 )
 
 $ErrorActionPreference = 'Stop'
-if($NetworkProfile -ne 'baseline' -and $Scenario -notin @('laser-moving-cover','projectile-combat','grenade-combat','special-projectiles','deflection','gunplay')) {
-    throw 'Injected network profiles are supported only for the moving-laser, projectile combat and gunplay scenarios.'
+# Special pickups carry WeaponCatalog.SpecialMagazines magazines (catalog revision 5, D040); grenades carry one.
+$specialMagazines = 2
+if(($Gameplay -and $Scenario -ne 'capacity') -or ($RoundSeconds -and (-not $Gameplay -or $RoundSeconds -lt 20))){throw '-Gameplay is capacity-only; -RoundSeconds needs -Gameplay and 20-480 s.'}
+if($NetworkProfile -ne 'baseline' -and $Scenario -notin @('laser-moving-cover','projectile-combat','grenade-combat','special-projectiles','deflection','stun-client','gunplay')) {
+    throw 'Injected network profiles are supported only for the moving-laser, projectile combat, stun-client and gunplay scenarios.'
 }
 # Players allow 180 s under injected latency; keep the wrapper's hang guard above that.
 $effectiveTimeoutSeconds = if($Scenario -eq 'capacity'){[Math]::Max($TimeoutSeconds,$SoakSeconds+150)}elseif($NetworkProfile -ne 'baseline'){[Math]::Max($TimeoutSeconds,210)}else{$TimeoutSeconds}
@@ -23,7 +29,7 @@ $allowed = [IO.Path]::GetFullPath((Join-Path $project 'Artifacts/Unity')) + [IO.
 if (-not $Executable.StartsWith($allowed,[StringComparison]::OrdinalIgnoreCase) -or (Split-Path $Executable -Leaf) -ne 'WildstoneArena.exe') {
     throw 'Use a Wildstone test player built under this workspace Artifacts/Unity directory.'
 }
-$run = Join-Path $smokeRoot ((Get-Date -Format 'yyyyMMdd-HHmmss-fff')+'-'+$Scenario+'-'+$NetworkProfile)
+$run = Join-Path $smokeRoot ((Get-Date -Format 'yyyyMMdd-HHmmss-fff')+'-'+$Scenario+$(if($Gameplay){'-gameplay'})+'-'+$NetworkProfile)
 New-Item -ItemType Directory -Path $run -Force | Out-Null
 $hostStatus = Join-Path $run 'host.json'
 $clientStatus = Join-Path $run 'client.json'
@@ -62,6 +68,8 @@ function Start-Peer([string]$Role,[string]$Room) {
         '--wildstone-smoke-network-profile',$NetworkProfile,
         '--wildstone-smoke-output',('"'+$statusPath+'"'),'--wildstone-smoke-peer-output',('"'+$peerPath+'"'))
     if($Scenario -eq 'capacity'){$arguments += @('--wildstone-smoke-soak-seconds',$SoakSeconds.ToString([Globalization.CultureInfo]::InvariantCulture))}
+    if($Gameplay){$arguments += @('--wildstone-smoke-soak-gameplay','1')}
+    if($RoundSeconds){$arguments += @('--wildstone-smoke-soak-round-seconds',$RoundSeconds.ToString([Globalization.CultureInfo]::InvariantCulture))}
     if($Room){$arguments += @('--wildstone-smoke-room',$Room)}
     $peer = Start-Process -FilePath $Executable -ArgumentList $arguments -WorkingDirectory (Split-Path $Executable) -PassThru -WindowStyle Hidden
     $owned.Add($peer)
@@ -120,13 +128,17 @@ try {
                 $state.stage -notin @('leaving','passed','failed') -and -not $owned[$index].HasExited){
                 $sample=Get-CapacityMemorySample $owned[$index] $state.stableSeconds
                 if($null -ne $sample){
+                    $sample | Add-Member -NotePropertyMembers ([ordered]@{managedHeapBytes=$state.managedHeapBytes;gcCollections=$state.gcCollections})
                     $role=$roles[$index]
                     if(-not $capacityMemory.ContainsKey($role)){
-                        $capacityMemory[$role]=[ordered]@{role=$role;source='Windows process';sampleCount=0;start=$sample;end=$null;observedHoldSeconds=0}
+                        $capacityMemory[$role]=[ordered]@{role=$role;source='Windows process';sampleCount=0;start=$sample;end=$null;observedHoldSeconds=0;
+                            series=[Collections.Generic.List[object]]::new()}
                     }
                     $record=$capacityMemory[$role]
                     $record.sampleCount++
                     $record.end=$sample
+                    # One point per minute of hold, so steady growth can be told apart from warm-up.
+                    if($record.series.Count -eq 0 -or $sample.holdSeconds -ge $record.series[$record.series.Count-1].holdSeconds+60){$record.series.Add($sample)}
                     $record.observedHoldSeconds=$sample.holdSeconds-$record.start.holdSeconds
                 }
             }
@@ -257,7 +269,7 @@ try {
                 if(-not $v.verified -or -not $v.observed -or -not $v.despawned -or $v.samples -lt 2 -or
                     $v.lastTick -le $v.firstTick -or $v.lastTravel-$v.firstTravel -le .2 -or
                     $v.shotCount -ne 1 -or $v.explosions -ne 1 -or -not $v.identity -or -not $v.shotId -or -not $v.explosionId -or
-                    $v.ammo -ne (9-$i) -or $v.identity -ne $r.identity -or $v.shotId -ne $r.shotId -or
+                    $v.ammo -ne (10*$specialMagazines-1-$i) -or $v.identity -ne $r.identity -or $v.shotId -ne $r.shotId -or
                     $v.explosionId -ne $r.explosionId -or $v.hitId -ne $r.hitId -or [Math]::Abs($v.damage-$r.damage) -gt .01) {
                     throw 'Projectile smoke requires matching sampled travel, terminal event, despawn and single-spend verdicts.'
                 }
@@ -300,7 +312,7 @@ try {
             for($i=0;$i -lt 2;$i++) {
                 $v=$state.specialProjectiles[$i]; $r=$other.specialProjectiles[$i]
                 $expectedWeapon=if($i -eq 0){'ReboundDisc'}else{'StunGun'}
-                $expectedShots=if($i -eq 0){1}else{3}; $ammo=if($i -eq 0){10}else{8}; $damage=if($i -eq 0){35}else{15}
+                $expectedShots=if($i -eq 0){1}else{3}; $ammo=$specialMagazines*$(if($i -eq 0){10}else{8}); $damage=if($i -eq 0){35}else{15}
                 if($v.weapon -ne $expectedWeapon -or -not $v.picked -or -not $v.equipped -or -not $v.verified -or @($v.shots).Count -ne $expectedShots){throw 'Special projectile pickup/equip/verdict incomplete.'}
                 for($j=0;$j -lt $expectedShots;$j++) {
                     $a=$v.shots[$j]; $b=$r.shots[$j]
@@ -324,6 +336,20 @@ try {
             }
         }
     }
+    if($Scenario -eq 'stun-client') {
+        foreach($state in $requiredStates) {
+            $v=$state.stunClient
+            if($null -eq $v -or -not $v.verified -or -not $v.settled -or -not $v.released -or $v.stunnedSamples -lt 2 -or
+                -not ($v.stunnedTravel -ge 0 -and $v.stunnedTravel -lt .05) -or -not ($v.releasedTravel -gt .3)) {
+                throw "Stun-client $($state.role) lacks settled suppression or release travel within bounds."
+            }
+            if($state.role -eq 'client' -and (-not $v.suppressionObserved -or $v.liftTick -le 0 -or
+                $v.releasedTick-$v.liftTick -ne $v.releaseLagTicks -or $v.lastSuppressedTick -ge $v.liftTick -or $v.releasedTick -lt $v.liftTick -or
+                -not ($v.maxReleaseJump -ge 0 -and $v.maxReleaseJump -lt .5))) {
+                throw 'Stun-client predicted release must happen on the lift tick (last suppressed tick < lift <= released tick) and jump less than 0.5 m per frame.'
+            }
+        }
+    }
     if($Scenario -eq 'deflection') {
         # D037: round 0 the host pushes, round 1 the client; both peers must report the same single reflection.
         $hostState=$requiredStates | Where-Object role -eq 'host'; $clientState=$requiredStates | Where-Object role -eq 'client'
@@ -337,7 +363,7 @@ try {
                     $v.samples -lt 1 -or $v.deflectedSamples -lt 1 -or -not $v.deflectedFlag -or $v.ownerTeam -ne $v.pusherTeam -or $v.ownerTeam -eq $v.shooterTeam -or
                     $v.velocityDot -ge 0 -or $v.deflectedLaunchTick -ne $v.launchTick -or $v.remaining -ne 0 -or
                     $v.fireShots -ne 1 -or $v.pushShots -ne 1 -or $v.deflections -ne 1 -or $v.explosions -ne 1 -or $v.shooterExplosions -ne 0 -or
-                    $v.hits -ne 1 -or $v.pusherHits -ne 0 -or $v.pusherHealth -ne 100 -or $v.shooterAmmo -ne 9 -or $v.pusherAmmo -ne 5 -or
+                    $v.hits -ne 1 -or $v.pusherHits -ne 0 -or $v.pusherHealth -ne 100 -or $v.shooterAmmo -ne (10*$specialMagazines-1) -or $v.pusherAmmo -ne (6*$specialMagazines-1) -or
                     $v.expectedDamage -le 20 -or [Math]::Abs($v.damage-$v.expectedDamage) -gt .01 -or [Math]::Abs($v.eventDamage-$v.expectedDamage) -gt .01 -or
                     -not $v.deflectedId -or -not $v.explosionId -or -not $v.hitId -or $v.deflectedId -ne $r.deflectedId -or $v.explosionId -ne $r.explosionId -or
                     $v.hitId -ne $r.hitId -or $v.fireShotId -ne $r.fireShotId -or $v.pushShotId -ne $r.pushShotId -or [Math]::Abs($v.damage-$r.damage) -gt .01) {
@@ -362,7 +388,13 @@ try {
                 $memory.start.holdSeconds -gt 2 -or $memory.end.holdSeconds -lt $SoakSeconds-2 -or $memory.observedHoldSeconds -le 0){
                 throw 'A capacity peer is missing positive Windows memory samples near the start and end of the hold.'
             }
+            # A round lasts at most 480 s (or RoundSeconds), so a long hold must include rematches.
+            $round=if($RoundSeconds){$RoundSeconds}else{480}
+            if($Gameplay -and (-not $state.soakGameplay -or $state.soakShots -lt 1 -or $state.soakRounds -lt 1+[Math]::Floor($SoakSeconds/($round+120)))){
+                throw 'A gameplay soak peer did not fire through the expected rematched rounds.'
+            }
         }
+        if($Gameplay -and ($requiredStates | Measure-Object soakDeaths -Sum).Sum -lt 1){throw 'No gameplay soak shot killed a player.'}
     }
     $result.passed = @($requiredStates | Where-Object success).Count -eq $requiredCount
 }
@@ -403,6 +435,9 @@ finally {
             $memory.privateGrowthBytes=$memory.end.privateBytes-$memory.start.privateBytes
             [pscustomobject]$memory}})
         foreach($slot in 2..7){$result['client'+$slot]=Read-Status (Join-Path $run ('client'+$slot+'.json'))}
+        $result.capacityGameplay=$Gameplay.IsPresent
+        if($Gameplay){$result.soak=@($roles | ForEach-Object {$state=$result[$_]; if($state){[pscustomobject]@{role=$_;rounds=$state.soakRounds;shots=$state.soakShots
+            reloads=$state.soakReloads;deaths=$state.soakDeaths;runningSeconds=$state.capacityRunningSeconds;betweenSeconds=$state.soakBetweenSeconds}}})}
         $result.capacityTraffic=@($roles | ForEach-Object {$state=$result[$_]; if($state){[pscustomobject]@{role=$_;statsAvailable=$state.capacityStatsAvailable
             statsForwardTicks=$state.capacityStatsForwardTicks;sdkTicks=$state.capacityRunningSdkTicks+$state.capacityFinishedSdkTicks
             runningSeconds=$state.capacityRunningSeconds;runningInBytesPerSecond=$state.capacityRunningInBytesPerSecond;runningOutBytesPerSecond=$state.capacityRunningOutBytesPerSecond

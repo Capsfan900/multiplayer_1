@@ -104,7 +104,7 @@ namespace Wildstone.UI
             if(description!=null) { var copy=new Label(description); copy.AddToClassList("description"); card.Add(copy); }
         }
         static readonly char[] TeamSymbols={'▲','■','◆','●'};
-        // User-chosen game name (D038); two lines so the 80 px display face fits the 520 px column.
+        // User-chosen game name (D038); two 64 px lines fit the 520 px column and keep the title menu unscrolled at 720p.
         public const string GameTitle="BETTER BEAN\nBATTLES";
         // vibegame1 title language: left-hung display title over an offset accent copy, a slab rule with a fading tail.
         void Hero()
@@ -206,7 +206,7 @@ namespace Wildstone.UI
                     Note(online?.Available==true?"Private matches · Offline Practice ready":"Offline Practice ready"); break;
                 case MenuScreen.Online: Online(); break;
                 case MenuScreen.Practice:
-                    Heading("OFFLINE PRACTICE","Choose your arena","Explore movement, collect weapons and hold the zone. One strafing target fixture; no online players.");
+                    Heading("OFFLINE PRACTICE","Choose your arena","Explore movement, collect weapons and hold the zone. Blink pickups teleport you 6 m along your aim onto open floor. One strafing target fixture; no online players.");
                     if(session.Catalog!=null) foreach(var map in session.Catalog.Maps)
                     { string id=map.Id; Button(map.DisplayName,()=>Dive(()=>{selectedMap=id;session.Load(id);}),true); }
                     else Note("Arena content is unavailable. Return and retry loading.");

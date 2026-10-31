@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -30,6 +31,7 @@ namespace Wildstone.Networking
             public GrenadeMetrics grenade;
             public SpecialProjectileMetrics[] specialProjectiles;
             public DeflectionRound[] deflection;
+            public StunClientMetrics stunClient;
             public RematchMetrics rematch;
             public string role,scenario,stage="boot",room="",error="",phase="Closed",screen="Title";
             // "stage@elapsed;" per stage change (whole seconds; the latest ~3000 chars), so a deadline failure shows which step took the time.
@@ -68,6 +70,15 @@ namespace Wildstone.Networking
             public int capacityStatsForwardTicks;
             public double capacityRunningInBytes,capacityRunningOutBytes,capacityFinishedInBytes,capacityFinishedOutBytes;
             public float capacityRunningInBytesPerSecond,capacityRunningOutBytesPerSecond,capacityFinishedInBytesPerSecond,capacityFinishedOutBytesPerSecond;
+            // Gameplay soak (capacity plus --wildstone-smoke-soak-gameplay 1): every peer moves and fires; the host rematches.
+            public bool soakGameplay;
+            public int soakRoundSeconds,soakRounds,soakShots,soakReloads,soakDeaths;
+            public float soakBetweenSeconds;
+            // Managed heap in use and Gen0 collections so far; the runner copies them into each per-minute memory point.
+            public long managedHeapBytes;
+            // Largest frame gap seen by this process: a machine-wide stall drops peers and is not a game desync.
+            public float maxFrameGapSeconds;
+            public int gcCollections;
         }
         Status status;
         string output,peerOutput,joinRoom;
@@ -120,15 +131,19 @@ namespace Wildstone.Networking
             began=Time.realtimeSinceStartupAsDouble;
             bool capacity=status.scenario=="capacity";
             if(capacity?CapacityRoleIndex(status.role)<0:status.role!="host" && status.role!="client" && status.role!="client2") throw new ArgumentException();
-            if(status.scenario!="basic" && status.scenario!="reconnect" && !IsMigrationScenario && status.scenario!="combat" && status.scenario!="projectile-combat" && status.scenario!="grenade-combat" && status.scenario!="special-projectiles" && status.scenario!="deflection" && status.scenario!="laser-combat" && status.scenario!="laser-moving-cover" && status.scenario!="gunplay" && status.scenario!="late-join" && status.scenario!="team-switch" && status.scenario!="rematch" && !capacity) throw new NotSupportedException("This smoke scenario is not implemented.");
+            if(status.scenario!="basic" && status.scenario!="reconnect" && !IsMigrationScenario && status.scenario!="combat" && status.scenario!="projectile-combat" && status.scenario!="grenade-combat" && status.scenario!="special-projectiles" && status.scenario!="deflection" && status.scenario!="stun-client" && status.scenario!="laser-combat" && status.scenario!="laser-moving-cover" && status.scenario!="gunplay" && status.scenario!="late-join" && status.scenario!="team-switch" && status.scenario!="rematch" && !capacity) throw new NotSupportedException("This smoke scenario is not implemented.");
             if(status.role=="client2" && !IsMigrationScenario && status.scenario!="late-join" && !capacity) throw new ArgumentException();
             if((IsMigrationScenario || capacity || status.scenario=="late-join") && Path.GetFileName(output)!=status.role+".json") throw new ArgumentException("This scenario requires fixed sibling status filenames.");
             if(capacity)
             {
                 status.roleIndex=CapacityRoleIndex(status.role);
                 status.capacitySoakSeconds=ParseCapacitySoakSeconds(args.TryGetValue("--wildstone-smoke-soak-seconds",out var soak)?soak:null);
+                status.soakGameplay=args.TryGetValue("--wildstone-smoke-soak-gameplay",out var gameplay) && gameplay=="1";
+                if(args.TryGetValue("--wildstone-smoke-soak-round-seconds",out var round) &&
+                    (!status.soakGameplay || !int.TryParse(round,NumberStyles.None,CultureInfo.InvariantCulture,out status.soakRoundSeconds) || status.soakRoundSeconds<20 || status.soakRoundSeconds>480))
+                    throw new ArgumentException("Gameplay soak rounds must be 20 to 480 seconds.");
             }
-            if((status.scenario=="reconnect" || status.scenario=="combat" || status.scenario=="projectile-combat" || status.scenario=="grenade-combat" || status.scenario=="special-projectiles" || status.scenario=="deflection" || status.scenario=="laser-combat" || status.scenario=="laser-moving-cover" || status.scenario=="gunplay" || status.scenario=="team-switch" || status.scenario=="rematch") && peerOutput==null) throw new ArgumentException("This scenario requires the peer status file.");
+            if((status.scenario=="reconnect" || status.scenario=="combat" || status.scenario=="projectile-combat" || status.scenario=="grenade-combat" || status.scenario=="special-projectiles" || status.scenario=="deflection" || status.scenario=="stun-client" || status.scenario=="laser-combat" || status.scenario=="laser-moving-cover" || status.scenario=="gunplay" || status.scenario=="team-switch" || status.scenario=="rematch") && peerOutput==null) throw new ArgumentException("This scenario requires the peer status file.");
             if(status.role!="host")
             {
                 joinRoom=args["--wildstone-smoke-room"].Trim().ToUpperInvariant();
@@ -229,9 +244,13 @@ namespace Wildstone.Networking
                 status.externalSimulation=presentation.ExternalSimulation;
                 var model=presentation.Match; status.playerCount=model?.Players.Count??0;
                 status.avatarCount=0;
-                if(runner!=null)
-                    foreach(var avatar in FindObjectsByType<FusionPlayer>())
-                        if(avatar.Runner==runner && avatar.Initialized && avatar.Object!=null && avatar.Object.IsValid) status.avatarCount++;
+                if(runner!=null && runner.IsRunning)
+                {
+                    // Reused list: a per-frame scene search would put the harness's own garbage into soak GC figures.
+                    smokeAvatars.Clear(); runner.GetAllBehaviours(smokeAvatars);
+                    foreach(var avatar in smokeAvatars)
+                        if(avatar.Initialized && avatar.Object!=null && avatar.Object.IsValid) status.avatarCount++;
+                }
                 if(presentation.ExternalSimulation && presentation.Flow.Screen==MenuScreen.Pause) presentation.Show(MenuScreen.Playing);
                 bool playing=presentation.ExternalSimulation && model!=null && model.Phase==ArenaMatchPhase.Running &&
                     session.Phase==SessionPhase.Running && status.playerCount>=2 && status.avatarCount>=2 && presentation.LocalPlayer!=null;
@@ -324,6 +343,7 @@ namespace Wildstone.Networking
                 bool combatReady=status.scenario=="grenade-combat" ? playing && DriveGrenadeCombat(model,runner,peerStatus,now) :
                     status.scenario=="special-projectiles" ? playing && DriveSpecialProjectiles(model,runner,peerStatus,now) :
                     status.scenario=="projectile-combat" ? playing && DriveProjectileCombat(model,runner,peerStatus,now) :
+                    status.scenario=="stun-client" ? playing && DriveStunClient(model,runner,peerStatus,now) :
                     status.scenario=="deflection" ? playing && DriveDeflection(model,runner,peerStatus,now) :
                     (status.scenario=="laser-combat" || status.scenario=="laser-moving-cover") ? playing && DriveLaserCombat(model,runner,peerStatus,now) :
                     status.scenario=="gunplay" ? playing && DriveGunplay(model,runner,peerStatus,now) :
@@ -553,7 +573,8 @@ namespace Wildstone.Networking
             using(var file=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
             using(var reader=new StreamReader(file)) return JsonUtility.FromJson<Status>(reader.ReadToEnd());
         }
-        void PublishDue(double now) { if(now>=nextWrite) { nextWrite=now+.25; WriteOutput(); } }
+        readonly List<FusionPlayer> smokeAvatars=new List<FusionPlayer>();
+        void PublishDue(double now) { if(now>=nextWrite) { nextWrite=now+(status.scenario=="capacity"?1:.25); WriteOutput(); } }
         void WriteOutput()
         {
             Directory.CreateDirectory(Path.GetDirectoryName(output)); string temporary=output+".tmp";

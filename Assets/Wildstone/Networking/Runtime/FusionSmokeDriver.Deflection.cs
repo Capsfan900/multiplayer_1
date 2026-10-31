@@ -72,8 +72,8 @@ namespace Wildstone.Networking
                 d.pickupSequence=local.LastActionSequence+1; d.pickupSent=true;
                 SendLaserAction(model,local,d.pickupSequence,CombatActionKind.Pickup,Vector3.forward,own.Id,own.Generation);
             }
-            d.picked|=r.pickupSent && shooter.SpecialWeapon==WeaponKind.PulseLobber && shooter.SpecialAmmo==lobber.Ammo && shooter.SelectedSpecial &&
-                pusher.SpecialWeapon==WeaponKind.PushLens && pusher.SpecialAmmo==lens.Ammo && pusher.SelectedSpecial;
+            d.picked|=r.pickupSent && shooter.SpecialWeapon==WeaponKind.PulseLobber && shooter.SpecialAmmo==WeaponCatalog.PickupAmmo(WeaponKind.PulseLobber) && shooter.SelectedSpecial &&
+                pusher.SpecialWeapon==WeaponKind.PushLens && pusher.SpecialAmmo==WeaponCatalog.PickupAmmo(WeaponKind.PushLens) && pusher.SelectedSpecial;
             if(!d.picked || !r.picked) return false;
             var shooterPoint=new Vector3(-30,.02f,-3); var pusherPoint=new Vector3(-30,.02f,-15);
             status.stage="deflection_fixture_"+deflectionIndex;
@@ -174,13 +174,13 @@ namespace Wildstone.Networking
             { d.blastDistance=(d.shooterEye-d.explosion).magnitude; d.expectedDamage=lobber.Damage+(lobber.EdgeDamage-lobber.Damage)*(d.blastDistance/lobber.Radius); }
             if(d.samples>0 && d.deflectedSamples>0) d.velocityDot=Vector3.Dot(d.originalVelocity.normalized,d.deflectedVelocity.normalized);
             if(d.fireShots>1 || d.pushShots>1 || d.deflections>1 || d.explosions>1 || d.hits>1 || d.shooterExplosions>0 || d.pusherHits>0 ||
-                d.pusherHealth!=WeaponCatalog.Health || d.shooterAmmo<lobber.Ammo-1 || d.pusherAmmo<lens.Ammo-1 ||
+                d.pusherHealth!=WeaponCatalog.Health || d.shooterAmmo<WeaponCatalog.PickupAmmo(WeaponKind.PulseLobber)-1 || d.pusherAmmo<WeaponCatalog.PickupAmmo(WeaponKind.PushLens)-1 ||
                 shooter.StarterAmmo!=WeaponCatalog.StarterAmmo || pusher.StarterAmmo!=WeaponCatalog.StarterAmmo)
                 throw new InvalidOperationException("Deflection duplicated events/spending, credited the shooter or damaged the pusher.");
             d.observed=d.samples>0 && d.deflectedSamples>0 && d.velocityDot<0 && d.deflectedFlag && d.ownerTeam==d.pusherTeam && d.deflectedLaunchTick==d.launchTick &&
                 d.fireShots==1 && d.pushShots==1 && d.deflections==1 && d.explosions==1 && d.hits==1 && d.remaining==0 &&
                 d.expectedDamage>lobber.EdgeDamage && Mathf.Abs(d.damage-d.expectedDamage)<.01f && Mathf.Abs(d.eventDamage-d.expectedDamage)<.01f &&
-                d.shooterAmmo==lobber.Ammo-1 && d.pusherAmmo==lens.Ammo-1 && shooter.LastActionSequence==d.fireSequence && pusher.LastActionSequence==d.pushSequence;
+                d.shooterAmmo==WeaponCatalog.PickupAmmo(WeaponKind.PulseLobber)-1 && d.pusherAmmo==WeaponCatalog.PickupAmmo(WeaponKind.PushLens)-1 && shooter.LastActionSequence==d.fireSequence && pusher.LastActionSequence==d.pushSequence;
             status.stage="deflection_verdict_"+deflectionIndex;
             if(!d.observed || !r.observed) return false;
             if(d.fireShotId!=r.fireShotId || d.pushShotId!=r.pushShotId || d.deflectedId!=r.deflectedId || d.explosionId!=r.explosionId || d.hitId!=r.hitId ||

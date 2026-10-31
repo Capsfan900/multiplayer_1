@@ -63,9 +63,11 @@ namespace Wildstone.Presentation
         Vector3 hipPosition, adsPosition;
         Quaternion adsRotation=Quaternion.identity;
         float ads, equip, eyeRelief;
-        Vector2 sway, swayVelocity;
-        Quaternion previousLook;
+        Vector2 sway, swayVelocity, previousLook;
+        FirstPersonView aim;
         bool hasLook, scoped;
+        // Sway spring: damping 2*sqrt(stiffness) is critical, so the weapon settles without swinging back past the aim.
+        const float SwayStiffness=90, SwayDamping=19;
         // Renderer 1 of each Wildstone pipeline omits SSAO (Editor RenderingSetup.OverlayRendererIndex).
         const int OverlayRenderer=1;
         // Dash speed streaks (vibegame1 DashFx pattern): lens-space lines that stream away from the dash direction for
@@ -155,6 +157,7 @@ namespace Wildstone.Presentation
         }
         public void SyncProjection(Camera world,FirstPersonView firstPerson=null)
         {
+            aim=firstPerson; // sway reads this aim, never the punched camera transform
             if(world==null || overlay==null) return;
             float change=firstPerson!=null && firstPerson.BaseFieldOfView>0?world.fieldOfView-firstPerson.BaseFieldOfView:0;
             overlay.fieldOfView=Mathf.Clamp(ViewmodelFieldOfView+change*KickFollow,20,100);
@@ -487,19 +490,15 @@ namespace Wildstone.Presentation
                 renderer.GetPropertyBlock(glowBlock,index); glowBlock.SetColor(EmissionColor,emission*scale); renderer.SetPropertyBlock(glowBlock,index);
             }
         }
-        // Mouse-look inertia (vibegame1 ViewmodelMotion): the weapon lags the turn on a damped spring.
+        // Mouse-look inertia (vibegame1 ViewmodelMotion): the weapon lags the turn on a critically damped spring. It follows
+        // the aim (FirstPersonView.Yaw/Pitch), not the camera, so shot punch, shake, landing nod and roll never feed it.
         void UpdateSway(float dt,bool reducedMotion)
         {
-            var look=overlay.transform.parent!=null?overlay.transform.parent.rotation:overlay.transform.rotation;
-            Vector2 turn=Vector2.zero;
-            if(hasLook && dt>0)
-            {
-                var delta=(Quaternion.Inverse(previousLook)*look).eulerAngles;
-                turn=new Vector2(Mathf.DeltaAngle(0,delta.y),Mathf.DeltaAngle(0,delta.x))/dt;
-            }
-            previousLook=look; hasLook=true;
+            Vector2 turn=Vector2.zero, look=aim!=null?new Vector2(aim.Yaw,aim.Pitch):Vector2.zero;
+            if(aim!=null && hasLook && dt>0) turn=new Vector2(Mathf.DeltaAngle(previousLook.x,look.x),look.y-previousLook.y)/dt;
+            previousLook=look; hasLook=aim!=null;
             Vector2 target=reducedMotion?Vector2.zero:Vector2.ClampMagnitude(-turn*.004f,1);
-            swayVelocity+=((target-sway)*90-swayVelocity*14)*dt;
+            swayVelocity+=((target-sway)*SwayStiffness-swayVelocity*SwayDamping)*dt;
             sway+=swayVelocity*dt;
             sway=Vector2.ClampMagnitude(sway,1.2f);
         }

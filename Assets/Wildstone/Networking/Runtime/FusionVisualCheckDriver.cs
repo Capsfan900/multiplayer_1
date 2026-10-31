@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UIElements;
@@ -196,7 +197,7 @@ namespace Wildstone.Networking
                 },()=>
                 {
                     if(!Playing("atrium",1280,720)) return false;
-                    if(fixtureView==null) { CreateFixture(); Pose(35,0,0,false,true,90); }
+                    if(fixtureView==null) { CreateFixture(); Pose(35,0,0,false,true,FixtureFov); }
                     return true;
                 });
                 var step=steps[steps.Count-1]; step.SettleSeconds=0;
@@ -247,37 +248,37 @@ namespace Wildstone.Networking
             Add("fixture-standing-forward",()=>{ApplySize(1280,720,1);session.Load("atrium");},()=>
             {
                 if(!Playing("atrium",1280,720)) return false;
-                if(fixtureView==null) { CreateFixture(); Pose(0,0,0,false,true,90); }
+                if(fixtureView==null) { CreateFixture(); Pose(0,0,0,false,true,FixtureFov); }
                 return true;
             });
-            AddPose("fixture-standing-down",()=>Pose(65,0,0,false,true,90));
-            AddPose("fixture-walk-phase-a",()=>Pose(55,8,.08f,false,true,90));
-            AddPose("fixture-walk-phase-b",()=>Pose(55,8,.23f,false,true,90));
-            AddPose("fixture-air-down",()=>Pose(55,6,.15f,false,false,90));
-            AddPose("fixture-slide-entry",()=>Pose(0,16,.05f,true,true,90));
-            AddPose("fixture-slide-sustain",()=>Pose(0,16,.3f,true,true,90));
-            AddPose("fixture-slide-down",()=>Pose(55,16,.3f,true,true,90));
+            AddPose("fixture-standing-down",()=>Pose(65,0,0,false,true,FixtureFov));
+            AddPose("fixture-walk-phase-a",()=>Pose(55,8,.08f,false,true,FixtureFov));
+            AddPose("fixture-walk-phase-b",()=>Pose(55,8,.23f,false,true,FixtureFov));
+            AddPose("fixture-air-down",()=>Pose(55,6,.15f,false,false,FixtureFov));
+            AddPose("fixture-slide-entry",()=>Pose(0,16,.05f,true,true,FixtureFov));
+            AddPose("fixture-slide-sustain",()=>Pose(0,16,.3f,true,true,FixtureFov));
+            AddPose("fixture-slide-down",()=>Pose(55,16,.3f,true,true,FixtureFov));
             AddPose("fixture-slide-fov60",()=>Pose(0,16,.3f,true,true,60));
             AddPose("fixture-slide-exit",()=>
             {
-                Pose(45,16,.3f,true,true,90);
+                Pose(45,16,.3f,true,true,FixtureFov);
                 fixtureState.Sliding=false; fixtureState.CapsuleHeight=1.8f; AdvanceFixture(.1f);
             });
             AddPose("fixture-fire",()=>
             {
-                Pose(0,0,0,false,true,90);
+                Pose(0,0,0,false,true,FixtureFov);
                 fixtureWeapon.Play(new CombatEvent(CombatEventKind.Shot,new CombatAction {Participant=fixturePlayer.Participant},100),fixturePlayer.Participant);
                 AdvanceFixture(.025f);
             });
             AddPose("fixture-reload",()=>
             {
-                Pose(0,0,0,false,true,90);
+                Pose(0,0,0,false,true,FixtureFov);
                 fixturePlayer.ReloadUntil=100+Mathf.RoundToInt(WeaponCatalog.ReloadSeconds*WeaponCatalog.DefaultTickRate*.5f);
                 AdvanceFixture(.05f);
             });
             AddPose("fixture-special-sword",()=>
             {
-                Pose(0,0,0,false,true,90);
+                Pose(0,0,0,false,true,FixtureFov);
                 fixturePlayer.SelectedSpecial=true; fixturePlayer.SpecialWeapon=WeaponKind.LaserSword;
                 fixturePlayer.Pending=new PendingAttack {Weapon=WeaponKind.LaserSword,Action=new CombatAction {Tick=90},EndTick=110};
                 AdvanceFixture(.05f);
@@ -384,7 +385,7 @@ namespace Wildstone.Networking
                 for(int i=0;i<12;i++) { runner.Present(state,in motor,fixtureCatalog); runner.PresentHandling(state,100,.05f,false); }
             }
         }
-        // Five pickup pads on the court ahead; the shotgun was taken 6 s ago, so its pad shows the refill arc.
+        // Six pickup pads on the court ahead; the shotgun was taken 6 s ago, so its pad shows the refill arc.
         void PickupFixture()
         {
             // Accepted plays no shot; clear the charge it would otherwise leave pending on the Line Driver.
@@ -394,7 +395,7 @@ namespace Wildstone.Networking
             DestroyImmediate(fixtureEffects.gameObject);
             ArenaPickup Pad(string item,float x,float z) => new ArenaPickup {Item=item,Position=new Vector3(x,.45f,z)};
             var definition=new ArenaDefinition { Id="atrium",Spawns=Array.Empty<ArenaSpawn>(),
-                Pickups=new[]{Pad("laser-pistol",-3.5f,-6),Pad("laser-shotgun",0,-4),Pad("laser-sniper",3.5f,-6),Pad("shield",-1.6f,-8.5f),Pad("pulse-lobber",1.8f,-8.5f)},
+                Pickups=new[]{Pad("laser-pistol",-3.5f,-6),Pad("laser-shotgun",0,-4),Pad("laser-sniper",3.5f,-6),Pad("shield",-1.6f,-8.5f),Pad("pulse-lobber",1.8f,-8.5f),Pad("health",-2.5f,-2)},
                 ZoneRoute=new[]{Vector3.zero,Vector3.forward*8,Vector3.right*8} };
             fixtureEffectMatch=new ArenaMatch(definition,practice:true);
             fixtureEffectMatch.AddPlayer(1,0,1,1,fixtureState.Position); fixtureEffectMatch.Begin();
@@ -438,7 +439,7 @@ namespace Wildstone.Networking
             if(fixtureWallRun!=null) DestroyImmediate(fixtureWallRun);
             fixtureState.Position=new Vector3(0,.02f,-12);
             fixtureState.Yaw=facing==0?0:180;
-            Pose(0,0,0,false,true,90);
+            Pose(0,0,0,false,true,FixtureFov);
             fixturePlayer.SelectedSpecial=kind!=WeaponKind.LineDriver && kind!=WeaponKind.Grenade;
             fixturePlayer.SpecialWeapon=fixturePlayer.SelectedSpecial?kind:WeaponKind.None;
             session.LocalPlayer.SelectedSpecial=fixturePlayer.SelectedSpecial;
@@ -524,6 +525,8 @@ namespace Wildstone.Networking
         {
             foreach(var skin in root.GetComponentsInChildren<SkinnedMeshRenderer>(true)) skin.forceMatrixRecalculationPerRender=true;
         }
+        // Fixtures frame the world at the game's default view (100 degrees horizontal at 16:9), not the retired 90 degree vertical.
+        static readonly float FixtureFov=LocalSettings.VerticalFov(LocalSettings.DefaultFov,16f/9);
         void Pose(float pitch,float speed,float elapsed,bool sliding,bool grounded,float fov)
         {
             fixtureState.Generation++;
@@ -579,12 +582,15 @@ namespace Wildstone.Networking
         // side: a remote sniper rail from the right flank that passes just beside the lens. Then a grenade and a plasma orb
         // detonate on the court 8 m ahead beside the soldier, sampled for most of a second. The fixture world has no floor,
         // so their flight is skipped and each blast is placed where the host would report it.
-        static readonly WeaponKind[] FirefightWeapons={WeaponKind.LineDriver,WeaponKind.LaserSMG,WeaponKind.LaserShotgun,WeaponKind.LaserSniper};
+        static readonly WeaponKind[] FirefightWeapons={WeaponKind.LineDriver,WeaponKind.LaserSMG,WeaponKind.LaserShotgun,WeaponKind.LaserSniper,WeaponKind.LaserSword};
         static readonly WeaponKind[] BlastWeapons={WeaponKind.Grenade,WeaponKind.PulseLobber};
         static readonly int[] FirefightSamples={0,1,2,4,6,9,14,20},BlastSamples={0,2,4,8,14,22,34,50};
-        int[] Samples => firefightWeapon>FirefightWeapons.Length?BlastSamples:FirefightSamples;
+        static readonly int[] RangeDistances={15,30,45},RangeSamples={0};
+        bool FirefightRange => firefightWeapon>FirefightWeapons.Length+BlastWeapons.Length;
+        int[] Samples => FirefightRange?RangeSamples:firefightWeapon>FirefightWeapons.Length?BlastSamples:FirefightSamples;
         readonly List<(RenderTexture texture,int frame,float age,float delta)> firefightCopies=new List<(RenderTexture,int,float,float)>();
         int firefightWeapon=-1,firefightFrame=-1;
+        bool firefightWarmed;
         float firefightShot;
         double firefightReadyAt=-1;
         Vector3 firefightTargetFeet;
@@ -596,6 +602,8 @@ namespace Wildstone.Networking
                 if(!Playing("atrium",1280,720)) return;
                 if(fixtureView==null) CreateFixture();
                 if(firefightReadyAt<0) { firefightReadyAt=now; Time.captureDeltaTime=1f/60; } // on before the first shot: it takes effect a frame late
+                // One unrecorded shot first: the first use of the effect materials can stall the frame after a shot.
+                if(now-firefightReadyAt>=.5 && !firefightWarmed) { firefightWarmed=true; WeaponFixture(WeaponKind.LineDriver,0,CombatEventKind.Shot,new Vector3(0,1.67f,-.3f)); }
                 if(now-firefightReadyAt<1.5) return; // let streaming and probes settle, as the weapon steps do
                 firefightWeapon=0;
             }
@@ -606,7 +614,7 @@ namespace Wildstone.Networking
             {
                 SaveFirefight();
                 firefightFrame=-1;
-                if(++firefightWeapon>FirefightWeapons.Length+BlastWeapons.Length) Finish(true,"");
+                if(++firefightWeapon>FirefightWeapons.Length+BlastWeapons.Length+RangeDistances.Length) Finish(true,"");
                 return;
             }
             AdvanceFixture(1f/60);
@@ -621,11 +629,24 @@ namespace Wildstone.Networking
                 fixtureTarget=new GameObject("Diagnostic firefight target",typeof(PlayerVisual)).GetComponent<PlayerVisual>();
                 fixtureTarget.transform.SetParent(transform,false); fixtureTarget.Initialize(fixtureCatalog,1); FreshSkinning(fixtureTarget);
             }
+            if(FirefightRange)
+            {
+                int distance=RangeDistances[firefightWeapon-FirefightWeapons.Length-BlastWeapons.Length-1];
+                WeaponFixture(WeaponKind.LineDriver,0,CombatEventKind.Accepted);
+                fixturePlayer.Pending=null;
+                fixtureState.Position=new Vector3(0,.02f,-distance*.5f);
+                AdvanceFixture(.2f);
+                firefightTargetFeet=new Vector3(0,.02f,distance*.5f);
+                PresentFirefightTarget(.2f);
+                firefightShot=Time.unscaledTime; firefightFrame=0; return;
+            }
             if(firefightWeapon>FirefightWeapons.Length) { FireBlast(BlastWeapons[firefightWeapon-FirefightWeapons.Length-1]); firefightShot=Time.unscaledTime; firefightFrame=0; return; }
             var kind=FirefightWeapons[firefightWeapon];
             firefightTargetFeet=new Vector3(0,.02f,0);
+            if(kind==WeaponKind.LaserSword)
+                firefightTargetFeet.z=-12+WeaponCatalog.Get(kind).Range*.6f;
             PresentFirefightTarget(0);
-            var hit=new Vector3(0,1.67f,-.3f); // eye height on the aim line, at the target's face
+            var hit=firefightTargetFeet+new Vector3(0,1.65f,-.3f); // eye height on the aim line, at the target's face
             WeaponFixture(kind,0,CombatEventKind.Shot,hit);
             fixtureTarget.Vfx=fixtureEffects.Vfx;
             fixtureTarget.React(new CombatEvent(CombatEventKind.Hit,new CombatAction {Participant=1,LifeGeneration=1,Sequence=1},1,2,1,position:hit,amount:10,weapon:kind,headshot:true));
@@ -662,7 +683,7 @@ namespace Wildstone.Networking
         }
         void SaveFirefight()
         {
-            string weapon=firefightWeapon<FirefightWeapons.Length?FirefightWeapons[firefightWeapon].ToString().ToLowerInvariant():
+            string weapon=FirefightRange?"range-"+RangeDistances[firefightWeapon-FirefightWeapons.Length-BlastWeapons.Length-1]+"m":firefightWeapon<FirefightWeapons.Length?FirefightWeapons[firefightWeapon].ToString().ToLowerInvariant():
                 firefightWeapon==FirefightWeapons.Length?"incoming-sniper":BlastWeapons[firefightWeapon-FirefightWeapons.Length-1].ToString().ToLowerInvariant()+"-blast";
             var previous=RenderTexture.active; var pixels=new Texture2D(target.width,target.height,TextureFormat.RGB24,false);
             try
@@ -670,7 +691,7 @@ namespace Wildstone.Networking
                 foreach(var sample in firefightCopies)
                 {
                     RenderTexture.active=sample.texture; pixels.ReadPixels(new Rect(0,0,target.width,target.height),0,0); pixels.Apply();
-                    string file=Path.Combine(directory,"firefight-"+weapon+"-"+sample.frame.ToString("D2")+".png");
+                    string file=Path.Combine(directory,"firefight-"+weapon+(FirefightRange?"":"-"+sample.frame.ToString("D2"))+".png");
                     File.WriteAllBytes(file,pixels.EncodeToPNG());
                     result.captures.Add(new Capture {file=file,screen=session.Flow.Screen.ToString(),map=session.MapId,mode=result.mode,
                         width=target.width,height=target.height,screenWidth=Screen.width,screenHeight=Screen.height,cameraAspect=session.Camera.aspect,
@@ -795,14 +816,17 @@ namespace Wildstone.Networking
         // a smaller desktop cannot shrink it; Atrium, the local fixture plus seven animated soldiers, continuous beams and
         // a blast every 1.2 s. High (level 5) then Low (level 1), 3 s warm-up and 8 s measured each, one PNG per tier.
         // Same-PC evidence only, not a performance acceptance.
-        [Serializable] sealed class PerfTier { public string quality; public int level,frames; public float meanMs,p50Ms,p95Ms,p99Ms,maxMs; }
+        // GC figures come from the development player's "GC Allocated In Frame" counter over the measured frames.
+        [Serializable] sealed class PerfTier { public string quality; public int level,frames,gen0Collections; public float meanMs,p50Ms,p95Ms,p99Ms,maxMs; public long gcAllocMeanBytes,gcAllocMaxBytes; }
         [Serializable] sealed class PerfResult { public string mode="frame-time-sample-not-acceptance",graphicsDevice="",gpu="",resolution=""; public List<PerfTier> tiers=new List<PerfTier>(); }
         static readonly int[] PerfLevels={5,1};
         readonly List<float> perfFrames=new List<float>();
         readonly List<PlayerVisual> perfSoldiers=new List<PlayerVisual>();
         readonly List<CombatState> perfStates=new List<CombatState>();
         PerfResult perf;
-        int perfTier, perfSequence;
+        int perfTier, perfSequence, perfCollections=-1;
+        ProfilerRecorder perfGc;
+        long perfGcSum, perfGcMax;
         double perfPhase;
         float perfBeam, perfBlast, perfClock;
         void RunPerf(double now)
@@ -824,15 +848,22 @@ namespace Wildstone.Networking
             float dt=Time.unscaledDeltaTime;
             AdvancePerf(dt);
             double elapsed=now-perfPhase;
-            if(elapsed>3) perfFrames.Add(dt*1000);
+            if(elapsed>3)
+            {
+                if(perfCollections<0) perfCollections=GC.CollectionCount(0);
+                perfFrames.Add(dt*1000);
+                long allocated=perfGc.Valid?perfGc.LastValue:0; perfGcSum+=allocated; perfGcMax=Math.Max(perfGcMax,allocated);
+            }
             if(elapsed<11) return;
             perfFrames.Sort();
             float Percentile(float p) => perfFrames[Mathf.Clamp(Mathf.CeilToInt(p*perfFrames.Count)-1,0,perfFrames.Count-1)];
             float sum=0; foreach(var frame in perfFrames) sum+=frame;
             SavePerfFrame("perf-"+PerfLevels[perfTier]+".png");
             perf.tiers.Add(new PerfTier {quality=QualitySettings.names[PerfLevels[perfTier]],level=PerfLevels[perfTier],frames=perfFrames.Count,
-                meanMs=sum/Mathf.Max(1,perfFrames.Count),p50Ms=Percentile(.5f),p95Ms=Percentile(.95f),p99Ms=Percentile(.99f),maxMs=perfFrames[perfFrames.Count-1]});
+                meanMs=sum/Mathf.Max(1,perfFrames.Count),p50Ms=Percentile(.5f),p95Ms=Percentile(.95f),p99Ms=Percentile(.99f),maxMs=perfFrames[perfFrames.Count-1],
+                gcAllocMeanBytes=perfGcSum/Math.Max(1,perfFrames.Count),gcAllocMaxBytes=perfGcMax,gen0Collections=GC.CollectionCount(0)-perfCollections});
             if(++perfTier<PerfLevels.Length) { StartPerfTier(now); return; }
+            perfGc.Dispose();
             perf.resolution=target.width+"x"+target.height;
             File.WriteAllText(Path.Combine(directory,"perf.json"),JsonUtility.ToJson(perf,true));
             Finish(true,"");
@@ -849,11 +880,13 @@ namespace Wildstone.Networking
             // Quality levels carry vSyncCount 1; the sample is uncapped.
             QualitySettings.vSyncCount=0; Application.targetFrameRate=-1;
             perfFrames.Clear(); perfPhase=now;
+            if(!perfGc.Valid) perfGc=ProfilerRecorder.StartNew(ProfilerCategory.Memory,"GC Allocated In Frame");
+            perfGcSum=perfGcMax=0; perfCollections=-1;
         }
         void CreatePerfScene()
         {
             fixtureState.Position=new Vector3(0,.02f,-12); fixtureState.Yaw=0;
-            Pose(0,0,0,false,true,LocalSettings.VerticalFov(LocalSettings.DefaultFov,16f/9));
+            Pose(0,0,0,false,true,FixtureFov);
             var definition=new ArenaDefinition { Id="atrium",Spawns=Array.Empty<ArenaSpawn>(),Pickups=Array.Empty<ArenaPickup>(),
                 ZoneRoute=new[]{Vector3.zero,Vector3.forward*8,Vector3.right*8} };
             fixtureEffectMatch=new ArenaMatch(definition,practice:true);

@@ -99,7 +99,7 @@ namespace Wildstone.Networking
                 m.pickupSequence=shooter.LastActionSequence+1; m.pickupSent=true;
                 SendLaserAction(model,shooter,m.pickupSequence,CombatActionKind.Pickup,Vector3.forward,pickup.Id,pickup.Generation);
             }
-            m.picked|=client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==spec.Ammo && pickup.Generation==host.pickupGeneration+1;
+            m.picked|=client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==WeaponCatalog.PickupAmmo(weapon) && pickup.Generation==host.pickupGeneration+1;
             if(!m.picked || !q.picked) return false;
             if(status.role=="client" && !m.equipSent)
             { m.equipSequence=shooter.LastActionSequence+1; m.equipSent=true; SendLaserAction(model,shooter,m.equipSequence,CombatActionKind.SelectSpecial,Vector3.forward); }
@@ -203,7 +203,7 @@ namespace Wildstone.Networking
                 s.events+=e.ToCombat().Id+";";
             }
             s.ammo=shooter.SpecialAmmo; s.damage=m.baselineHealth-target.Health;
-            if(s.shots>1 || s.hits>1 || s.ricochets>2 || s.stuns>1 || s.ammo<spec.Ammo-specialShotIndex-1 || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
+            if(s.shots>1 || s.hits>1 || s.ricochets>2 || s.stuns>1 || s.ammo<WeaponCatalog.PickupAmmo(weapon)-specialShotIndex-1 || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
                 throw new InvalidOperationException("Special projectile duplicated spending/events.");
             // Event-ring and avatar snapshots can arrive separately. Keep sampling until the exact event/timer contract agrees.
             if(s.hits==1 && specialWeaponIndex==1)
@@ -232,7 +232,7 @@ namespace Wildstone.Networking
             bool discTerminal=s.firstDespawnTick>s.lastTick && s.firstDespawnTick<s.expireTick &&
                 s.lastTravel+spec.Speed*(s.firstDespawnTick-s.lastTick)/(float)model.TickRate<spec.Range-1;
             s.observed=s.absent && s.lastTick>s.firstTick && s.lastTravel>s.firstTravel+.2f && s.shots==1 && s.hits==1 &&
-                s.ammo==spec.Ammo-specialShotIndex-1 && Mathf.Abs(s.eventDamage-spec.Damage)<.01f &&
+                s.ammo==WeaponCatalog.PickupAmmo(weapon)-specialShotIndex-1 && Mathf.Abs(s.eventDamage-spec.Damage)<.01f &&
                 Mathf.Abs(s.damage-spec.Damage*(specialShotIndex+1))<.01f && statusValid &&
                 (specialWeaponIndex!=0 || s.ricochets==2 && s.ricochetMask==6 && s.maxBounces==2 && discPath && discTerminal);
             status.stage="special_verdict_"+weapon+"_"+specialShotIndex;

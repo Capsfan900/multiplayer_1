@@ -310,7 +310,7 @@ namespace Wildstone.Networking
                 m.pickupGeneration=pickup.Generation; m.pickupSequence=shooter.LastActionSequence+1; m.pickupSent=true;
                 SendLaserAction(model,shooter,m.pickupSequence,CombatActionKind.Pickup,Vector3.forward,pickup.Id,pickup.Generation);
             }
-            m.picked=m.picked || client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==spec.Ammo && pickup.Generation==host.pickupGeneration+1 && pickup.AvailableTick>model.Tick;
+            m.picked=m.picked || client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==WeaponCatalog.PickupAmmo(weapon) && pickup.Generation==host.pickupGeneration+1 && pickup.AvailableTick>model.Tick;
             if(!m.picked || !remote.picked) return false;
             // Explicit selection exercises the production equip RPC even though pickup auto-selects.
             if(status.role=="client" && !m.equipSent)
@@ -373,9 +373,9 @@ namespace Wildstone.Networking
                 m.hitCount++; m.eventDamage+=e.Amount; m.hitIds+=e.ToCombat().Id+";";
             }
             float expected=spec.Damage*WeaponCatalog.HitscanPellets(weapon);
-            if(m.ammo<spec.Ammo-1 || m.shotCount>1 || m.hitCount>WeaponCatalog.HitscanPellets(weapon) || m.damage>expected+.001f || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
+            if(m.ammo<WeaponCatalog.PickupAmmo(weapon)-1 || m.shotCount>1 || m.hitCount>WeaponCatalog.HitscanPellets(weapon) || m.damage>expected+.001f || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
                 throw new InvalidOperationException("Laser shot duplicated ammo, damage or events.");
-            m.observed=m.ammo==spec.Ammo-1 && m.shotCount==1 && m.hitCount==WeaponCatalog.HitscanPellets(weapon) && Mathf.Abs(m.damage-expected)<.001f && Mathf.Abs(m.eventDamage-expected)<.001f;
+            m.observed=m.ammo==WeaponCatalog.PickupAmmo(weapon)-1 && m.shotCount==1 && m.hitCount==WeaponCatalog.HitscanPellets(weapon) && Mathf.Abs(m.damage-expected)<.001f && Mathf.Abs(m.eventDamage-expected)<.001f;
             status.stage="laser_verdict_"+weapon;
             if(!m.observed || !remote.observed) return false;
             if(m.shotId!=remote.shotId || m.hitIds!=remote.hitIds || m.life!=remote.life || m.targetLife!=remote.targetLife) throw new InvalidOperationException("Peers disagree on laser event identity.");
@@ -429,10 +429,10 @@ namespace Wildstone.Networking
             m.coverSequence=client.coverSequence; m.coverAmmo=shooter.SpecialAmmo; m.coverHealth=target.Health;
             m.coverShots=CountSmokeShots(shooter.Participant,shooter.LifeGeneration,m.coverSequence,out m.coverShotId);
             m.coverHits=CountSmokeHits(shooter.Participant,shooter.LifeGeneration,m.coverSequence,target.Participant,target.LifeGeneration,out _,out _);
-            if(m.coverHits!=0 || m.coverHealth!=m.coverBaselineHealth || m.coverShots>1 || m.coverAmmo<spec.Ammo-2 ||
+            if(m.coverHits!=0 || m.coverHealth!=m.coverBaselineHealth || m.coverShots>1 || m.coverAmmo<WeaponCatalog.PickupAmmo(LaserWeapons[laserIndex])-2 ||
                 shooter.StarterAmmo!=WeaponCatalog.StarterAmmo)
                 throw new InvalidOperationException("Cover shot damaged its protected target or duplicated ammunition/events.");
-            m.coverObserved=m.coverShots==1 && m.coverAmmo==spec.Ammo-2 && shooter.LastActionSequence==m.coverSequence;
+            m.coverObserved=m.coverShots==1 && m.coverAmmo==WeaponCatalog.PickupAmmo(LaserWeapons[laserIndex])-2 && shooter.LastActionSequence==m.coverSequence;
             if(!m.coverObserved || !remote.coverObserved) return false;
             if(m.coverShotId!=remote.coverShotId || m.coverSequence!=remote.coverSequence || m.coverHealth!=remote.coverHealth)
                 throw new InvalidOperationException("Peers disagree on the blocked moving-target verdict.");
@@ -512,7 +512,7 @@ namespace Wildstone.Networking
                 m.pickupGeneration=pickup.Generation; m.pickupSequence=shooter.LastActionSequence+1; m.pickupSent=true;
                 SendLaserAction(model,shooter,m.pickupSequence,CombatActionKind.Pickup,Vector3.forward,pickup.Id,pickup.Generation);
             }
-            m.picked=m.picked || client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==spec.Ammo && pickup.Generation==host.pickupGeneration+1;
+            m.picked=m.picked || client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==WeaponCatalog.PickupAmmo(weapon) && pickup.Generation==host.pickupGeneration+1;
             if(!m.picked || !remote.picked) return false;
             if(status.role=="client" && !m.equipSent)
             {
@@ -670,7 +670,7 @@ namespace Wildstone.Networking
             // (late then early) but never the whole run by more than one slack; the mean must stay within a tick of it.
             int interval=WeaponCatalog.Ticks(spec.Interval,model.TickRate),slack=WeaponCatalog.Ticks(WeaponCatalog.FireSlackSeconds,model.TickRate);
             if(shots<7 || shots>8 || hits!=shots || Mathf.Abs(damage-spec.Damage*shots)>.001f || Mathf.Abs(target.Health-(WeaponCatalog.Health-spec.Damage*shots))>.001f ||
-                shooter.SpecialAmmo!=spec.Ammo-shots || spacing<interval-2*slack || lastTick-firstTick<(shots-1)*interval-slack || m.autoMeanSpacing>interval+1 ||
+                shooter.SpecialAmmo!=WeaponCatalog.PickupAmmo(WeaponKind.LaserSMG)-shots || spacing<interval-2*slack || lastTick-firstTick<(shots-1)*interval-slack || m.autoMeanSpacing>interval+1 ||
                 firstSpread!=WeaponCatalog.SpreadDegrees(WeaponKind.LaserSMG,0,0) || !growing)
                 throw new InvalidOperationException("SMG held fire verdict mismatch: shots "+shots+" of "+client.autoRequests+" requests, hits "+hits+" damage "+damage+
                     " spacing "+spacing+" mean "+m.autoMeanSpacing+" ammo "+shooter.SpecialAmmo);
@@ -707,7 +707,7 @@ namespace Wildstone.Networking
         void StopCombatInput()
         {
             StopGunplayTrigger(); FusionCombatWorld.SmokeShotResolved-=RecordRewind;
-            if(combatSession!=null) { combatSession.InputRequested-=SmokeCombatInput; combatSession.InputRequested-=SmokeLaserMovingInput; combatSession.InputRequested-=SmokeGunplayInput; combatSession.InputRequested-=SmokeStunProbeInput; }
+            if(combatSession!=null) { combatSession.InputRequested-=SmokeCombatInput; combatSession.InputRequested-=SmokeLaserMovingInput; combatSession.InputRequested-=SmokeGunplayInput; combatSession.InputRequested-=SmokeStunProbeInput; combatSession.InputRequested-=SmokeStunClientInput; }
             if(laserCover!=null) Destroy(laserCover);
             if(projectileCover!=null) Destroy(projectileCover);
             CleanupGrenadeFixture(); StopSpecialProjectiles();

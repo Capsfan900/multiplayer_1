@@ -1,17 +1,15 @@
 # Staged backlog
 
-Updated: 2026-10-30. **Execution resumed in `mvp-2`, with a published Photon-only Windows preview.**
+Updated: 2026-10-31. **Execution resumed in `mvp-2`, with a published Photon-only Windows preview.**
 Local implementation spans the stages below; full visual and internet acceptance
 remain open. Follow the
 [implementation plan](superpowers/plans/2026-10-25-wildstone-mvp.md) and [handoff](HANDOFF.md).
 Design documents and concept approvals do not complete implementation stages.
 Acceptance detail belongs in the [canonical specs](README.md), not this checklist.
 
-Delivery checkpoint: current-state game source `07d8cc8` is packaged as public preview
-`preview-20261030-07d8cc8` at the user's request. Fresh build, headless startup and
-ZIP integrity/checksum checks passed. [QA](QA.md#2026-10-30-current-state-public-preview-release)
-records the release snapshot and limits. The authoring checkout remains active and
-untouched; later work and remaining acceptance stages stay open.
+Delivery checkpoint: current-state snapshot `e9e091f` is published as public preview
+`preview-20261028-e9e091f` at the user's request. Anonymous download and checksum verification passed. Build/startup/package evidence is in
+[QA](QA.md). Ongoing development and remaining acceptance stages stay open.
 
 Current work (2026-10-30): user playtest of the D028–D031 quality pass. Its
 integration evidence is complete in [QA](QA.md#2026-10-30-quality-pass-integration-d028d031):
@@ -75,12 +73,26 @@ active acceptance backlog, replacing the old bootstrap implementation order.
 | Order | Next actionable work | Evidence needed to advance |
 | --- | --- | --- |
 | 1 | Reproduce user-reported disconnect/menu return after joining and selecting a team | Other player confirmed in Texas on another ISP; exact builds/error wording still needed. Actual four-team switching passes. New local pre-game Requested disconnect lacked host admission-rejection detail. Hosts now log a reason-only `WILDSTONE HOST REMOVED PEER` line for every removal ([QA](QA.md#2026-10-30-host-removal-reasons)); five local Photon runs did not reproduce it. Next: the host's Player.log from the next failing external session. It is not confirmed as the same external symptom. Reconnect cycles then found and fixed a join race: the SDK can report a peer before its user ID, and the host removed it as `invalid-peer` ([QA](QA.md#2026-10-30-reconnect-cycles-and-late-peer-identity)). It is a candidate cause of the startup disconnect, unconfirmed |
-| 2 | Extend live combat acceptance to moving projectile counterplay, deflection and measured rewind | Pulse and grenade flight/blast/cover plus disc ricochet/damage deduplication and stun timing pass baseline/adverse150; three moving lasers pass regional80/adverse150. Adverse150 laser moving-cover shotgun misses trace to the 150 ms rewind cap ([QA](QA.md#laser-moving-cover-investigation)). Rewind age is now measured: requested view age is about 80 ms on the same PC, 184 ms mean at regional80 and 283 ms at adverse150, so the cap clamps every regional80 shot; raising it awaits the user ([QA](QA.md#2026-10-30-measured-rewind-age)). D037 Push Lens deflection passes host- and client-push online at baseline/adverse150 ([QA](QA.md#2026-10-30-push-lens-deflection-d037)). A host-side stun probe shows the stunned target's replicated position holding under forward input, then moving once released; a predicting client target, natural moving counterplay and the full latency matrix remain. Under adverse150 loss a resent attack RPC can arrive past the 150 ms window and is dropped; the smoke fixtures now press again ([QA](QA.md#2026-10-30-smoke-harness-peer-reads-stun-probe-and-late-attacks)) |
-| 3 | Accept moving gameplay/remote weapon readability | Continuous first-person starter slide/fire/reload sample passes and 32 frames inspected; remote shot/reload checks pass. `-Firefight` frame sequences of four hitscan headshots on a strafing soldier and an incoming sniper rail are inspected ([QA](QA.md#2026-10-30-firefight-frame-sequences)). Natural first-/third-person movement, other weapon transitions and human aim/slide/audio acceptance remain |
+| 2 | Extend live combat acceptance to moving projectile counterplay, deflection and measured rewind | Pulse and grenade flight/blast/cover plus disc ricochet/damage deduplication and stun timing pass baseline/adverse150; three moving lasers pass regional80/adverse150. Adverse150 laser moving-cover shotgun misses trace to the 150 ms rewind cap ([QA](QA.md#laser-moving-cover-investigation)). Rewind age is now measured: requested view age is about 80 ms on the same PC, 184 ms mean at regional80 and 283 ms at adverse150, so the 150 ms cap clamped every regional80 shot ([QA](QA.md#2026-10-30-measured-rewind-age)). D040 raised it to 250 ms as a proposal for the user to tune: regional80 shots are no longer clamped, and adverse150 shots clamp at 250 ms against about 255–293 ms requested ([QA](QA.md#2026-10-31-playtest-fixes-d040)). D037 Push Lens deflection passes host- and client-push online at baseline/adverse150 ([QA](QA.md#2026-10-30-push-lens-deflection-d037)). A host-side stun probe shows the stunned target's replicated position holding under forward input, then moving once released; a predicting client target, natural moving counterplay and the full latency matrix remain. Under adverse150 loss a resent attack RPC can arrive past the 150 ms window and is dropped; the smoke fixtures now press again ([QA](QA.md#2026-10-30-smoke-harness-peer-reads-stun-probe-and-late-attacks)) |
+| 3 | Accept moving gameplay/remote weapon readability | Continuous first-person starter slide/fire/reload sample passes and 32 frames inspected; remote shot/reload checks pass. `-Firefight` frame sequences of four hitscan headshots on a strafing soldier and an incoming sniper rail are inspected ([QA](QA.md#2026-10-30-firefight-frame-sequences)); the grenade in hand, heavier sniper rail and crescent sword slash are captured ([QA](QA.md#2026-10-30-weapon-read-fixes-grenade-in-hand-sniper-rail-sword-slash-title-fit)). Natural first-/third-person movement, other weapon transitions and human aim/slide/audio acceptance remain |
 | 4 | Exercise full standalone loop and map traversal | Plain-movement reachability of every pickup and zone point from every start now gates the arena build, and per-team walking distances are measured ([QA](QA.md#2026-10-30-map-traversal-and-travel-distance)). Outer walls are now out of jump reach (map revision 4, 8 m). Terrace Steps' northern starts walk 29-55% farther than team 0; a layout fix awaits the user's direction. Still needed: all maps/weapons/items, UI/cancel/retry, death/respawn, zone completion and travel time/exposure |
 | 5 | Measure movement/combat under adverse network conditions | Initial two-player same-PC SDK injected delay/jitter/loss combat checks pass. Host plus two clients, mixed/asymmetric paths, prediction corrections, rewind measurement and authority/recovery remain |
-| 6 | Add measured performance and endurance evidence | A same-PC 1080p frame-time sample exists (`Invoke-PerfSample.ps1`: 8 soldiers plus effects, Ultra p99 2.04 ms, RTX 4070 Ti). The capacity soak now accepts 1800 s and reports per-peer bandwidth and memory growth, and `Invoke-ReconnectCycles.ps1` runs fresh reconnect sessions ([TOOLING](TOOLING.md)): 100 of 100 pass after the late-identity fix ([QA](QA.md#2026-10-30-reconnect-cycles-and-late-peer-identity)). Online rematch now lets a soak harness chain real matches in one room. Still needed: lower-end GPU, allocation measurements, separate-machine eight-player matrix, a gameplay (not Results-screen) 30-minute soak, two-hour soak |
+| 6 | Add measured performance and endurance evidence | A same-PC 1080p frame-time sample exists (`Invoke-PerfSample.ps1`: 8 soldiers plus effects, Ultra p99 2.04 ms, RTX 4070 Ti). The capacity soak now accepts 1800 s and reports per-peer bandwidth and memory growth; its first 1800 s run passes with +4.5 to +8 MB working set per peer ([QA](QA.md#2026-10-30-30-minute-capacity-soak)), and `Invoke-ReconnectCycles.ps1` runs fresh reconnect sessions ([TOOLING](TOOLING.md)): 100 of 100 pass after the late-identity fix ([QA](QA.md#2026-10-30-reconnect-cycles-and-late-peer-identity)). Online rematch now lets a soak harness chain real matches in one room. `capacity -Gameplay` (up to 7200 s) makes all eight peers move, fire and rematch; a 100 s run passes with 0.4 GC/s and +14–17 MB working set, and the perf sample reports 560 bytes managed allocation per frame after the HUD fix ([QA](QA.md#2026-10-31-hud-string-allocations)). A two-hour gameplay run failed at about 46 min when seven peers dropped together during a likely machine-wide stall from overlapping Unity batch work; the runner now logs peer removals and the largest frame gap and names a stall ([QA](QA.md#2026-10-31-gameplay-soak)). Still needed: lower-end GPU, separate-machine eight-player matrix, a passing two-hour run |
 | 7 | Complete independent-network acceptance | At least two external networks, direct/relay paths, rotate hosts, graceful/crash recovery; capture exact builds and logs |
+
+User playtest reports on 2026-10-31 (settings stuck, hitbox and no-reg, pickup while
+running, matches closing, bouncy recoil, red marker, sniper press, Blink, gun ammo,
+hot zone visibility) have root causes and proposed fixes in
+[PLAYTEST-FIX-LATER](PLAYTEST-FIX-LATER.md). At the user's request they were
+implemented on 2026-10-31 with the report's recommended values, recorded as
+proposals under [D040](DECISIONS.md) ([QA](QA.md#2026-10-31-playtest-fixes-d040)).
+Still open:
+- the user's tuning of the 250 ms rewind and attack window, the two-magazine ammo
+  and the 0.2 s fire buffer;
+- the eased recoil curve, which needs the user's OK;
+- which red mark the tester meant;
+- predicted local shot cosmetics;
+- a human playtest of a build with these fixes.
 
 User feedback on 2026-10-30, after a first local play of the 16:06 build
 (`d838ac03…`): "so far that is really good and like those improvements, keep going".

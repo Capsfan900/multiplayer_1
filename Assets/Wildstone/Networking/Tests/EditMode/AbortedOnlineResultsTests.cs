@@ -105,6 +105,76 @@ namespace Wildstone.Tests
             }
         }
 
+        // A refused 20 Hz snapshot must not end the match by itself: the client keeps its last good model until refusals last two seconds.
+        [Test] public void OneRefusedSnapshotKeepsTheLastGoodModelAndOnlySustainedRefusalsEndTheMatch()
+        {
+            var owner=new GameObject("Snapshot refusal"); owner.SetActive(false);
+            var catalog=ScriptableObject.CreateInstance<ArenaCatalog>();
+            try
+            {
+                var coordinator=owner.AddComponent<FusionGameCoordinator>(); var practice=owner.GetComponent<PracticeSession>();
+                var map=new ArenaDefinition { Id="atrium",Spawns=System.Array.Empty<ArenaSpawn>(),Pickups=System.Array.Empty<ArenaPickup>(),
+                    ZoneRoute=new[]{Vector3.zero,Vector3.right*8,Vector3.forward*8} };
+                catalog.Maps=new[]{map}; practice.Catalog=catalog;
+                Set(coordinator,"presentation",practice); Set(coordinator,"mapId","atrium");
+                var source=new ArenaMatch(map,120);
+                Assert.That(source.AddPlayer(1,0,1,1,Vector3.zero),Is.True);
+                var good=source.Capture(); var bad=source.Capture(); bad.AuthorityGeneration=0;
+                var wrongPlayer=source.Capture(); wrongPlayer.Players[0].DisconnectUntil=wrongPlayer.Tick+5*120+1;
+                Assert.That(source.TryRestore(bad,out var reason),Is.False); Assert.That(reason,Is.EqualTo("header"));
+                Assert.That(source.TryRestore(wrongPlayer,out reason),Is.False); Assert.That(reason,Is.EqualTo("player"));
+                Assert.That(source.TryRestore(null,out reason),Is.False); Assert.That(reason,Is.EqualTo("header"));
+                Assert.That(source.TryRestore(good,out reason),Is.True); Assert.That(reason,Is.Null);
+
+                coordinator.ApplySnapshot(good,10);
+                var model=(ArenaMatch)typeof(FusionGameCoordinator).GetField("clientModel",Private).GetValue(coordinator);
+                Assert.That(model.Find(1),Is.Not.Null);
+                Assert.DoesNotThrow(()=>coordinator.ApplySnapshot(bad,10.05),"One refused snapshot is tolerated.");
+                Assert.That(model.Find(1),Is.Not.Null,"The last good model is kept.");
+                coordinator.ApplySnapshot(good,10.1);
+                Assert.DoesNotThrow(()=>coordinator.ApplySnapshot(bad,11),"An accepted snapshot restarts the count.");
+                Assert.DoesNotThrow(()=>coordinator.ApplySnapshot(bad,12.9));
+                var thrown=Assert.Throws<System.InvalidOperationException>(()=>coordinator.ApplySnapshot(bad,11+FusionGameCoordinator.SnapshotRefusalSeconds));
+                StringAssert.Contains("header",thrown.Message);
+            }
+            finally { Object.DestroyImmediate(owner); Object.DestroyImmediate(catalog); }
+        }
+
+        IEnumerator CloseOnlineAs(bool localHost,bool runnerDestroyed,string[] status)
+        {
+            var owner=new GameObject("Online close text"); owner.SetActive(false);
+            var retained=new FusionSession(new ContentVersion("1","test","atrium-1","rules"),"ROOM1");
+            try
+            {
+                var bridge=owner.AddComponent<OnlineMenuBridge>();
+                var coordinator=owner.AddComponent<FusionGameCoordinator>();
+                var controller=owner.GetComponent<FusionMenuController>();
+                var practice=owner.GetComponent<PracticeSession>();
+                Set(controller,"menu",bridge); Set(controller,"<Session>k__BackingField",retained);
+                Set(coordinator,"menu",controller); Set(coordinator,"presentation",practice); Set(coordinator,"session",retained);
+                bridge.ActiveSession=true; bridge.Host=localHost; practice.Flow.Show(MenuScreen.Online);
+                var retired=new GameObject("Retired runner").AddComponent<Fusion.NetworkRunner>();
+                Object.DestroyImmediate(retired.gameObject);
+                if(runnerDestroyed) Set(coordinator,"observedRunner",retired);
+                Call(coordinator,"CloseOnline");
+                while(!retained.Completion.IsCompleted) yield return null;
+                yield return null;
+                status[0]=bridge.Status;
+            }
+            finally { Object.DestroyImmediate(owner); }
+        }
+
+        [UnityTest] public IEnumerator AClientWhoseRunnerIsGoneIsToldTheHostLeftWhileOtherFailuresKeepTheGenericText()
+        {
+            var status=new string[1];
+            yield return CloseOnlineAs(false,true,status);
+            StringAssert.Contains("Host left the match",status[0]);
+            yield return CloseOnlineAs(true,true,status);
+            StringAssert.Contains("could not continue",status[0]);
+            yield return CloseOnlineAs(false,false,status);
+            StringAssert.Contains("could not continue",status[0]);
+        }
+
         // A finished round stays in its session: only a running host runner may rematch, and every peer follows the lobby.
         [UnityTest] public IEnumerator FinishedRoundRematchNeedsTheHostAndPeersFollowTheLobbyInTheSameSession()
         {

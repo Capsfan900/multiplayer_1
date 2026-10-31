@@ -71,6 +71,34 @@ namespace Wildstone.Tests
             Assert.That(cue.style.unityTextOutlineWidth.value,Is.GreaterThan(0));
             Assert.That(cue.style.unityTextOutlineColor.value.grayscale,Is.LessThan(.1f));
         }
+        // Taking damage draws an arc far outside the reticle and the 48 px hitmarker, never a mark beside them.
+        [Test] public void DamageDirectionIsAFarArcNotAReticleMark()
+        {
+            var hud=new ArenaHud();
+            Assert.That(hud.Root.Q("hud-damage-direction").childCount,Is.Zero);
+            Assert.That(ArenaHud.DamageArcRadius(1080),Is.EqualTo(378).Within(.01f));
+            Assert.That(ArenaHud.DamageArcRadius(float.NaN),Is.EqualTo(60),"An unlaid-out panel still draws clear of the hitmarker.");
+            Assert.That(ArenaHud.DamageArcRadius(240),Is.EqualTo(84).Within(.01f));
+        }
+        // Blink names its key and effect at the pickup; other items keep the plain prompt.
+        [Test] public void BlinkPickupPromptSaysWhatItDoes()
+        {
+            Assert.That(ArenaHud.PickupPrompt("blink","<Keyboard>/e","<Keyboard>/q"),Is.EqualTo("E   PICK UP BLINK · Q TO TELEPORT 6 m"));
+            Assert.That(ArenaHud.PickupPrompt("laser-sniper","<Keyboard>/e","<Keyboard>/q"),Is.EqualTo("E   PICK UP LASER SNIPER"));
+        }
+        // The zone waypoint sits over the zone on screen and slides to the edge toward it when off screen or behind.
+        [Test] public void ZoneWaypointStaysOnScreenAndPointsTheWayToTurn()
+        {
+            Assert.That(ArenaHud.ZoneMarkerPosition(new Vector3(.25f,.75f,10),1920,1080,28),Is.EqualTo(new Vector2(480,270)));
+            Assert.That(ArenaHud.ZoneMarkerPosition(new Vector3(1.5f,.5f,10),1920,1080,28),Is.EqualTo(new Vector2(1892,540)),"Off to the right.");
+            Assert.That(ArenaHud.ZoneMarkerPosition(new Vector3(.5f,.5f,-5),1920,1080,28),Is.EqualTo(new Vector2(960,1052)),"Straight behind: bottom edge.");
+            Assert.That(ArenaHud.ZoneMarkerPosition(new Vector3(.8f,.5f,-5),1920,1080,28),Is.EqualTo(new Vector2(28,540)),"Behind on the left: left edge.");
+            Assert.That(ArenaHud.ZoneMarkerPosition(new Vector3(.8f,.3f,-5),1920,1080,28),Is.EqualTo(new Vector2(28,540)),"A pitched view does not lift a point behind to the top.");
+            Assert.That(ArenaHud.ZoneMarkerPosition(new Vector3(.1f,.5f,-5),1920,1080,28),Is.EqualTo(new Vector2(1892,540)),"Behind on the right: right edge.");
+            var chip=new ArenaHud().Root.Q<Label>("hud-zone-marker").style.backgroundColor.value;
+            Assert.That(chip.grayscale,Is.LessThan(.15f)); Assert.That(chip.a,Is.GreaterThan(.5f),"Coloured text alone is muddy on ivory stone.");
+            Assert.That(ArenaHud.ZoneIdle.grayscale,Is.LessThan(.5f)); Assert.That(ArenaHud.ZoneIdle.maxColorComponent-Mathf.Min(ArenaHud.ZoneIdle.r,Mathf.Min(ArenaHud.ZoneIdle.g,ArenaHud.ZoneIdle.b)),Is.GreaterThan(.6f),"Saturated, not stone grey.");
+        }
         // Body and shield hits tick: shorter and quieter than the head ding, so a head hit still stands out.
         [Test] public void BodyHitTickIsShorterAndQuieterThanTheHeadConfirm()
         {
@@ -134,11 +162,22 @@ namespace Wildstone.Tests
             Assert.That(hud.BannerText,Is.EqualTo("ELIMINATED  ■ P2"));
             Assert.That(ArenaHud.BannerSeconds,Is.LessThan(ArenaHud.StreakSeconds));
         }
+        // Each round opens on the map's name for three seconds, fading over the last half second unless motion is reduced.
+        [Test] public void EachRoundOpensOnTheMapNameThenClears()
+        {
+            Assert.That(ArenaHud.MapIntroOpacity(0,120,false),Is.EqualTo(1));
+            Assert.That(ArenaHud.MapIntroOpacity(300,120,false),Is.EqualTo(1));
+            Assert.That(ArenaHud.MapIntroOpacity(330,120,false),Is.EqualTo(.5f).Within(.001f));
+            Assert.That(ArenaHud.MapIntroOpacity(330,120,true),Is.EqualTo(1),"Reduced motion skips the fade.");
+            Assert.That(ArenaHud.MapIntroOpacity(360,120,false),Is.EqualTo(0));
+            Assert.That(ArenaHud.MapIntroOpacity(360,120,true),Is.EqualTo(0));
+            Assert.That(ArenaHud.MapIntroOpacity(0,0,false),Is.EqualTo(0),"No tick rate shows nothing.");
+        }
         // The last quarter of any magazine warns; the sword and an empty hand never do.
         [Test] public void LastQuarterOfAMagazineWarnsWithADryClickUnderTheHitTick()
         {
             Assert.That(ArenaHud.LowAmmo(WeaponKind.LineDriver,6),Is.True); Assert.That(ArenaHud.LowAmmo(WeaponKind.LineDriver,7),Is.False);
-            Assert.That(ArenaHud.LowAmmo(WeaponKind.LaserSniper,1),Is.True); Assert.That(ArenaHud.LowAmmo(WeaponKind.LaserSniper,2),Is.False);
+            Assert.That(ArenaHud.LowAmmo(WeaponKind.LaserSniper,3),Is.True); Assert.That(ArenaHud.LowAmmo(WeaponKind.LaserSniper,4),Is.False,"A quarter of the two-magazine pickup.");
             Assert.That(ArenaHud.LowAmmo(WeaponKind.LaserSMG,0),Is.True);
             Assert.That(ArenaHud.LowAmmo(WeaponKind.LaserSword,0),Is.False); Assert.That(ArenaHud.LowAmmo(WeaponKind.None,0),Is.False);
             var dry=Wildstone.Presentation.ArenaAudio.MakeDry(); var tick=Wildstone.Presentation.ArenaAudio.MakeTick();

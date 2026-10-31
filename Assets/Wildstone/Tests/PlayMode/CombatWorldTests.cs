@@ -56,6 +56,15 @@ namespace Wildstone.Tests
             Assert.That(world.Sweep(origin,Vector3.forward*10,.12f,1,0,out var blocked),Is.True); Assert.That(blocked.Participant,Is.Zero);
             Assert.That(world.Visible(origin,target.transform.position+Vector3.up*1.5f),Is.False);
         }
+        [Test] public void NativeRaysUseTheOnlineTorsoAndHeadInsideTheCapsule()
+        {
+            Vector3 eye=attacker.transform.position+Vector3.up*1.5f;
+            // 0.3 m to the side at ear height crosses the 0.4 m capsule but misses the torso box and head sphere.
+            Assert.That(world.Sweep(eye+Vector3.right*.3f,Vector3.forward*10,0,1,0,out _),Is.False);
+            Assert.That(world.Sweep(eye+Vector3.right*.2f+Vector3.down*.4f,Vector3.forward*10,0,1,0,out var body),Is.True);
+            Assert.That(body.Participant,Is.EqualTo(2)); Assert.That(body.Head,Is.False);
+            Assert.That(world.Sweep(eye+Vector3.up*.12f,Vector3.forward*10,0,1,0,out var head),Is.True); Assert.That(head.Head,Is.True);
+        }
         [Test] public void NativeBlinkClampsBeforeWallAndRejectsNoDisplacement()
         {
             Box("wall",new Vector3(0,2,3),new Vector3(10,4,.4f)); Physics.SyncTransforms();

@@ -121,7 +121,8 @@ namespace Wildstone.Tests
             var m=new ArenaMatch(map,60); m.AddPlayer(1,0,1,1,Vector3.zero); m.AddPlayer(2,1,1,1,Vector3.forward*5); m.Begin();
             m.Step(1,new[]{Act(1,1,1,CombatActionKind.Pickup)},new EmptyCombatWorld());
             Assert.That(m.Find(1).SelectedSpecial,Is.True); Assert.That(m.Find(1).SpecialWeapon,Is.EqualTo(kind));
-            Assert.That(m.Find(1).SpecialAmmo,Is.EqualTo(WeaponCatalog.Get(kind).Ammo));
+            Assert.That(m.Find(1).SpecialAmmo,Is.EqualTo(WeaponCatalog.Get(kind).Ammo*WeaponCatalog.SpecialMagazines),"Two magazines as one count.");
+            Assert.That(m.TryRestore(m.Capture()),Is.True,"A snapshot carrying both magazines restores.");
             var saved=m.Capture(); saved.Players[0].SpecialAmmo++;
             Assert.That(m.TryRestore(saved),Is.False);
         }
@@ -196,6 +197,9 @@ namespace Wildstone.Tests
                 Assert.That(WeaponCatalog.CanAim(kind),Is.True);
             }
             Assert.That(WeaponCatalog.SpreadDegrees(WeaponKind.LaserSniper,1,1),Is.Zero);
+            Assert.That(WeaponCatalog.SpreadDegrees(WeaponKind.LaserSniper,WeaponCatalog.ScopeThreshold,1),Is.Zero,"Exact as soon as the scope shows.");
+            Assert.That(WeaponCatalog.ScopeActive(WeaponKind.LaserSniper,WeaponCatalog.ScopeThreshold-.05f),Is.False);
+            Assert.That(WeaponCatalog.SpreadDegrees(WeaponKind.LaserSniper,WeaponCatalog.ScopeThreshold-.05f,0),Is.GreaterThan(0),"Still a gamble before it shows.");
             Assert.That(WeaponCatalog.SpreadDegrees(WeaponKind.LaserSniper,0,0),Is.GreaterThan(WeaponCatalog.SpreadDegrees(WeaponKind.LaserShotgun,0,0)),"A no-scope sniper shot is a gamble.");
             foreach(var kind in new[]{WeaponKind.PulseLobber,WeaponKind.ReboundDisc,WeaponKind.PushLens,WeaponKind.StunGun,WeaponKind.LaserSword,WeaponKind.Grenade})
             { Assert.That(WeaponCatalog.CanAim(kind),Is.False); Assert.That(WeaponCatalog.SpreadDegrees(kind,0,1),Is.Zero); }
@@ -305,6 +309,21 @@ namespace Wildstone.Tests
             Assert.That(CombatRules.RayHitsHead(eye,Vector3.zero,20,feet,1.8f),Is.False);
             Assert.That(standing.y+CombatRules.HeadRadius,Is.LessThanOrEqualTo(feet.y+1.8f+.001f),"Head sphere stays inside the capsule top.");
         }
+        [Test] public void TorsoBoxStopsUnderTheHeadAndTurnsWithTheAvatar()
+        {
+            var feet=new Vector3(0,0,10); var eye=new Vector3(0,1.62f,0);
+            Assert.That(CombatRules.RayHitsBody(eye,(feet+Vector3.up*1.1f-eye).normalized,20,feet,0,1.8f,out float entry),Is.True,"Chest.");
+            Assert.That(entry,Is.EqualTo(9.73f).Within(.02f));
+            Assert.That(CombatRules.RayHitsBody(new Vector3(.3f,1.55f,0),Vector3.forward,20,feet,0,1.8f,out _),Is.False,"Past the ear above the torso.");
+            Assert.That(CombatRules.RayHitsHead(new Vector3(.3f,1.55f,0),Vector3.forward,20,feet,1.8f),Is.False,"Past the ear beside the head.");
+            Assert.That(CombatRules.RayHitsBody(new Vector3(.31f,1f,0),Vector3.forward,20,feet,0,1.8f,out _),Is.False,"Beside the torso.");
+            Assert.That(CombatRules.RayHitsBody(new Vector3(.31f,1f,0),Vector3.forward,20,feet,45,1.8f,out _),Is.True,"A turned torso's corner reaches 0.38 m.");
+            Assert.That(CombatRules.RayHitsBody(new Vector3(0,1.2f,0),Vector3.forward,20,feet,0,.9f,out _),Is.False,"A slider's torso drops.");
+            Assert.That(CombatRules.RayHitsBody(new Vector3(0,.4f,0),Vector3.forward,20,feet,0,.9f,out _),Is.True);
+            Assert.That(CombatRules.RayHitsBody(new Vector3(0,1f,0),Vector3.forward,5,feet,0,1.8f,out _),Is.False,"Beyond the ray length.");
+            Assert.That(CombatRules.RayHitsBody(new Vector3(0,1f,0),Vector3.back,20,feet,0,1.8f,out _),Is.False,"Behind the shooter.");
+            Assert.That(CombatRules.BodyTop(1.8f),Is.EqualTo(CombatRules.HeadCenter(Vector3.zero,1.8f).y-CombatRules.HeadRadius).Within(1e-5f));
+        }
         [Test] public void LaserSmgIsAutomaticFastAndFinite()
         {
             var smg=WeaponCatalog.Get(WeaponKind.LaserSMG);
@@ -329,13 +348,13 @@ namespace Wildstone.Tests
                 case "bloom-high": p.Bloom=1.5f; break;
                 case "bloom-recover": p.BloomRecoverTick=saved.Tick+1000; break;
                 case "dead-ads": p.Health=0; p.SpecialWeapon=WeaponKind.None; p.SpecialAmmo=0; p.SelectedSpecial=false; p.AdsProgress=.5f; break;
-                case "smg-ammo": p.SpecialAmmo=WeaponCatalog.Get(WeaponKind.LaserSMG).Ammo+1; break;
+                case "smg-ammo": p.SpecialAmmo=WeaponCatalog.PickupAmmo(WeaponKind.LaserSMG)+1; break;
             }
             Assert.That(Match().TryRestore(saved),Is.False);
         }
         [Test] public void StarterCadenceClipReloadAndRevisionStayConsistent()
         {
-            Assert.That(WeaponCatalog.Revision,Is.EqualTo(4));
+            Assert.That(WeaponCatalog.Revision,Is.EqualTo(5));
             Assert.That(WeaponCatalog.Get(WeaponKind.LineDriver).Damage,Is.EqualTo(13));
             Assert.That(WeaponCatalog.Get(WeaponKind.LineDriver).Ammo,Is.EqualTo(24));
             // 60 Hz: the Line Driver interval is 9 ticks and the D036 automatic slack 2.
@@ -429,6 +448,33 @@ namespace Wildstone.Tests
             Assert.That(m.Step(1,new[]{Act(1,1,1,CombatActionKind.Fire)},new EmptyCombatWorld(),false),Is.False);
             Assert.That(m.Tick,Is.Zero);
         }
+        static ArenaMatch HealthMatch()
+        {
+            var map=Map(); map.Pickups[0].Item="health";
+            var m=new ArenaMatch(map,60); m.AddPlayer(1,0,1,1,Vector3.zero); m.AddPlayer(2,1,1,1,Vector3.forward*5); m.Begin(); return m;
+        }
+        [TestCase(20f,70f)] [TestCase(70f,100f)]
+        public void HealthPackRestoresUpToFullHealth(float before,float after)
+        {
+            var m=HealthMatch(); m.Find(1).Health=before;
+            m.Step(1,new[]{Act(1,1,1,CombatActionKind.Pickup)},new EmptyCombatWorld());
+            Assert.That(m.Find(1).Health,Is.EqualTo(after)); Assert.That(m.Pickups[0].Generation,Is.EqualTo(2));
+        }
+        // The host's copy of a running claimant trails its prediction, so it accepts PickupLagMargin past the 2.5 m reach.
+        [TestCase(2.8f,2)] [TestCase(3.1f,1)]
+        public void HostAcceptsAPickupWithinTheLagMargin(float distance,int generation)
+        {
+            var m=Match(); m.Find(1).Feet=new Vector3(distance,0,0);
+            m.Step(1,new[]{Act(1,1,1,CombatActionKind.Pickup)},new EmptyCombatWorld());
+            Assert.That(m.Pickups[0].Generation,Is.EqualTo(generation));
+        }
+        [Test] public void FullHealthLeavesTheHealthPackInPlace()
+        {
+            var m=HealthMatch();
+            m.Step(1,new[]{Act(1,1,1,CombatActionKind.Pickup)},new EmptyCombatWorld());
+            Assert.That(m.Find(1).Health,Is.EqualTo(WeaponCatalog.Health));
+            Assert.That(m.Pickups[0].Generation,Is.EqualTo(1)); Assert.That(m.Pickups[0].AvailableTick,Is.Zero);
+        }
         [Test] public void FullConsumableDoesNotConsumePickupOrChangeGeneration()
         {
             var m=Match(); m.Players[0].ShieldCharges=1;
@@ -472,6 +518,17 @@ namespace Wildstone.Tests
             var a=Act(1,2,2,CombatActionKind.Blink); m.Step(2,new[]{a,a},world);
             Assert.That(m.Players[0].BlinkCharges,Is.Zero); Assert.That(m.Players[0].Feet.z,Is.EqualTo(6));
             Assert.That(m.Events.Count(e=>e.Kind==CombatEventKind.Blink),Is.EqualTo(1));
+        }
+        [Test] public void BlinkFollowsTheHorizontalAim()
+        {
+            var m=Match(); m.Players[0].BlinkCharges=1; var world=new TargetWorld{BlinkAllowed=true}; var start=m.Players[0].Feet;
+            var up=Act(1,1,1,CombatActionKind.Blink); up.Direction=new Vector3(0,1,1).normalized;
+            m.Step(1,new[]{up},world);
+            Assert.That(m.Players[0].BlinkCharges,Is.Zero,"45 degrees up still blinks.");
+            Assert.That(m.Players[0].Feet.y,Is.EqualTo(start.y).Within(1e-4f)); Assert.That(m.Players[0].Feet.z-start.z,Is.EqualTo(6).Within(1e-4f));
+            m.Players[0].BlinkCharges=1; var straight=Act(1,2,2,CombatActionKind.Blink); straight.Direction=Vector3.up;
+            m.Step(2,new[]{straight},world);
+            Assert.That(m.Players[0].BlinkCharges,Is.EqualTo(1),"Straight up has no horizontal aim; the charge is kept.");
         }
         [Test] public void TeamScoreHasNoOutnumberMultiplierAndContestsStopIt()
         {

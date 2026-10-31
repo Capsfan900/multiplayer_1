@@ -184,7 +184,9 @@ namespace Wildstone.Match
                     p.ShieldCharges--; p.Shield=WeaponCatalog.Shield; p.ShieldUntil=Tick+Ticks(WeaponCatalog.ShieldSeconds);
                     Emit(CombatEventKind.ShieldActivated,a,p.Participant,WeaponCatalog.Shield); break;
                 case CombatActionKind.Blink:
-                    if(p.Suppressed(Tick) || p.BlinkCharges==0 || !world.TryBlink(p,a.Direction,6,out var landing) ||
+                    // Blink follows the horizontal aim, so looking up or down still lands 6 m ahead (PLAYTEST-FIX-LATER #9).
+                    var flat=new Vector3(a.Direction.x,0,a.Direction.z);
+                    if(p.Suppressed(Tick) || p.BlinkCharges==0 || flat.sqrMagnitude<.0001f || !world.TryBlink(p,flat.normalized,6,out var landing) ||
                         !CombatRules.Finite(landing) || (landing-p.Feet).sqrMagnitude<.04f || (landing-p.Feet).sqrMagnitude>36.01f || !map.Contains(landing)) return Reject(a,"No legal Blink destination.");
                     p.BlinkCharges--; p.Feet=landing; p.DiscontinuityTick=Tick; p.Pending=null;
                     Emit(CombatEventKind.Blink,a,p.Participant,position:landing); break;
@@ -222,13 +224,14 @@ namespace Wildstone.Match
             if(a.PickupId<0 || a.PickupId>=pickups.Count) return Reject(a,"Unknown pickup.");
             var item=pickups[a.PickupId];
             if(item.Generation>=int.MaxValue-1) return Reject(a,"Pickup generation exhausted.");
-            if(item.Generation!=a.PickupGeneration || Tick<item.AvailableTick || (item.Position-p.Feet).sqrMagnitude>6.25f || !world.Visible(p.Eye,item.Position)) return Reject(a,"Pickup unavailable or out of reach.");
+            if(item.Generation!=a.PickupGeneration || Tick<item.AvailableTick || (item.Position-p.Feet).magnitude>WeaponCatalog.PickupReach+WeaponCatalog.PickupLagMargin || !world.Visible(p.Eye,item.Position)) return Reject(a,"Pickup unavailable or out of reach.");
             var weapon=WeaponCatalog.FromPickup(item.Item);
             if(item.Item=="blink") { if(p.BlinkCharges==1) return Reject(a,"Blink slot full."); p.BlinkCharges=1; }
             else if(item.Item=="shield") { if(p.ShieldCharges==1) return Reject(a,"Shield slot full."); p.ShieldCharges=1; }
+            else if(item.Item=="health") { if(p.Health>=WeaponCatalog.Health) return Reject(a,"Health full."); p.Health=Math.Min(WeaponCatalog.Health,p.Health+WeaponCatalog.HealthPack); }
             else if(weapon==WeaponKind.Grenade) { if(p.GrenadeAmmo==2) return Reject(a,"Grenades full."); p.GrenadeAmmo=2; }
             else if(weapon==WeaponKind.LineDriver) { if(p.StarterAmmo==WeaponCatalog.StarterAmmo) return Reject(a,"Starter clip full."); p.StarterAmmo=WeaponCatalog.StarterAmmo; p.ReloadUntil=0; }
-            else { p.SpecialWeapon=weapon; p.SpecialAmmo=WeaponCatalog.Get(weapon).Ammo; p.SelectedSpecial=true; p.Pending=null; p.AdsProgress=0; }
+            else { p.SpecialWeapon=weapon; p.SpecialAmmo=WeaponCatalog.PickupAmmo(weapon); p.SelectedSpecial=true; p.Pending=null; p.AdsProgress=0; }
             item.Generation++; item.AvailableTick=Tick+Ticks(WeaponCatalog.PickupSeconds); Emit(CombatEventKind.Pickup,a,p.Participant,position:item.Position); return true;
         }
         void Resolve(CombatAction a,WeaponKind weapon,ICombatWorld world)
@@ -459,7 +462,9 @@ namespace Wildstone.Match
         public MatchSnapshot Capture() => new MatchSnapshot { MapId=map.Id,MapRevision=map.Revision,CatalogRevision=WeaponCatalog.Revision,TickRate=TickRate,
             Tick=Tick,StartTick=startTick,AuthorityGeneration=AuthorityGeneration,AbsenceSince=absenceSince,OppositionStableSince=oppositionStableSince,Winner=Winner,Practice=Practice,Phase=Phase,
             ScoreTicks=(int[])scoreTicks.Clone(),Players=players.Select(p=>p.Copy()).ToArray(),Pickups=pickups.Select(p=>p.Copy()).ToArray(),Projectiles=projectiles.Select(p=>p.Copy()).ToArray() };
-        public bool TryRestore(MatchSnapshot saved)
+        public bool TryRestore(MatchSnapshot saved)=>TryRestore(saved,out _);
+        // reason is the rule group that refused the snapshot (header, player, pickup, projectile), null when restored; a refusal replaces nothing.
+        public bool TryRestore(MatchSnapshot saved,out string reason)
         {
             if(saved==null || saved.MapId!=map.Id || saved.MapRevision!=map.Revision || saved.CatalogRevision!=WeaponCatalog.Revision || saved.TickRate!=TickRate || saved.Practice!=Practice ||
                 saved.Tick<0 || saved.Tick>int.MaxValue-240000 || saved.StartTick<0 || saved.StartTick>saved.Tick || saved.AuthorityGeneration<1 ||
@@ -467,7 +472,7 @@ namespace Wildstone.Match
                 saved.OppositionStableSince< -1 || saved.OppositionStableSince>saved.Tick || (saved.OppositionStableSince>=0 && saved.AbsenceSince<0) ||
                 saved.Players==null || saved.Players.Length>8 || saved.Pickups==null || saved.Pickups.Length!=pickups.Count ||
                 saved.Projectiles==null || saved.Projectiles.Length>WeaponCatalog.MaximumProjectiles || saved.ScoreTicks==null || saved.ScoreTicks.Length!=4 ||
-                saved.ScoreTicks.Any(s=>s<0 || s>120*TickRate)) return false;
+                saved.ScoreTicks.Any(s=>s<0 || s>120*TickRate)) { reason="header"; return false; }
             var ids=new HashSet<int>(); var teams=new int[4];
             foreach(var p in saved.Players)
             {
@@ -477,25 +482,25 @@ namespace Wildstone.Match
                     p.FireReadyTick>saved.Tick+Ticks(1.2f) || p.BloomRecoverTick>saved.Tick+Ticks(WeaponCatalog.BloomDelaySeconds) || p.GrenadeReadyTick>saved.Tick+Ticks(.7f) || p.ReloadUntil>saved.Tick+Ticks(WeaponCatalog.ReloadSeconds) ||
                     p.RespawnTick>saved.Tick+Ticks(WeaponCatalog.RespawnSeconds) || p.DisconnectUntil>saved.Tick+5*TickRate ||
                     (p.Pending!=null && (p.Pending.Action.Tick>saved.Tick || p.Pending.Action.AuthorityGeneration<1 || p.Pending.Action.AuthorityGeneration>saved.AuthorityGeneration ||
-                        p.Pending.EndTick<saved.Tick || p.Pending.EndTick>saved.Tick+Ticks(.25f)))) return false;
+                        p.Pending.EndTick<saved.Tick || p.Pending.EndTick>saved.Tick+Ticks(.25f)))) { reason="player"; return false; }
             }
             for(int i=0;i<saved.Pickups.Length;i++)
             {
                 var item=saved.Pickups[i]; var original=pickups[i];
                 if(item==null || item.Id!=i || item.Generation<1 || item.Generation==int.MaxValue || item.AvailableTick<0 ||
-                    item.AvailableTick>saved.Tick+Ticks(WeaponCatalog.PickupSeconds) || item.Item!=original.Item || item.Position!=original.Position) return false;
+                    item.AvailableTick>saved.Tick+Ticks(WeaponCatalog.PickupSeconds) || item.Item!=original.Item || item.Position!=original.Position) { reason="pickup"; return false; }
             }
             var actions=new HashSet<string>();
             foreach(var shot in saved.Projectiles)
             {
                 if(shot==null || !shot.Valid(saved.Tick) || shot.Action.AuthorityGeneration>saved.AuthorityGeneration || !ids.Contains(shot.Action.Participant) ||
-                    !actions.Add(shot.Action.Participant+":"+shot.Action.LifeGeneration+":"+shot.Action.Sequence)) return false;
+                    !actions.Add(shot.Action.Participant+":"+shot.Action.LifeGeneration+":"+shot.Action.Sequence)) { reason="projectile"; return false; }
                 var owner=saved.Players.First(p=>p.Participant==shot.Action.Participant); var spec=WeaponCatalog.Get(shot.Weapon);
                 if(shot.OwnerTeam!=owner.Team || shot.Action.LifeGeneration>owner.LifeGeneration || shot.Action.ConnectionGeneration>owner.ConnectionGeneration ||
                     (shot.Action.LifeGeneration==owner.LifeGeneration && shot.Action.Sequence>owner.LastActionSequence) ||
                     shot.ExpireTick!=shot.Action.Tick+Ticks(spec.Lifetime) || !CombatRules.Direction(shot.Action.Direction) ||
                     (shot.Weapon!=WeaponKind.Grenade && shot.Travel>spec.Range) ||
-                    (shot.Weapon!=WeaponKind.ReboundDisc && shot.Bounces!=0)) return false;
+                    (shot.Weapon!=WeaponKind.ReboundDisc && shot.Bounces!=0)) { reason="projectile"; return false; }
             }
             // Validate everything before replacing anything; clone so callers cannot mutate an installed checkpoint.
             var restoredPlayers=saved.Players.Select(p=>p.Copy()).OrderBy(p=>p.Participant).ToArray();
@@ -504,6 +509,7 @@ namespace Wildstone.Match
             foreach(var savedShot in restoredShots) { var shot=freeProjectiles[--freeProjectileCount]; shot.CopyFrom(savedShot); projectiles.Add(shot); }
             scoreTicks=(int[])saved.ScoreTicks.Clone(); Tick=saved.Tick; startTick=saved.StartTick; AuthorityGeneration=saved.AuthorityGeneration;
             absenceSince=saved.AbsenceSince; oppositionStableSince=saved.OppositionStableSince; Winner=saved.Winner; Phase=saved.Phase; events.Clear(); reservedProjectiles=0; Captor=-1; Contested=false;
+            reason=null;
             return true;
         }
         public bool AdvanceAuthorityGeneration(int generation)

@@ -1,0 +1,26 @@
+{
+  "generator": "Tools/Assets/build_assets.py health-pickup",
+  "blender": "4.2.0",
+  "axis": "Unity (X,Y,Z) -> Blender (X,-Z,Y); FBX -Z forward, Y up; FBX_SCALE_ALL; metres",
+  "provenance": "Original procedural pickup from the existing box helper; no copied meshes or textures",
+  "exports": [
+    {
+      "asset": "HealthPickup.fbx",
+      "bounds_min": [
+        -0.14249999821186066,
+        0.062499988824129105,
+        -0.10750003904104233
+      ],
+      "bounds_max": [
+        0.14249999821186066,
+        0.23750002682209015,
+        0.10749999433755875
+      ],
+      "triangles": 972,
+      "mesh_count": 9,
+      "actions": [],
+      "source_sha256": "18dc0aafea8bd644558661f22d3b1e81ba8394a6e2f162164c0cf68d4fb97428",
+      "fbx_sha256": "9927b1ad11ae38ae236026ab96ed1c5253f820fe84cc20e692856ebe01f27f11"
+    }
+  ]
+}

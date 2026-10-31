@@ -63,7 +63,7 @@ namespace Wildstone.Networking
                 p.pickupSequence=shooter.LastActionSequence+1; p.pickupGeneration=pickup.Generation; p.pickupSent=true;
                 SendLaserAction(model,shooter,p.pickupSequence,CombatActionKind.Pickup,Vector3.forward,pickup.Id,pickup.Generation);
             }
-            p.picked|=client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==spec.Ammo && pickup.Generation==host.pickupGeneration+1 && pickup.AvailableTick>model.Tick;
+            p.picked|=client.pickupSent && shooter.SpecialWeapon==weapon && shooter.SpecialAmmo==WeaponCatalog.PickupAmmo(weapon) && pickup.Generation==host.pickupGeneration+1 && pickup.AvailableTick>model.Tick;
             if(!p.picked || !q.picked) return false;
             if(status.role=="client" && !p.equipSent)
             { p.equipSequence=shooter.LastActionSequence+1; p.equipSent=true; SendLaserAction(model,shooter,p.equipSequence,CombatActionKind.SelectSpecial,Vector3.forward); }
@@ -149,12 +149,12 @@ namespace Wildstone.Networking
                 if(projectileIndex==1)
                     m.coverBlocks=Physics.Raycast(m.explosion,(m.targetEye-m.explosion).normalized,out var coverHit,m.blastDistance,MotorTuning.WorldMask,QueryTriggerInteraction.Ignore) && coverHit.collider.gameObject==projectileCover;
             }
-            if(m.ammo<spec.Ammo-projectileIndex-1 || m.shotCount>1 || m.explosions>1 || m.hits>1 || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo || shooter.Health!=WeaponCatalog.Health || projectileIndex==1 && (m.damage!=0 || m.hits!=0))
+            if(m.ammo<WeaponCatalog.PickupAmmo(weapon)-projectileIndex-1 || m.shotCount>1 || m.explosions>1 || m.hits>1 || shooter.StarterAmmo!=WeaponCatalog.StarterAmmo || shooter.Health!=WeaponCatalog.Health || projectileIndex==1 && (m.damage!=0 || m.hits!=0))
                 throw new InvalidOperationException("Projectile duplicated spending/events or changed protected health.");
             m.despawned=m.samples>=2 && !present && m.explosions==1;
             bool damageValid=projectileIndex==0 ? m.hits==1 && m.expectedDamage>spec.EdgeDamage && Mathf.Abs(m.damage-m.expectedDamage)<.01f && Mathf.Abs(m.eventDamage-m.expectedDamage)<.01f :
                 m.coverBlocks && m.blastDistance<spec.Radius-.5f && m.expectedDamage>spec.EdgeDamage && m.damage==0 && m.hits==0;
-            m.observed=m.despawned && m.lastTick>m.firstTick && m.lastTravel-m.firstTravel>.2f && m.shotCount==1 && m.ammo==spec.Ammo-projectileIndex-1 && shooter.LastActionSequence==m.sequence && damageValid;
+            m.observed=m.despawned && m.lastTick>m.firstTick && m.lastTravel-m.firstTravel>.2f && m.shotCount==1 && m.ammo==WeaponCatalog.PickupAmmo(weapon)-projectileIndex-1 && shooter.LastActionSequence==m.sequence && damageValid;
             status.stage="projectile_verdict_"+projectileIndex;
             if(!m.observed || !remote.observed) return false;
             if(m.identity!=remote.identity || m.shotId!=remote.shotId || m.explosionId!=remote.explosionId || m.hitId!=remote.hitId || Mathf.Abs(m.damage-remote.damage)>.01f || (m.explosion-remote.explosion).sqrMagnitude>.0001f)

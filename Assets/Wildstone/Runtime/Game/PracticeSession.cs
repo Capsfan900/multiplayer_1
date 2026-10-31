@@ -88,7 +88,7 @@ namespace Wildstone.Game
         {
             Settings=value.Copy(); Settings.Normalize(); Settings.Apply(Camera); if(save) Settings.Save();
             if(View!=null) { View.ReducedMotion=Settings.ReducedMotion; View.SetBaseFieldOfView(HipVerticalFov); fovView=View; fovAspect=Camera!=null?Camera.aspect:0; }
-            Input?.Dispose(); Input=new PracticeInput(Settings); SettingsChanged?.Invoke();
+            var previous=Input; Input=new PracticeInput(Settings,previous); previous?.Dispose(); SettingsChanged?.Invoke();
         }
         public void Show(MenuScreen screen)
         {
@@ -302,7 +302,7 @@ namespace Wildstone.Game
                 var command=new CombatAction { Participant=1,ConnectionGeneration=player.ConnectionGeneration,LifeGeneration=player.LifeGeneration,AuthorityGeneration=Match.AuthorityGeneration,Tick=tick,Sequence=++actionSequence,Kind=kind,Direction=aim };
                 if(kind==CombatActionKind.Pickup)
                 {
-                    float nearest=6.25f; command.PickupId=-1;
+                    float nearest=WeaponCatalog.PickupReach*WeaponCatalog.PickupReach; command.PickupId=-1;
                     for(int i=0;i<Match.Pickups.Count;i++)
                     {
                         var item=Match.Pickups[i];

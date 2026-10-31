@@ -12,10 +12,10 @@ namespace Wildstone.Tests
     public sealed class FusionCombatWorldTests
     {
         [TestCase(100,101,.5f,100,101,.5f)]
-        [TestCase(-100,-99,.5f,102,102,.5f)]
+        [TestCase(-100,-99,.5f,90,90,.5f)]
         [TestCase(125,130,.5f,120,120,.5f)]
         [TestCase(115,110,2f,115,115,1f)]
-        public void ProviderViewIntervalStaysWithin150Milliseconds(int sdkFrom,int sdkTo,float sdkAlpha,int expectedFrom,int expectedTo,float expectedAlpha)
+        public void ProviderViewIntervalStaysWithinTheRewindCap(int sdkFrom,int sdkTo,float sdkAlpha,int expectedFrom,int expectedTo,float expectedAlpha)
         {
             // The first normal interval is below the cap; use a later host tick for that case.
             int now=sdkFrom==100?110:120;

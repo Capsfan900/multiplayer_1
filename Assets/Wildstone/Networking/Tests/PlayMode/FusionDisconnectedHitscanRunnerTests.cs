@@ -95,7 +95,8 @@ namespace Wildstone.Tests
             var request = new FusionCombatAction
             {
                 Participant = 1, ConnectionGeneration = 1, AuthorityGeneration = match.Model.AuthorityGeneration,
-                LifeGeneration = 1, Sequence = 0, Kind = CombatActionKind.Fire, Direction = Vector3.forward
+                // Chest height: the fixture has no head hitbox and the torso box stops under the head (D040).
+                LifeGeneration = 1, Sequence = 0, Kind = CombatActionKind.Fire, Direction = new Vector3(0, -.06f, 1).normalized
             };
             Assert.That(match.SubmitAction(player, request), Is.True);
             targetTick = match.Model.Tick + 3;

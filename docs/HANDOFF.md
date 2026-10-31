@@ -1,18 +1,13 @@
 # Handoff
 
-Updated: 2026-10-30. **Photon-only Windows preview published; full multiplayer MVP remains open.**
+Updated: 2026-10-31. **Photon-only Windows preview published; full multiplayer MVP remains open.**
 Active worktree: `C:\Users\tyler\orca\workspaces\multiplayer_1\mvp-2`, branch `mvp-2`.
 The original project at `C:\Users\tyler\Main Storage\multiplayer_1` remains untouched.
 
-Latest public download: [Better Bean Battles preview 07d8cc8](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261030-07d8cc8).
-Game sources were frozen at `07d8cc8176c5328f556f008a40a3de2862b78a32` from the current files on
-2026-10-30 (22:52 EDT), then built at `D:/WildstoneBuilds/release-20261030-225213/source`.
-A documentation-only release record follows that build-source commit. Fresh Unity
-Windows build, 15-second headless startup and ZIP CRC/SHA-256 checks pass.
-[QA](QA.md#2026-10-30-current-state-public-preview-release) records the exact
-commands and limits. The separate authoring checkout and its ongoing work were
-left untouched. The uncommitted labels below describe the authoring checkout at
-capture; those files are committed in this isolated release snapshot.
+Latest public download: [laser arsenal and first-person polish preview e9e091f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-e9e091f).
+Built from committed snapshot `e9e091f` in `D:/WildstoneBuilds/wildstone-e9e091f`.
+Fresh Windows build, 15-second headless startup, archive integrity and anonymous
+download checks pass. [QA](QA.md) records the failed C: attempt and acceptance limits.
 
 The user resumed all tasks and requested GPT-6.1 Sol delegates. We recovered the
 existing authored checkpoint rather than reimplementing it: 194 files were copied
@@ -21,6 +16,32 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
 
 ## Current evidence
 
+- **Resume here (2026-10-31 02:20).** Uncommitted.
+  - **Playable build `b563bab3…`** (`Artifacts/Unity/Windows/WildstoneArena.exe`,
+    not yet played). It adds the HUD allocation fix, health packs (D039), the
+    playtest fixes (D040) and the zone waypoint chip to `5ac42eed…`, which is
+    archived. Both players must use it. The build hash method changed; see
+    [QA](QA.md#2026-10-31-d040-playable-build).
+  - **Verified on the final source:** EditMode 522/524 and PlayMode 184/185, with
+    explicit skips only. All four capture modes pass, plus a frame sample (Ultra p99
+    2.71 ms, about 560 B/frame). All 17 Photon regression scenarios pass
+    ([QA](QA.md#2026-10-31-playtest-fixes-d040)). Two needed the smoke harness's
+    one-magazine ammo pins fixed. Reconnect needed reruns after a transient Photon
+    fault, then passed 10 of 10 cycles.
+  - **Rewind cap 250 ms (D040 proposal):** regional80 shots are no longer clamped;
+    adverse150 shots clamp at 250 ms against about 255–293 ms requested.
+  - **Next: the two-hour gameplay soak, rerun with nothing else on the PC.** The
+    first run failed at about 46 min, most likely from a machine-wide stall while
+    Unity batch work overlapped it ([QA](QA.md#2026-10-31-gameplay-soak)). The
+    runner now names a stall. Command:
+    `Invoke-NetworkSmoke.ps1 -Scenario capacity -Gameplay -SoakSeconds 7200`.
+    It occupies the PC for over two hours, so do not run it while the user is
+    playing on that PC.
+- **Playtest fixes (D040, 2026-10-31), implemented as proposals.** The eleven
+  reports in [PLAYTEST-FIX-LATER](PLAYTEST-FIX-LATER.md) are implemented with the
+  report's recommended values ([D040](DECISIONS.md)). Still the user's call: the
+  250 ms rewind and attack window, the two-magazine ammo, the 0.2 s fire buffer,
+  the eased recoil curve (unchanged), and which red mark the tester meant.
 - **Quality pass D028–D031 (2026-10-30), uncommitted and not in any public build.**
   It covers rendering, armored soldiers with procedural animation, competitive
   gunplay revision 4, the menu and music, the derez, and D031's matte maps and weapon
@@ -223,10 +244,58 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
   ordinary ping. The cap is unchanged; whether to raise it is the user's call. See
   [QA](QA.md#2026-10-30-measured-rewind-age).
 
-- **Grenade in hand, dimmer muzzle lamps, firmer HUD panels (2026-10-30),
-  uncommitted, not yet captured.** Tests pass, but the GPU was in use, so there are
-  no captures. Capture and compare before any playable build includes them. See
-  [QA](QA.md#2026-10-30-grenade-in-hand-muzzle-lamp-and-hud-backing-not-yet-captured).
+- **Weapon read fixes (2026-10-30), uncommitted, captured.** The grenade shows in the
+  support hand while the throw key is held. Muzzle lamps are dimmer and the bottom HUD
+  panels firmer. The sniper rail is heavier and the sword swing is a crescent. The
+  two-line title no longer makes the 720p title menu scroll, and the kill banner
+  clears the muzzle. Tests and captures pass;
+  Ultra frame time is about 0.15 ms higher on average than the last sample, with p99
+  in the same range. None of it has been played. See
+  [QA](QA.md#2026-10-30-weapon-read-fixes-grenade-in-hand-sniper-rail-sword-slash-title-fit).
+
+- **30-minute capacity soak (2026-10-30).** Eight processes held a real Photon room
+  for 1800 s (480 s Running, then Results) and passed. Working set grew 4.5–8 MB per
+  peer; only start and end values are kept. It has no gameplay actions, so the
+  backlog's gameplay soak and the two-hour soak are still open. See
+  [QA](QA.md#2026-10-30-30-minute-capacity-soak).
+
+- **Stun end on a predicting client (2026-10-30), uncommitted, in the `5ac42eed…`
+  build.** A stunned player on a client used to stay frozen about one round trip past
+  the stun and then jump forward. The movement snapshot now carries the stun's end
+  tick, so the client releases on the host's tick. Suites and seven real-Photon
+  regressions pass. The new two-process `stun-client` smoke (2026-10-31) makes the
+  client the target. It releases exactly on the end tick at about 10 ms and 163 ms
+  RTT, with no catch-up jump. See
+  [QA](QA.md#2026-10-30-stun-end-on-a-predicting-client) and
+  [the proof](QA.md#2026-10-31-stunned-client-two-process-proof).
+
+- **Gameplay soak and allocation figures (2026-10-30/31), uncommitted, smoke-only.**
+  `Invoke-NetworkSmoke.ps1 -Scenario capacity -Gameplay` makes all eight peers move and
+  fire and the host rematch every round; `-SoakSeconds` reaches 7200. A 100 s run
+  passes:
+  - 4 rounds; about 175 shots per peer;
+  - 0.4 GC collections/s per peer, once the harness stopped allocating per frame;
+  - heap about 20–24 MB;
+  - working set +14–17 MB.
+
+  The perf sample showed about 1.4 KB of managed allocation per frame and no
+  frame-time regression (Ultra p99 2.49 ms against 2.78–2.99 ms before). The HUD
+  now rebuilds a label only when its value changes, which cut that to 560 bytes
+  and 3 collections per sample
+  ([QA](QA.md#2026-10-31-hud-string-allocations)). The
+  two-hour run failed at about 46 min on a coherence check, not yet diagnosed. See
+  [QA](QA.md#2026-10-31-gameplay-soak).
+
+- **Map name card and fixture FOV (2026-10-31), uncommitted.** Each round opens with
+  the map's name for 3 s, and the hint line keeps it. The tester read the three
+  maps as one, because they share a kit and spawn structure; making them look
+  different is still a proposal. Capture fixtures now use the game's default view.
+  Before, they used 90 degrees vertical and drew the world about 1.5x smaller. The
+  `-Firefight` mode adds sword and 15/30/45 m range views. The Laser Sword slash is
+  now a blade-mask smear 1 m out, its bright head leading the swing in front of the
+  target; before, it was a thin streak hidden behind the target. See
+  [QA](QA.md#2026-10-31-map-name-card) and
+  [captures](QA.md#2026-10-31-firefight-sword-and-range-captures-fixture-fov).
 
 - **Smoke harness (2026-10-30), uncommitted, smoke-only.** Peer status reads keep the
   last good copy, so a briefly locked file no longer restarts stability windows.
@@ -412,15 +481,24 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
   pass; human animation loop contracts and attachment checks pass.
 - Four Python map regressions pass. Fourteen model/source hash pairs and all 73
   saved map meshes were verified without regenerating the approved source assets.
-- Current playable build (2026-10-30 20:15): `Artifacts/Unity/Windows/WildstoneArena.exe`,
-  hash `058fa3dd…`, named Better Bean Battles (D038). Since the 16:06 build it adds:
+- Current playable build (2026-10-31 02:15): `Artifacts/Unity/Windows/WildstoneArena.exe`,
+  hash `b563bab3…` (new hash method), not yet played; see Resume here above. It
+  replaced the 00:32 build `5ac42eed…`, archived as `Windows-5ac42eed`, which was
+  not played either. On top of the 23:33 build `db84d55e…`, `5ac42eed…` added the
+  stunned-client release fix, the sword slash smear and the map name card; both
+  players should use it ([QA](QA.md#2026-10-31-playable-build)). The 23:33 build,
+  named Better Bean Battles (D038), had added since the 16:06 build:
   - D036 held-fire cadence;
   - no legs in view while sliding;
   - D037 Push Lens deflection;
   - online rematch and the late peer identity fix
-    ([QA](QA.md#2026-10-30-online-rematch-and-night-playable-build)).
+    ([QA](QA.md#2026-10-30-online-rematch-and-night-playable-build));
+  - the weapon read fixes: grenade in hand, dimmer muzzle lamps, firmer HUD panels,
+    heavier sniper rail, crescent sword slash, title fit and kill banner
+    ([QA](QA.md#2026-10-30-late-night-playable-build)).
 
-  The unplayed 19:18 `ece027dc…` and 19:44 `625026d1…` builds were overwritten. The 16:06 build `d838ac03…`, which
+  The unplayed 19:18 `ece027dc…` and 19:44 `625026d1…` builds were overwritten. The 23:33
+  build `db84d55e…`, the 20:15 build `058fa3dd…`, the 16:06 build `d838ac03…`, which
   the user played, the 15:08 build `76f03229…`
   ([QA](QA.md#2026-10-30-second-playable-build-refresh)) and the 12:39 build
   `d6d14b5a…` are kept under `D:/WildstoneArchive/mvp-2/Artifacts/Unity/`.
@@ -495,11 +573,11 @@ SDK, identity, content and menu work is not repeated.
      no legs in view while sliding, Push Lens deflection (D037), online rematch and
      the Better Bean Battles title screen (D038). The rename resets saved settings
      once.
-   - Decide the lag-compensation cap: measured view ages exceed the accepted 150 ms
-     at an ordinary 80 ms ping ([QA](QA.md#2026-10-30-measured-rewind-age)). The
-     same 150 ms window drops an attack whose RPC was lost and resent under loss, so
-     that press is lost
-     ([QA](QA.md#2026-10-30-smoke-harness-peer-reads-stun-probe-and-late-attacks)).
+   - Tune the lag-compensation cap. The 150 ms cap clamped every shot at an
+     ordinary 80 ms ping ([QA](QA.md#2026-10-30-measured-rewind-age)) and dropped
+     resent attacks under loss. D040 raised the cap and attack window to 250 ms as a
+     proposal, which covers regional80 shots
+     ([QA](QA.md#2026-10-31-playtest-fixes-d040)).
 
    Tune from that feedback. Spawns now face the exit of the arrival screen, but the first
    view is still a walled alley; opening it would mean a map geometry change. Listen

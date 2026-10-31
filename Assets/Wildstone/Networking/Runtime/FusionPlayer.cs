@@ -45,10 +45,10 @@ namespace Wildstone.Networking
 #endif
         }
 
-        // Shots, grenades, Blink and shield answer timing, so they keep the 150 ms window (18 ticks at 120 Hz). Pickups,
-        // reloads and weapon selections are judged on current host state, so one resent after packet loss still lands
-        // up to 500 ms late instead of silently vanishing.
-        internal const int AttackWindowTicks=18, InventoryWindowTicks=60;
+        // Shots, grenades, Blink and shield answer timing, so they keep a 250 ms window (30 ticks at 120 Hz, D040
+        // proposal) matching the hitscan rewind cap. Pickups, reloads and weapon selections are judged on current host
+        // state, so one resent after packet loss still lands up to 500 ms late instead of silently vanishing.
+        internal const int AttackWindowTicks=30, InventoryWindowTicks=60;
         internal static bool AcceptsCombatTick(int now,int sent,CombatActionKind kind=CombatActionKind.Fire)
         {
             long age=(long)now-sent;
@@ -157,11 +157,11 @@ namespace Wildstone.Networking
             State = FusionMotorState.FromMotor(motor.CaptureState());
         }
 
-        public void SetSuppressed(bool suppressed)
+        public void SetSuppressed(bool suppressed, int liftTick = 0)
         {
             if (!HasStateAuthority || !Runner.IsServer) throw new InvalidOperationException("Only the host sets combat suppression");
             motor.RestoreState(State.ToMotor());
-            motor.SetSuppressed(suppressed);
+            motor.SetSuppressed(suppressed, liftTick);
             State = FusionMotorState.FromMotor(motor.CaptureState());
         }
 
@@ -212,8 +212,9 @@ namespace Wildstone.Networking
             if(HasInputAuthority && !Runner.IsServer) predictionStarted=true;
             if (hitbox != null && HasStateAuthority)
             {
-                hitbox.BoxExtents = new Vector3(.35f, State.CapsuleHeight * .5f, .35f);
-                hitbox.Offset = State.CapsuleCenter;
+                float top = CombatRules.BodyTop(State.CapsuleHeight);
+                hitbox.BoxExtents = new Vector3(CombatRules.BodyHalfWidth, top * .5f, CombatRules.BodyHalfWidth);
+                hitbox.Offset = Vector3.up * (top * .5f);
             }
             if (head != null && HasStateAuthority)
             {

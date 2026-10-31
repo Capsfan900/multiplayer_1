@@ -67,8 +67,10 @@ The port of vibegame1 `MenuCameraDrift`, `CloudDive`, `UiSprites.RampH` and the
   band, then the source's eased fall) with a thin sand margin rule; the world is not
   flat-dimmed except under Pause/Settings/Results over a match. The title uses
   Barlow Condensed Black (OFL) italic "BETTER BEAN / BATTLES" (the game's name, D038;
-  two 80 px lines, formerly one 92 px "WILDSTONE") over a sand offset copy, a slab rule
-  with fading tail and a letter-spaced subtitle. Screen titles and eyebrows use the
+  two 64 px lines, formerly one 92 px "WILDSTONE") over a sand offset copy, a slab rule
+  with fading tail and a letter-spaced subtitle. Two 80 px lines made the 720p title
+  column scroll and pushed Quit below the fold on ultrawide, so the face is 64 px and the
+  column's top and bottom padding is 3% of the width (was 4%). Screen titles and eyebrows use the
   same face unless the text carries a team symbol.
 - Motion: a new screen's column fades in from -24 px over 0.22 s; same-screen refreshes
   do not animate. Buttons carry a sand accent bar, invert to ivory (primary to sand)
@@ -127,16 +129,29 @@ ADS and head rules; values here are proposed.
   tick, so later pellets and other shooters land 0-damage hits that tick; those
   never take the credit (2026-10-30).
 - Kill banner (2026-10-30; implemented and captured, values proposed):
-  - Your own kill shows `ELIMINATED` plus the victim's team symbol and number on a
-    graphite pill 63% down the screen. A headshot adds `HEADSHOT` in words, because a
-    `◎` read as the violet team's `●`.
+  - Your own kill shows `ELIMINATED` plus the victim's team symbol and number in 17 px
+    text on a graphite pill (0.8 opacity) 59% down the screen. A headshot adds
+    `HEADSHOT` in words, because a `◎` read as the violet team's `●`. At 63%, 15 px and
+    0.62 the pill ran into the Line Driver's muzzle and the red streak word was faint
+    on the grey it made over ivory stone.
   - Kills within 4 s of your previous kill count up `DOUBLE`, `TRIPLE`, then `×N`.
     The streak word is in the kill-mark red. A longer pause starts over.
   - The banner lasts 1.8 s and fades over its last third of a second (no fade with
     reduced motion). It hides while you are dead.
   - It uses the same attribution as the feed and is presentation only.
-- Damage direction: a red wedge rotates toward the attacker's eye for 1 s and fades
+- Map name card (2026-10-31; implemented and captured, values proposed, not
+  human-accepted). The three maps share a kit and spawn structure, and the tester
+  read them as one. The first 3 s of each round show the map's display name in
+  capitals on a graphite card under the zone pill (34 px, wide letter spacing).
+  It fades over its last half second, or cuts with reduced motion. It names the
+  map; it does not stand in for making the maps look different.
+- Damage direction: a red arc rotates toward the attacker's eye for 1 s and fades
   (it stays static when reduced motion is on).
+  - Since 2026-10-31 it is a thin 44° arc at 35% of screen height from the centre
+    (at least 60 px; `ArenaHud.DamageArcRadius`). A 56 px bar 120 px from the
+    reticle read as a red hitmarker
+    ([playtest item 7](../../PLAYTEST-FIX-LATER.md#7-red-hit-marker)).
+  - The red kill ✕ is unchanged. Which red mark the tester meant is still open.
 - Low health below 35: an edge vignette. It pulses gently unless reduced motion is on.
 
 Playing HUD layout (2026-10-30; implemented and captured, not human-accepted). `ArenaHud`
@@ -149,10 +164,25 @@ the map shows through them.
   that fills toward `ArenaHud.WinSeconds`. The bar is visible even at zero, so the
   colour always shows. The player's own team chip has an ivory border.
 - Under the chips: a zone pill. Its ▲ arrow points toward the zone. The arrow is
-  ivory while the zone is free, the captor's tint while it is held, and warning red
-  with "ZONE CONTESTED" while it is contested.
+  the idle zone magenta (`ArenaHud.ZoneIdle`, matching the world zone) while the
+  zone is free, the captor's tint while it is held, and warning red with
+  "ZONE CONTESTED" while it is contested. It was ivory before 2026-10-31.
+- Zone waypoint (2026-10-31, playtest item 12; implemented and captured, not
+  human-accepted): a ◆ with the distance in metres. It sits over the zone centre,
+  2 m up, in the arrow's colour on an 80 px graphite chip (0.72, like the bottom
+  panels). The first version drew the text with a 1.5 px dark outline, which ate the
+  14 px glyphs and left them hollow.
+  - Off screen in front, it slides to the nearest screen edge along its direction
+    from the centre (`ArenaHud.ZoneMarkerPosition`), 44 px in from the edge so the
+    whole chip stays on screen.
+  - Behind the camera, the projection is mirrored and its height means nothing, so
+    it only shows which way to turn: the left or right edge at mid-height, or
+    bottom centre when the zone is almost directly behind (within 5% of the
+    screen width of centre).
+  - It hides inside the zone radius and while dead.
 - Bottom left, stacked upward from the vitals panel: ability chips (Blink, Shield,
-  Grenade, each with its key; dimmed at zero), then a faint `ESC MENU` hint. At the
+  Grenade, each with its key; dimmed at zero), then a faint hint led by the map name
+  (`ATRIUM · ESC MENU`). At the
   largest UI scale, a top-left hint ran into the score chips. The vitals panel has
   a left border in the team colour, a shield value and bar that appear only while
   shielded, a large health number that turns red below 35, a health bar and a
@@ -163,13 +193,23 @@ the map shows through them.
   - Both bottom panels use the score chips' 0.72 backing (2026-10-30; it was 0.55).
     Several viewmodels still reach under the weapon panel, and through the thinner
     backing the sniper's scope lens and the guns' cyan stripes muddied the count.
-  - Low ammo (2026-10-30): in the last quarter of the held magazine (rounds × 4 ≤
-    capacity), the count turns the warning red.
+  - Low ammo (2026-10-30): in the last quarter of the held ammo (rounds × 4 ≤
+    capacity), the count turns the warning red. Since catalog revision 5 a
+    special's capacity is its two-magazine pickup count (`WeaponCatalog.PickupAmmo`).
   - Each shot in that range also plays a 45 ms dry click on the HUD voice at 0.35
     of the confirm level. It is pitched well under the hit tick so the two stay
     distinct.
   - Switching weapons, picking up ammo and death never click.
 - While dead, the panels hide and the centre shows `RESPAWN` with the seconds left.
+- Pickup prompt: `E   PICK UP <ITEM>` while a pickup is within reach of the predicted
+  feet. Since 2026-10-31 a Blink pickup reads `E   PICK UP BLINK · Q TO TELEPORT 6 m`
+  (`ArenaHud.PickupPrompt`, with the player's bindings), and the Practice screen says
+  what Blink does ([playtest item 9](../../PLAYTEST-FIX-LATER.md#9-what-is-blink)).
+- Blink refusal (2026-10-31): a Blink press that still holds its charge 0.6 s later
+  (`ArenaHud.BlinkDenySeconds`, which covers the round trip online) was refused. It
+  plays the dry click and shows `NO FLOOR TO BLINK TO · AIM AT OPEN GROUND` in the
+  prompt slot for 1.5 s. The host's refusal reason is not replicated; this
+  inference is presentation only.
 
 The tints lift crimson and violet so they read on graphite. Team symbols always go
 with the tints.

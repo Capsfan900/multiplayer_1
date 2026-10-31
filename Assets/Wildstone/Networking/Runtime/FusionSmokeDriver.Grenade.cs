@@ -112,7 +112,7 @@ namespace Wildstone.Networking
             }
             else if(status.role=="client" && shooter.LastActionSequence<m.sequence && now-grenadeThrown>1)
             {
-                // A loss-resent RPC can reach the host past the 150 ms attack window and is dropped unseen
+                // A loss-resent RPC can reach the host past the 250 ms attack window and is dropped unseen
                 // (FusionPlayer.AcceptsCombatTick); press again with the same sequence, which the host dedups.
                 m.resends++; grenadeThrown=now; SendLaserAction(model,shooter,m.sequence,CombatActionKind.Grenade,Vector3.back);
             }

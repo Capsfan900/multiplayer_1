@@ -208,7 +208,9 @@ namespace Wildstone.Networking
                 var player = Model.Find(i + 1);
                 if (avatar == null || player == null) continue;
                 avatar.ApplyCombatState(player);
-                avatar.SetSuppressed(RecoveryWarmup || player.Suppressed(Model.Tick) || Model.Phase == ArenaMatchPhase.Finished || Model.Phase == ArenaMatchPhase.Aborted);
+                bool stepping = Model.Phase == ArenaMatchPhase.Running && !RecoveryWarmup;
+                avatar.SetSuppressed(RecoveryWarmup || player.Suppressed(Model.Tick) || Model.Phase == ArenaMatchPhase.Finished || Model.Phase == ArenaMatchPhase.Aborted,
+                    stepping ? StunLift(player, avatar.State.Tick + 1) : 0);
                 avatar.SimulateHostTick();
                 var motor = avatar.State;
                 var aim = Quaternion.Euler(motor.Pitch, motor.Yaw, 0) * Vector3.forward;
@@ -242,9 +244,14 @@ namespace Wildstone.Networking
             {
                 if (avatars[i] == null) continue;
                 var player = Model.Find(i + 1);
-                if (player != null) avatars[i].SetSuppressed(player.Suppressed(Model.Tick) || Model.Phase != ArenaMatchPhase.Running);
+                if (player != null) avatars[i].SetSuppressed(player.Suppressed(Model.Tick) || Model.Phase != ArenaMatchPhase.Running,
+                    Model.Phase == ArenaMatchPhase.Running ? StunLift(player, avatars[i].State.Tick) : 0);
             }
         }
+
+        // Motor tick a stun-only suppression lifts at; motorTick is the motor tick simulated at Model.Tick.
+        int StunLift(CombatState player, int motorTick) =>
+            player.Alive && player.Connected && Model.Tick < player.StunUntil ? player.StunUntil - Model.Tick + motorTick : 0;
 
         void PublishPresentationEvents()
         {

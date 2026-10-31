@@ -35,6 +35,7 @@ namespace Wildstone.Maps
             kit.Pick("laser-sniper", 0, 4, 24);
             kit.Pick("laser-smg", 0, 0, 3);
             kit.Utilities(14, 18);
+            kit.HealthPacks(V(-28.5f, 0, 2), V(28.5f, 0, 2), V(0, 0, -24), V(0, 0, 14));
             return kit.Finish(new[] { V(0, 0, -8), V(20, 0, -8), V(20, 0, -4), V(20, 4, 12),
                 V(20, 4, 22), V(-20, 4, 22), V(-20, 4, 12), V(-20, 0, -4), V(-20, 0, -8) });
         }
@@ -62,6 +63,7 @@ namespace Wildstone.Maps
             kit.Pick("laser-sniper", 0, 4, 10);
             kit.Pick("laser-smg", 0, 4, -10);
             kit.Utilities(26, 7);
+            kit.HealthPacks(V(-36, 0, 0), V(36, 0, 0), V(0, 4, -17), V(0, 4, 17));
             return kit.Finish(new[] { V(-28, 0, -14), V(-20, 0, -14), V(-6, 4, -14), V(0, 4, -14),
                 V(0, 4, 14), V(6, 4, 14), V(20, 0, 14), V(28, 0, 14), V(28, 0, -14),
                 V(20, 0, -14), V(6, 4, -14), V(0, 4, -14), V(0, 4, 14), V(-6, 4, 14),
@@ -93,6 +95,7 @@ namespace Wildstone.Maps
             kit.Pick("laser-sniper", -8, 4, 26);
             kit.Pick("laser-smg", 19, 0, -20);
             kit.Utilities(14, 22);
+            kit.HealthPacks(V(-29, 0, -8), V(29, 0, -8), V(0, 0, -32), V(0, 0, 22));
             return kit.Finish(new[] { V(-24, 0, -21), V(20, 0, -21), V(20, 0, -16), V(20, 4, 0),
                 V(20, 4, 22), V(-25, 4, 22), V(-25, 4, 12), V(-25, 0, -4), V(-25, 0, -21) });
         }
@@ -107,7 +110,7 @@ namespace Wildstone.Maps
             private readonly List<ArenaPickup> pickups = new List<ArenaPickup>();
             public Kit(string id, string name, float width, float depth)
             {
-                map = new ArenaDefinition { Id = id, DisplayName = name, Revision = 4, Minimum = V(-width / 2, -2, -depth / 2), Maximum = V(width / 2, 24, depth / 2) };
+                map = new ArenaDefinition { Id = id, DisplayName = name, Revision = 6, Minimum = V(-width / 2, -2, -depth / 2), Maximum = V(width / 2, 24, depth / 2) };
                 Slab("Foundation", 0, 0, 0, width, depth, 2, StoneTone.Ash);
                 // 8 m: a jump from the +4 m floors (2.4 m apex) cannot reach the top. At 6 m it put players on the perimeter.
                 Box("South boundary", 0, 4, -depth / 2 + .5f, width, 8, 1);
@@ -148,6 +151,11 @@ namespace Wildstone.Maps
             {
                 Pick("blink", -x, 0, -z); Pick("shield", x, 0, -z);
                 Pick("grenade", -x, 0, z); Pick("grenade", x, 0, z);
+            }
+            // Map revision 6: one pack at each edge's midpoint, so every pack sits between two corner starts.
+            public void HealthPacks(params Vector3[] floors)
+            {
+                foreach (var floor in floors) Pick("health", floor.x, floor.y, floor.z);
             }
             public ArenaDefinition Finish(Vector3[] route)
             {

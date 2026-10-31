@@ -34,6 +34,7 @@ Material:
     - _Mode: 0
     - _Opacity: 1
     - _Pulse: 0
+    - _Track: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _RimColor: {r: 1, g: 1, b: 1, a: 1}

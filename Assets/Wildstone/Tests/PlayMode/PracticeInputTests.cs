@@ -216,6 +216,36 @@ namespace Wildstone.Tests
             }
             finally { InputSystem.RemoveDevice(keyboard); }
         }
+        [Test] public void EarlySemiAutomaticPressFiresOnceAtReady()
+        {
+            var keyboard=InputSystem.AddDevice<Keyboard>();
+            try
+            {
+                var settings=new LocalSettings(); settings.Bindings[7]="<Keyboard>/j";
+                using(var input=new PracticeInput(settings))
+                {
+                    var player=new CombatState {LifeGeneration=1,ConnectionGeneration=1,SelectedSpecial=true,SpecialWeapon=WeaponKind.LaserSniper,SpecialAmmo=6};
+                    var actions=new List<CombatActionKind>();
+                    void Press()
+                    {
+                        InputSystem.QueueStateEvent(keyboard,new KeyboardState()); InputSystem.Update(); input.Sample(true);
+                        InputSystem.QueueStateEvent(keyboard,new KeyboardState(Key.J)); InputSystem.Update(); input.Sample(true);
+                    }
+                    int interval=WeaponCatalog.Ticks(WeaponCatalog.Get(WeaponKind.LaserSniper).Interval,120), ready=1+interval;
+                    Press(); input.ConsumeActions(actions,1,120,player,true); CollectionAssert.AreEqual(new[]{CombatActionKind.Fire},actions);
+                    Press(); input.ConsumeActions(actions,ready-12,120,player,true); Assert.That(actions,Is.Empty,"0.1 s early waits.");
+                    Press(); input.ConsumeActions(actions,ready-6,120,player,true); Assert.That(actions,Is.Empty,"A second early press is the same shot.");
+                    input.ConsumeActions(actions,ready-1,120,player,true); Assert.That(actions,Is.Empty);
+                    input.ConsumeActions(actions,ready,120,player,true); CollectionAssert.AreEqual(new[]{CombatActionKind.Fire},actions,"Fires once at ready.");
+                    input.ConsumeActions(actions,ready+1,120,player,true); Assert.That(actions,Is.Empty);
+                    Press(); input.ConsumeActions(actions,ready+interval-12,120,player,true); Assert.That(actions,Is.Empty);
+                    InputSystem.QueueStateEvent(keyboard,new KeyboardState()); InputSystem.Update(); input.Sample(true);
+                    player.SelectedSpecial=false; input.ConsumeActions(actions,ready+interval,120,player,true);
+                    Assert.That(actions,Is.Empty,"A weapon switch drops the buffered shot.");
+                }
+            }
+            finally { InputSystem.RemoveDevice(keyboard); }
+        }
         [Test] public void CompleteFireTapRemainsExactlyOneAction()
         {
             var keyboard=InputSystem.AddDevice<Keyboard>();

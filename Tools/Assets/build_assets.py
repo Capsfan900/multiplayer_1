@@ -528,6 +528,7 @@ def palette():
         "amber": material("SignalAmber", (.95, .43, .12)),
         "coral": material("SignalCoral", (.84, .30, .24)),
         "violet": material("SignalViolet", (.55, .39, .80)),
+        "mint": material("SignalMint", (.30, .86, .50)),
         "suit": material("MatteCharcoalSuit", (.19, .21, .22)),
         "shade": material("DeepCharcoal", (.105, .12, .13)),
         "head": material("HeadValue", (.28, .30, .31)),
@@ -1034,6 +1035,16 @@ def weapon(root, name):
         B("ShieldKeel", (0, .19, -.025), (.055, .035, .24), "graphite")
         R("ShieldStatus", (0, .207, 0), .082, .065, "cyan", axis="y", depth=.009)
         muzzle = (0, .15, .16)
+    elif name == "HealthPickup":
+        # Ivory canister with graphite end caps; a mint plus on the top and both faces reads as health while it spins.
+        B("HealthCanister", (0, .15, 0), (.24, .16, .20), "ivory")
+        for side in (-1, 1):
+            B("HealthCap", (side * .13, .15, 0), (.025, .175, .215), "graphite")
+            B("HealthCross", (0, .15, side * .1015), (.11, .034, .006), "mint")
+            B("HealthCross", (0, .15, side * .1015), (.034, .11, .006), "mint")
+        B("HealthCross", (0, .2315, 0), (.13, .006, .04), "mint")
+        B("HealthCross", (0, .2315, 0), (.04, .006, .13), "mint")
+        muzzle = (0, .15, .16)
     else:
         raise ValueError(name)
     if sight or name in WEAPON_SPECIALS:
@@ -1065,14 +1076,14 @@ def weapon(root, name):
         S("TriggerGuard", band(guard, .011), -.009, .009, "graphite", .002)
         S("Trigger", [(-.086, .03), (-.07, .03), (-.067, .005), (-.071, -.017), (-.079, -.022), (-.083, -.015), (-.081, .005)],
           -.006, .006, "mid", .0015)
-    elif name not in ("BlinkPickup", "ShieldPickup", "Grenade"):
+    elif name not in ("BlinkPickup", "ShieldPickup", "HealthPickup", "Grenade"):
         B("PalmGrip", (0, -.095, -.18), (.09, .25, .09), "graphite")
         B("GripHeel", (0, -.225, -.205), (.105, .045, .10), "ivory")
-    add(empty("Grip", (0, -.12, -.18) if name not in ("BlinkPickup", "ShieldPickup", "Grenade") else (0, 0, 0), base))
+    add(empty("Grip", (0, -.12, -.18) if name not in ("BlinkPickup", "ShieldPickup", "HealthPickup", "Grenade") else (0, 0, 0), base))
     add(empty("Muzzle", muzzle, base))
     if sight:
         add(empty("Sight", sight, base))
-    if name not in ("BlinkPickup", "ShieldPickup"):
+    if name not in ("BlinkPickup", "ShieldPickup", "HealthPickup"):
         support = {"LaserShotgun": (-.10,-.05,.32), "PulseLobber": (-.075,-.065,.20),
                    "ReboundDisc": (-.055,.015,.12), "PushLens": (-.06,.04,.07),
                    "StunGun": (-.06,.035,.015), "LaserSword": (0,-.21,-.20)}
@@ -1336,6 +1347,7 @@ def verify_asset(path, kind):
             "LaserSword": ("BladeCore", "Guard"),
             "BlinkPickup": ("BlinkOuter", "BlinkNotch"),
             "ShieldPickup": ("ShieldBody", "ShieldStatus"),
+            "HealthPickup": ("HealthCanister", "HealthCross"),
             "LaserPistol": ("PistolSlide", "PistolEmitter", "FrontSight", "RearSight"),
             "LaserShotgun": ("ShotgunBarrel", "PumpForeend"),
             "LaserSniper": ("PrecisionBarrel", "ScopeTube", "ScopeEyepiece"),
@@ -1624,9 +1636,23 @@ def preview_weapon_specials(root):
     print(path)
 
 
+def build_health_pickup(root):
+    """Only the health pack pickup; no other model is rebuilt."""
+    path = weapon(root, "HealthPickup")
+    result = verify_asset(path, "weapon")
+    result["source_sha256"] = hashlib.sha256((root / "ArtSource" / "HealthPickup.blend").read_bytes()).hexdigest()
+    result["fbx_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    manifest = {"generator": "Tools/Assets/build_assets.py health-pickup", "blender": bpy.app.version_string,
+                "axis": "Unity (X,Y,Z) -> Blender (X,-Z,Y); FBX -Z forward, Y up; FBX_SCALE_ALL; metres",
+                "provenance": "Original procedural pickup from the existing box helper; no copied meshes or textures",
+                "exports": [result]}
+    (root / "ArtSource" / "health-pickup-export-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(manifest, indent=2))
+
+
 def build_all(root):
     output = []
-    for name in ("LineDriver", "PulseLobber", "ReboundDisc", "PushLens", "Grenade", "StunGun", "LaserSword", "BlinkPickup", "ShieldPickup", "LaserPistol", "LaserShotgun", "LaserSniper", "LaserSMG"):
+    for name in ("LineDriver", "PulseLobber", "ReboundDisc", "PushLens", "Grenade", "StunGun", "LaserSword", "BlinkPickup", "ShieldPickup", "HealthPickup", "LaserPistol", "LaserShotgun", "LaserSniper", "LaserSMG"):
         path = weapon(root, name)
         output.append(verify_asset(path, "weapon"))
     for path in human(root):
@@ -1649,7 +1675,7 @@ def build_all(root):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["fixture", "human", "all", "laser-kit", "weapon-kit", "weapon-specials", "weapon-specials-previews", "weapon-energy", "weapon-energy-previews"])
+    parser.add_argument("mode", choices=["fixture", "human", "all", "laser-kit", "weapon-kit", "weapon-specials", "weapon-specials-previews", "weapon-energy", "weapon-energy-previews", "health-pickup"])
     parser.add_argument("--output-root", required=True, type=Path)
     args = parser.parse_args()
     root = args.output_root.resolve()
@@ -1670,5 +1696,7 @@ if __name__ == "__main__":
         build_weapon_energy(root)
     elif args.mode == "weapon-energy-previews":
         preview_weapon_energy(root)
+    elif args.mode == "health-pickup":
+        build_health_pickup(root)
     else:
         build_all(root)

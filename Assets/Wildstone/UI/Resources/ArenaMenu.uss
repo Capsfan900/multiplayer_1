@@ -5,7 +5,7 @@
 .menu-shade { position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
 .menu-shade--over-match { background-color: rgba(27,30,29,0.35); }
 .menu-scrim { position: absolute; left: 0; top: 0; bottom: 0; width: 1000px; max-width: 100%; -unity-background-image-tint-color: rgba(22,25,24,0.9); -unity-background-scale-mode: stretch-to-fill; }
-.menu-scroll { flex-grow: 1; padding-left: 5%; padding-right: 5%; padding-top: 4%; padding-bottom: 4%; }
+.menu-scroll { flex-grow: 1; padding-left: 5%; padding-right: 5%; padding-top: 3%; padding-bottom: 3%; }
 .menu-scroll .unity-scroll-view__vertical-scroller { width: 16px; min-width: 16px; background-color: rgba(31,35,33,0.94); border-radius: 3px; }
 .menu-scroll .unity-scroller__low-button, .menu-scroll .unity-scroller__high-button { display: none; }
 .menu-scroll .unity-scroller__slider { margin: 0; padding: 0; }
@@ -21,7 +21,7 @@
 .title { font-size: 42px; white-space: normal; -unity-font-style: bold; margin-bottom: 16px; }
 .title.display { font-size: 50px; -unity-font-style: normal; letter-spacing: 1px; }
 .hero { margin-bottom: 2px; }
-.hero-title, .hero-echo { font-size: 80px; -unity-font-style: italic; letter-spacing: 3px; white-space: nowrap; color: rgb(244,241,233); }
+.hero-title, .hero-echo { font-size: 64px; -unity-font-style: italic; letter-spacing: 3px; white-space: nowrap; color: rgb(244,241,233); }
 .hero-echo { position: absolute; left: 6px; top: 6px; color: rgba(233,204,145,0.85); }
 .hero-rule { flex-direction: row; align-items: center; height: 6px; margin: 2px 0 14px 0; }
 .hero-rule__slab { width: 72px; height: 5px; background-color: rgb(233,204,145); }
@@ -79,7 +79,8 @@ Button:disabled { opacity: 0.5; }
 .hud-ammo { font-size: 52px; color: rgb(244,241,233); margin: -8px 0 -8px 0; }
 .hud-ammo__tag { font-size: 13px; letter-spacing: 2px; color: rgba(240,238,230,0.7); margin: 0 0 8px 8px; }
 .hud-items { flex-direction: row; margin-bottom: 6px; }
-.hud-kill-banner { position: absolute; left: 50%; top: 63%; translate: -50% 0; padding: 5px 14px 5px 14px; background-color: rgba(20,24,22,0.62); border-radius: 3px; border-bottom-width: 2px; border-bottom-color: rgb(233,204,145); font-size: 15px; letter-spacing: 2px; -unity-font-style: bold; color: rgb(244,241,233); white-space: nowrap; }
+.hud-map-intro { position: absolute; left: 50%; top: 22%; translate: -50% 0; padding: 8px 26px 8px 26px; background-color: rgba(20,24,22,0.72); border-radius: 3px; border-bottom-width: 2px; border-bottom-color: rgb(233,204,145); font-size: 34px; letter-spacing: 10px; color: rgb(244,241,233); white-space: nowrap; -unity-font-definition: url("project://database/Assets/Wildstone/UI/Fonts/BarlowCondensed-Black.ttf"); }
+.hud-kill-banner { position: absolute; left: 50%; top: 59%; translate: -50% 0; padding: 6px 16px 6px 16px; background-color: rgba(20,24,22,0.8); border-radius: 3px; border-bottom-width: 2px; border-bottom-color: rgb(233,204,145); font-size: 17px; letter-spacing: 2px; -unity-font-style: bold; color: rgb(244,241,233); white-space: nowrap; }
 .hud-item { flex-direction: row; align-items: center; margin: 0 6px 0 0; padding: 4px 9px 4px 5px; background-color: rgba(20,24,22,0.62); border-radius: 2px; }
 .hud-item--empty { opacity: 0.4; }
 .hud-key { min-width: 18px; font-size: 12px; -unity-font-style: bold; -unity-text-align: middle-center; color: rgb(27,31,29); background-color: rgb(233,204,145); padding: 1px 4px; margin-right: 6px; border-radius: 2px; }

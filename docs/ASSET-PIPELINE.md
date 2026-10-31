@@ -169,6 +169,14 @@ open glow envelope shares SignalCyan and leaves the core visible without requiri
 an unsupported transparent material. Native import, ADS/IK, mechanism motion,
 0.6-scale packaged appearance and 30 m readability still need Unity review.
 
+Health pack (2026-10-31, D039): run `build_assets.py health-pickup --output-root .`
+with the audited interpreter to build only `ArtSource/HealthPickup.blend` and
+`Assets/Wildstone/Art/HealthPickup.fbx`. It uses the existing box helper: an ivory
+canister, graphite end caps and a `SignalMint` plus on the top and both faces. The
+Blender re-import check passes at 972 triangles and 0.29 × 0.18 × 0.22 m; hashes are in
+`ArtSource/health-pickup-export-manifest.json`. No other model is rebuilt. Unity maps
+`SignalMint` through the presentation palette like the other `Signal*` accents.
+
 Exit with editable sources, reproducible exports, dependency/provenance records,
 Unity import/rig/collision checks and moving readability evidence. Profile the
 finished slice and busy eight-player build against the rendering/foundation gates.

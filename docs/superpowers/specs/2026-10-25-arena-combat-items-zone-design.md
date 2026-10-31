@@ -366,7 +366,8 @@ per-shot value on each accepted shot (capped at 1), holds for 0.1 s, then decays
 | Laser Shotgun | 5 deg fixed ring | none | none | 0.85 | 0.20 s | 1 (no sights) | 1 |
 
 Head hits. The head is a 0.17 m sphere centred 0.18 m below the capsule top, so it
-drops with slide height. The body hit still selects the target; the hit is a head
+drops with slide height. The body shape is the revision 5 torso box
+([below](#2026-10-31-playtest-fixes-catalog-revision-5-d040)). A body hit still selects the target; the hit is a head
 hit when the ray crosses that sphere before cover. Practice/Unity uses the same
 analytic sphere; Fusion uses a lag-compensated sphere `Hitbox` child ("Head hitbox")
 whose offset follows the authoritative capsule each tick. Only weapons with a
@@ -549,3 +550,76 @@ Acceptance (managed, `CombatRulesTests`):
 - The wire field is covered by the existing `FusionCombatMappingTests` round trip.
 
 Online Photon acceptance and the user's feel check remain open.
+
+### 2026-10-31 health packs (D039)
+
+Requested by the user; the amounts are proposals.
+
+- **Item.** `health`, a pickup like `blink` and `shield`, claimed with the same host
+  pickup action and checks (living avatar, generation, availability, 2.5 m reach,
+  line of sight).
+- **Effect.** Health rises by `WeaponCatalog.HealthPack` (50, proposed) up to
+  `WeaponCatalog.Health` (100). Shield is untouched. There is no other health
+  regeneration; death still resets health on respawn.
+- **Full health.** The claim is rejected ("Health full."), the pack keeps its
+  generation and stays available, as with a full consumable slot.
+- **Respawn.** The shared 15 s `PickupSeconds`.
+- **Placement.** Four per arena (map revision 6), owned by the
+  [map spec](2026-10-25-wildstone-modern-map-design.md).
+- **Network.** The item travels in the existing pickup state; no new wire fields.
+  Map revision 6 makes peers on older builds refuse the map.
+- **Tests.** `CombatRulesTests.HealthPackRestoresUpToFullHealth` (20 → 70, 70 → 100)
+  and `FullHealthLeavesTheHealthPackInPlace`.
+
+Playtest feel, the heal amount and the respawn time remain open.
+
+### 2026-10-31 playtest fixes (catalog revision 5, D040)
+
+The user asked for the root-cause fixes in
+[PLAYTEST-FIX-LATER](../../PLAYTEST-FIX-LATER.md) to be implemented. Every number
+below is a builder proposal for the user to tune
+([D040](../../DECISIONS.md)). Rewind and RPC windows are in the
+[foundation spec](2026-10-25-multiplayer-foundation-design.md).
+
+- **Hit shape (items 2, 4, 11).** Both worlds use one shape: the head sphere above,
+  and below it a torso box 0.27 m in half-width (`CombatRules.BodyHalfWidth`),
+  turned with the avatar's yaw. The box runs from the feet to the bottom of the head
+  sphere (`CombatRules.BodyTop`, 1.45 m standing, 0.55 m sliding). A ray past the
+  ear, or beside the torso, now misses.
+  - Fusion resizes the body `Hitbox` from the authoritative capsule height each tick.
+  - In Practice, a ray that crosses the 0.4 m motor capsule must also cross the box
+    or the head sphere, or it passes through.
+  - Sphere sweeps (travelling projectiles) still use the capsule.
+- **Scoped accuracy (item 8).** A scoped weapon's ADS factor is
+  `ads / ScopeThreshold` (0.9), clamped to 1. The sniper is exact as soon as the
+  scope overlay shows; before that it keeps its no-scope cone.
+- **Early semi-automatic press (item 8).** The client holds a press made up to
+  `FireBufferSeconds` (0.2 s) before its expected ready tick and sends it once, at
+  ready. An earlier press is sent as before, and the host refuses it. A weapon
+  switch, a new life or a menu clears the held press. The host cooldown stays
+  final. Predicting the local shot cosmetics is still open.
+- **Blink (item 9).** The host uses the horizontal part of the aim, so looking up
+  or down still lands up to 6 m ahead. Aiming straight up or down is refused, and
+  the charge is kept. The prompt and refusal cue are in the
+  [UI spec](2026-10-25-ui-gameflow-design.md).
+- **Special ammo (item 10).** A special weapon pickup gives `SpecialMagazines` (2)
+  magazines as one count (`WeaponCatalog.PickupAmmo`), so the sniper gets 12 and
+  the SMG 64. There is still no reserve and no special reload. Picking up the same
+  weapon refills it to that count. `CombatRules.ValidPlayer` bounds `SpecialAmmo`
+  by `PickupAmmo`. The starter and grenades are unchanged. Catalog revision 5 makes
+  peers on older builds refuse snapshots.
+- **Pickup reach (item 3).** The client prompts and chooses a pickup within
+  `PickupReach` (2.5 m) of its predicted feet. The host accepts an extra
+  `PickupLagMargin` (0.5 m), because its copy of a running player trails by about
+  a round trip.
+- **Tests.**
+  - `CombatRulesTests`:
+    - `TorsoBoxStopsUnderTheHeadAndTurnsWithTheAvatar`
+    - `BlinkFollowsTheHorizontalAim`
+    - `HostAcceptsAPickupWithinTheLagMargin`
+    - scope-threshold asserts in `AdsTightensEveryConeAndOnlyTheScopedSniperIsExact`
+    - two-magazine pickup and restore in `LaserPickupEquipsFiniteSpecialAndRejectsOverfullSnapshot`
+  - `CombatWorldTests.NativeRaysUseTheOnlineTorsoAndHeadInsideTheCapsule`
+  - `PracticeInputTests.EarlySemiAutomaticPressFiresOnceAtReady`
+
+Hit feel, the window size, the buffer length and the ammo count all need playtest.

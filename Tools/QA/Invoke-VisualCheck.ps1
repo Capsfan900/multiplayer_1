@@ -15,7 +15,7 @@ $arguments=@('-batchmode','-force-d3d11','-screen-fullscreen','0','-screen-width
     '-logFile',('"'+$log+'"'),'--wildstone-visual-output',('"'+$run+'"'))
 # Batch-mode players run without audio: the music check runs a normal (muted) player so streaming can be asserted.
 if($Music){$arguments=@($arguments|Where-Object {$_ -ne '-batchmode'})+'--wildstone-music-check'}
-$expectedCaptures=if($Firefight){56}elseif($Sequence){32}elseif($Weapons){35}elseif($Motion){13}elseif($Music){5}else{16}
+$expectedCaptures=if($Firefight){67}elseif($Sequence){32}elseif($Weapons){35}elseif($Motion){13}elseif($Music){5}else{16}
 if($Sequence){$arguments+='--wildstone-sequence-check'}
 if($Motion){$arguments+='--wildstone-motion-check'}
 if($Weapons){$arguments+='--wildstone-weapon-check'}
@@ -44,6 +44,7 @@ try {
     if($Firefight){
         $previous=$null
         foreach($capture in $status.captures){
+            if($capture.stage -match '^range-(15|30|45)m$'){$previous=$null;continue}
             # Ages come from the real unscaled effect clock: within one frame of nominal and rising through each sequence.
             if([Math]::Abs($capture.simulatedSeconds-$capture.simulatedFrame/60.0) -gt (1/60.0+.002)){throw "Firefight sample $($capture.stage) $($capture.simulatedFrame) is more than a frame off its nominal age."}
             if($previous -and $previous.stage -eq $capture.stage -and $capture.simulatedSeconds -le $previous.simulatedSeconds){throw "Firefight sample $($capture.stage) $($capture.simulatedFrame) does not advance."}

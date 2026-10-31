@@ -16,6 +16,7 @@ namespace Wildstone.Tests
         PresentationCatalog catalog;
         CombatState player;
         MotorState motor;
+        FirstPersonView aimView;
         [SetUp] public void Setup()
         {
             catalog=Resources.Load<PresentationCatalog>("WildstonePresentation");
@@ -31,9 +32,16 @@ namespace Wildstone.Tests
         [TearDown] public void Cleanup()
         {
             view.Teardown(camera);
+            if(aimView!=null) Object.DestroyImmediate(aimView.gameObject);
             Object.DestroyImmediate(view.gameObject); Object.DestroyImmediate(camera.gameObject);
         }
         void Step(float dt=.016f,bool reduced=false) => view.Present(player,catalog,in motor,10,dt,reduced);
+        // One rendered frame as the game runs it: mouse -> FirstPersonView (aim and camera punch) -> weapon.
+        void Frame(Vector2 mouse,float dt=.016f)
+        {
+            if(aimView==null) { aimView=new GameObject("Aim view",typeof(FirstPersonView)).GetComponent<FirstPersonView>(); aimView.OwnsLocalView=true; aimView.ViewCamera=camera; }
+            aimView.SampleLook(mouse); aimView.RenderFrame(motor,dt); view.SyncProjection(camera,aimView); Step(dt);
+        }
         Transform Find(string name) => GripAttachment.Find(camera.transform,name);
         Transform Pivot => Find("Weapon pivot");
         Transform Model => Pivot.GetChild(Pivot.childCount-1);
@@ -326,6 +334,46 @@ namespace Wildstone.Tests
             Assert.That(Glow(),Is.GreaterThan(1.15f).And.LessThan(flare),"Heat outlasts the recoil flare.");
             Step(3); Step(.016f);
             Assert.That(Glow(),Is.EqualTo(1).Within(.02f),"Cools back to the authored glow.");
+        }
+        // A shot tips the camera in one frame; sway once read that as a fast mouse flick and the weapon bounced.
+        [Test] public void ShotCameraPunchWithoutMouseInputLeavesSwayAtZero()
+        {
+            Frame(Vector2.zero);
+            var rest=Pivot.localPosition;
+            aimView.AddRecoil(WeaponView.ViewPunch(WeaponKind.LaserSniper));
+            view.Play(new CombatEvent(CombatEventKind.Shot,new CombatAction { Participant=1 },10),1);
+            for(int i=0;i<40;i++)
+            {
+                Frame(Vector2.zero);
+                if(i==0) Assert.That(Quaternion.Angle(camera.transform.rotation,Quaternion.identity),Is.GreaterThan(.5f),"The shot tipped the camera.");
+                Assert.That(Pivot.localPosition.x,Is.EqualTo(rest.x).Within(1e-6f),"frame "+i);
+                Assert.That(Pivot.localPosition.y,Is.EqualTo(rest.y).Within(1e-6f),"frame "+i);
+            }
+        }
+        // Critically damped: after a flick the weapon eases back to rest and never swings past it or rebounds.
+        [Test] public void MouseFlickSettlesWithoutOvershoot()
+        {
+            Frame(Vector2.zero);
+            var rest=Pivot.localPosition;
+            var x=new System.Collections.Generic.List<float>(); var y=new System.Collections.Generic.List<float>();
+            for(int i=0;i<130;i++)
+            {
+                Frame(i<10?new Vector2(3,-2):Vector2.zero);
+                x.Add(Pivot.localPosition.x-rest.x); y.Add(Pivot.localPosition.y-rest.y);
+            }
+            AssertSettles(x,"yaw"); AssertSettles(y,"pitch");
+        }
+        static void AssertSettles(System.Collections.Generic.List<float> path,string axis)
+        {
+            int peak=0;
+            for(int i=0;i<path.Count;i++) if(Mathf.Abs(path[i])>Mathf.Abs(path[peak])) peak=i;
+            Assert.That(Mathf.Abs(path[peak]),Is.GreaterThan(.001f),axis+" sway answers the flick.");
+            for(int i=peak+1;i<path.Count;i++)
+            {
+                Assert.That(path[i]*path[peak],Is.GreaterThanOrEqualTo(-1e-8f),axis+" swung past rest at frame "+i);
+                Assert.That(Mathf.Abs(path[i]),Is.LessThanOrEqualTo(Mathf.Abs(path[i-1])+3e-7f),axis+" rebounded at frame "+i);
+            }
+            Assert.That(Mathf.Abs(path[path.Count-1]),Is.LessThan(1e-4f),axis+" settled.");
         }
     }
 }

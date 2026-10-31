@@ -239,6 +239,20 @@ namespace Wildstone.Tests
             var view=body.AddComponent<FirstPersonView>(); view.OwnsLocalView=true; view.SampleLook(new Vector2(20,5));
             Assert.That(view.Yaw,Is.EqualTo(20)); Assert.That(view.Pitch,Is.EqualTo(-5));
         }
+        [Test] public void StunSuppressionLiftsAtItsEndTickWithoutAHostUpdate()
+        {
+            motor.RestoreState(Air()); motor.SetSuppressed(true,2);
+            motor.Simulate(Command(0,MotorButtons.None,Vector2.up),Dt,0);
+            motor.Simulate(Command(1,MotorButtons.None,Vector2.up),Dt,1);
+            Assert.That(motor.CaptureState().Suppressed,Is.True);
+            Assert.That(motor.CaptureState().Velocity.z,Is.Zero);
+            motor.Simulate(Command(2,MotorButtons.None,Vector2.up),Dt,2);
+            Assert.That(motor.CaptureState().Suppressed,Is.False);
+            Assert.That(motor.CaptureState().SuppressedUntil,Is.Zero);
+            Assert.That(motor.CaptureState().Velocity.z,Is.GreaterThan(0));
+            motor.SetSuppressed(false,9);
+            Assert.That(motor.CaptureState().SuppressedUntil,Is.Zero,"Only an active suppression carries a lift tick");
+        }
         [Test] public void ReplayingOrPresentingRemoteEventsCannotDuplicateLocalFeedback()
         {
             var view=body.AddComponent<FirstPersonView>(); view.OwnsLocalView=true; int count=0;

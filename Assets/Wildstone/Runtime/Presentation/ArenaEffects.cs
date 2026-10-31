@@ -14,7 +14,9 @@ namespace Wildstone.Presentation
         readonly float[] burstEnds=new float[BurstCapacity];
         readonly float[] burstStarts=new float[BurstCapacity],burstWidths=new float[BurstCapacity],burstRadii=new float[BurstCapacity];
         readonly Vector3[] burstCenters=new Vector3[BurstCapacity],burstNormals=new Vector3[BurstCapacity];
-        readonly bool[] expanding=new bool[BurstCapacity];
+        readonly bool[] expanding=new bool[BurstCapacity],sweeping=new bool[BurstCapacity];
+        readonly Quaternion[] burstRotations=new Quaternion[BurstCapacity];
+        readonly Color[] burstColors=new Color[BurstCapacity];
         readonly PresentationActionKey[] contextIds=new PresentationActionKey[512];
         readonly WeaponKind[] contextWeapons=new WeaponKind[512];
         readonly Vector3[] contextDirections=new Vector3[512];
@@ -32,6 +34,9 @@ namespace Wildstone.Presentation
         // item respawns, so an ivory weapon over ivory stone reads from across the court.
         public const int PickupRingPoints=40;
         public const float PickupRingRadius=.6f;
+        // Health packs read at 10 m: a larger canister on a wider mint ring (proposal, judged by capture).
+        public const float ZoneCurtainAlpha=.55f;
+        public const float HealthPickupScale=1.8f, PickupRingWidth=.11f, HealthRingWidth=.2f;
         readonly List<LineRenderer> pickupRings=new List<LineRenderer>(),pickupTracks=new List<LineRenderer>();
         readonly List<Material> pickupMaterials=new List<Material>();
         readonly LineRenderer[] shields=new LineRenderer[8];
@@ -48,8 +53,12 @@ namespace Wildstone.Presentation
         // Stun halo painted solid (premultiplied) like the pickup rings: the additive green washed out on ivory.
         Material stunPaint;
         public const int StunPoints=16;
-        Transform zoneDecal, zoneCurtain, zoneBeacon;
-        Material zoneDecalMaterial, zoneCurtainMaterial, zoneBeaconMaterial;
+        // Hot zone: a floor decal (hex fill, hue ring and a dark track band) plus a curtain and beacon painted solid
+        // (premultiplied, like the pickup rings) over a taller or wider dark copy, so ivory stone and bright sky cannot
+        // wash them out the way they did the additive grey.
+        public const float ZoneTrack=.5f, ZoneBeaconRadius=.5f, ZoneShade=1.5f;
+        Transform zoneDecal, zoneCurtain, zoneBeacon, zoneCurtainShade, zoneBeaconShade;
+        Material zoneDecalMaterial, zoneCurtainMaterial, zoneBeaconMaterial, zoneShadeMaterial;
         Mesh curtainMesh;
         Vector3 lastZone;
         float moteClock;
@@ -104,6 +113,7 @@ namespace Wildstone.Presentation
                 if(prefab==null) throw new ArgumentException("Missing pickup model: "+pickup.Item);
                 var model=Instantiate(prefab,transform);
                 model.name="Pickup "+pickup.Id+" "+pickup.Item;
+                if(pickup.Item=="health") model.transform.localScale*=HealthPickupScale;
                 pickupModels.Add(model);
             }
             stunPaint=new Material(sheath) { name="Stun halo",renderQueue=sheath.renderQueue+1 };
@@ -119,11 +129,18 @@ namespace Wildstone.Presentation
             vfx.Build(assets);
             if(assets.ZoneDecal==null || assets.ZoneCurtain==null) throw new ArgumentException("Missing hot zone materials.");
             zoneDecalMaterial=new Material(assets.ZoneDecal) { name="Hot zone decal" };
+            zoneDecalMaterial.SetFloat("_Track",ZoneTrack);
             zoneCurtainMaterial=new Material(assets.ZoneCurtain) { name="Hot zone curtain" };
             zoneBeaconMaterial=new Material(assets.ZoneCurtain) { name="Hot zone beacon" };
+            // The dark band queues just before its hue, like the beam sheath under the glow; it carries no energy noise.
+            zoneShadeMaterial=new Material(assets.ZoneCurtain) { name="Hot zone shade",renderQueue=assets.ZoneCurtain.renderQueue-1 };
+            zoneShadeMaterial.SetColor("_BaseColor",new Color(0,.02f,.06f,.35f));
+            zoneShadeMaterial.SetVector("_NoiseParams",new Vector4(0,1,1,0));
             curtainMesh=CreateCurtain(48);
             zoneDecal=Shape("Hot zone floor",Resources.GetBuiltinResource<Mesh>("Cube.fbx"),zoneDecalMaterial);
+            zoneCurtainShade=Shape("Hot zone curtain shade",curtainMesh,zoneShadeMaterial);
             zoneCurtain=Shape("Hot zone curtain",curtainMesh,zoneCurtainMaterial);
+            zoneBeaconShade=Shape("Hot zone beacon shade",curtainMesh,zoneShadeMaterial);
             zoneBeacon=Shape("Hot zone beacon",curtainMesh,zoneBeaconMaterial);
             if(assets.ShieldShell!=null)
                 for(int i=0;i<shells.Length;i++)
@@ -136,13 +153,13 @@ namespace Wildstone.Presentation
             {
                 var item=match.Pickups[i].Item;
                 var kind=WeaponCatalog.FromPickup(item);
-                var source=item=="blink"?assets.Blink:item=="shield"?assets.Shield:MaterialFor(kind);
+                var source=item=="blink"?assets.Blink:item=="shield"?assets.Shield:item=="health"?assets.Health:MaterialFor(kind);
                 // Painted in the item's hue (premultiplied, like the beam sheath): additive glow washed out to white on ivory.
                 var tint=Tint(kind,source); float peak=Mathf.Max(tint.r,Mathf.Max(tint.g,tint.b));
                 var paint=new Material(sheath) { name="Pickup ring "+item,renderQueue=sheath.renderQueue+1 };
                 paint.SetColor("_BaseColor",new Color(tint.r/peak*1.15f,tint.g/peak*1.15f,tint.b/peak*1.15f,1));
                 pickupMaterials.Add(paint);
-                var ring=Line("Pickup ring "+match.Pickups[i].Id,paint,.11f);
+                var ring=Line("Pickup ring "+match.Pickups[i].Id,paint,item=="health"?HealthRingWidth:PickupRingWidth);
                 var track=Line("Pickup track "+match.Pickups[i].Id,sheath,.3f);
                 track.loop=true; track.positionCount=PickupRingPoints;
                 pickupRings.Add(ring); pickupTracks.Add(track);
@@ -246,7 +263,8 @@ namespace Wildstone.Presentation
             line.loop=false;
             line.enabled=true;
             burstStarts[index]=Time.unscaledTime; burstEnds[index]=burstStarts[index]+seconds;
-            burstWidths[index]=width; expanding[index]=false;
+            burstWidths[index]=width; expanding[index]=false; sweeping[index]=false;
+            line.startColor=line.endColor=Color.white; line.textureMode=LineTextureMode.Stretch;
             return line;
         }
         public void Play(in CombatEvent e,ArenaMatch match,bool reducedMotion,Vector3 departure,IReadOnlyList<CombatEvent> events = null,Vector3? muzzle=null)
@@ -301,8 +319,18 @@ namespace Wildstone.Presentation
                     }
                     else if(e.Weapon==WeaponKind.LaserSword)
                     {
-                        Arc(e.Position,e.Vector,2.1f,catalog.Beam,reducedMotion?.12f:.3f,.20f);
-                        if(!reducedMotion) Arc(e.Position,e.Vector,1.7f,brightCore,.06f,.13f);
+                        if(catalog.VfxBlade!=null)
+                        {
+                            // 1 m from the eye, in front of a struck target (which would hide it); the mask fills only the
+                            // middle of the ribbon, so .38 m reads as a ~9 degree blade.
+                            Arc(e.Position,e.Vector,1f,catalog.VfxBlade,reducedMotion?.06f:.38f,.20f,!reducedMotion,reducedMotion?40:65);
+                            if(!reducedMotion) Arc(e.Position,e.Vector,1f,brightCore,.04f,.20f,true);
+                        }
+                        else
+                        {
+                            Arc(e.Position,e.Vector,2.1f,catalog.Beam,reducedMotion?.12f:.3f,.20f);
+                            if(!reducedMotion) Arc(e.Position,e.Vector,1.7f,brightCore,.06f,.13f);
+                        }
                     }
                     else
                     {
@@ -542,15 +570,33 @@ namespace Wildstone.Presentation
         }
         // A crescent, full width mid-swing and pointed at both tips, so the swing reads as a slash rather than a wire.
         static readonly AnimationCurve Crescent=new AnimationCurve(new Keyframe(0,0),new Keyframe(.5f,1),new Keyframe(1,0));
-        void Arc(Vector3 eye,Vector3 direction,float radius,Material material,float width,float life)
+        void Arc(Vector3 eye,Vector3 direction,float radius,Material material,float width,float life,bool sweep=false,float halfAngle=65)
         {
-            var line=Burst(material,width,life); line.positionCount=17; line.widthCurve=Crescent;
+            var line=Burst(material,width,life); line.widthCurve=Crescent;
             direction=direction.sqrMagnitude>.001f?direction.normalized:Vector3.forward;
             Quaternion rotation=Quaternion.LookRotation(direction,Mathf.Abs(direction.y)<.95f?Vector3.up:Vector3.right);
-            for(int i=0;i<17;i++)
+            int slot=(burstIndex-1)%BurstCapacity;
+            if(material==catalog.VfxBlade) line.startColor=line.endColor=catalog.Beam.GetColor("_BaseColor");
+            if(sweep)
             {
-                float angle=Mathf.Lerp(-65,65,i/16f)*Mathf.Deg2Rad;
-                line.SetPosition(i,eye+rotation*new Vector3(Mathf.Sin(angle)*radius,-.22f+Mathf.Sin(angle)*.24f,Mathf.Cos(angle)*radius));
+                sweeping[slot]=true; burstCenters[slot]=eye; burstRotations[slot]=rotation; burstRadii[slot]=radius;
+                burstColors[slot]=line.startColor;
+            }
+            DrawArc(line,eye,rotation,radius,halfAngle,sweep?.08f:1,material==brightCore && sweep);
+        }
+        static void DrawArc(LineRenderer line,Vector3 eye,Quaternion rotation,float radius,float halfAngle,float reveal,bool core)
+        {
+            // The core hugs the forward edge of the smear rather than forming a second inner swing.
+            // Drawn from the swing's front back to its start: the blade mask's bright head leads and its tail trails.
+            // Heights scale with the radius, so any radius keeps the 2.1 m design's angles.
+            int count=Mathf.Clamp(Mathf.CeilToInt(16*reveal)+1,2,17);
+            line.positionCount=count;
+            float k=radius/2.1f;
+            for(int i=0;i<count;i++)
+            {
+                float t=reveal*i/(count-1f), angle=Mathf.Lerp(-halfAngle,halfAngle,t)*Mathf.Deg2Rad;
+                float edge=core?.20f*Mathf.Sin(t*Mathf.PI):0;
+                line.SetPosition(count-1-i,eye+rotation*new Vector3(Mathf.Sin(angle)*radius,(-.22f+Mathf.Sin(angle)*.24f+edge)*k,Mathf.Cos(angle)*radius));
             }
         }
         void Cross(Vector3 center,Material material,float size)
@@ -721,6 +767,10 @@ namespace Wildstone.Presentation
             }
             PresentZone(match,reducedMotion,captor??match.Captor,contested??match.Contested);
         }
+        // Contested stays warm; an owned zone wears its captor's team tint (the HUD arrow's, so world and HUD agree); an idle
+        // one is a saturated accent that is no team hue or the danger orange, so it cannot read as grey stone.
+        public Color ZoneColor(int captor,bool contested) =>
+            contested?Tint(WeaponKind.None,catalog.ZoneContested):captor>=0?Wildstone.UI.ArenaHud.TeamTints[Math.Min(3,captor)]:Tint(WeaponKind.None,catalog.ZoneIdle);
         void PresentZone(ArenaMatch match,bool reducedMotion,int captor,bool contested)
         {
             var center=match.ZonePosition;
@@ -729,27 +779,35 @@ namespace Wildstone.Presentation
             var travel=center-lastZone; travel.y=0;
             bool moving=travel.sqrMagnitude>.000001f && travel.sqrMagnitude<1;
             lastZone=center;
-            var state=contested?catalog.ZoneContested:captor>=0?catalog.ZoneOwned:catalog.ZoneIdle;
-            var color=Tint(WeaponKind.None,state);
+            var color=ZoneColor(captor,contested);
             float now=Time.unscaledTime, clock=reducedMotion?0:now;
-            float diameter=MovingZone.Radius*2;
+            // The box holds the zone disc plus the dark track band just outside its rim (ProjectedDecal _Track).
+            float diameter=(MovingZone.Radius+ZoneTrack)*2;
             zoneDecal.gameObject.SetActive(true);
             zoneDecal.SetPositionAndRotation(center+Vector3.up*.2f,Quaternion.identity);
             zoneDecal.localScale=new Vector3(diameter,MovingZone.FloorTolerance*2+.6f,diameter);
-            zoneDecalMaterial.SetColor("_BaseColor",color*.9f);
-            zoneDecalMaterial.SetColor("_RimColor",color*1.3f);
+            zoneDecalMaterial.SetColor("_BaseColor",color);
+            zoneDecalMaterial.SetColor("_RimColor",Color.Lerp(color,Color.white,.3f));
             zoneDecalMaterial.SetFloat("_Clock",clock);
             zoneDecalMaterial.SetFloat("_Pulse",contested && !reducedMotion?1:0);
             if(moving) zoneDecalMaterial.SetVector("_Travel",new Vector4(travel.normalized.x,travel.normalized.z,1,0));
+            float height=contested?2.6f:1.8f;
+            zoneCurtainShade.gameObject.SetActive(true);
+            zoneCurtainShade.SetPositionAndRotation(center-Vector3.up*(ZoneShade-1)*.4f*height,Quaternion.identity); // band centres line up
+            zoneCurtainShade.localScale=new Vector3(MovingZone.Radius,height*ZoneShade,MovingZone.Radius);
             zoneCurtain.gameObject.SetActive(true);
             zoneCurtain.SetPositionAndRotation(center,Quaternion.identity);
-            zoneCurtain.localScale=new Vector3(MovingZone.Radius,contested?2.6f:1.8f,MovingZone.Radius);
-            zoneCurtainMaterial.SetColor("_BaseColor",color*(contested?.55f+.25f*Mathf.Sin(clock*12):.4f));
-            zoneCurtainMaterial.SetVector("_NoiseParams",new Vector4(.6f,6,1,clock*.08f));
+            zoneCurtain.localScale=new Vector3(MovingZone.Radius,height,MovingZone.Radius);
+            // Partly see-through, so a player standing behind the boundary still reads; the floor disc carries the colour.
+            zoneCurtainMaterial.SetColor("_BaseColor",new Color(color.r,color.g,color.b,contested?.45f+.2f*Mathf.Sin(clock*12):ZoneCurtainAlpha));
+            zoneCurtainMaterial.SetVector("_NoiseParams",new Vector4(.35f,6,1,clock*.08f));
+            zoneBeaconShade.gameObject.SetActive(true);
+            zoneBeaconShade.SetPositionAndRotation(center,Quaternion.identity);
+            zoneBeaconShade.localScale=new Vector3(ZoneBeaconRadius*ZoneShade,60,ZoneBeaconRadius*ZoneShade);
             zoneBeacon.gameObject.SetActive(true);
             zoneBeacon.SetPositionAndRotation(center,Quaternion.identity);
-            zoneBeacon.localScale=new Vector3(.22f,60,.22f);
-            zoneBeaconMaterial.SetColor("_BaseColor",color*.5f);
+            zoneBeacon.localScale=new Vector3(ZoneBeaconRadius,60,ZoneBeaconRadius);
+            zoneBeaconMaterial.SetColor("_BaseColor",new Color(color.r,color.g,color.b,1));
             zoneBeaconMaterial.SetVector("_NoiseParams",new Vector4(0,1,1,0));
             if(!reducedMotion)
             {
@@ -786,6 +844,15 @@ namespace Wildstone.Presentation
                 if(line==null || !line.enabled) continue;
                 if(now>=burstEnds[i]) { line.enabled=false; continue; }
                 float age=Mathf.Clamp01((now-burstStarts[i])/Mathf.Max(.001f,burstEnds[i]-burstStarts[i]));
+                if(sweeping[i])
+                {
+                    float elapsed=Mathf.Max(0,now-burstStarts[i]);
+                    float fade=1-Mathf.Clamp01((elapsed-.07f)/.13f);
+                    line.widthMultiplier=burstWidths[i];
+                    var color=burstColors[i]; color.a*=fade; line.startColor=line.endColor=color;
+                    DrawArc(line,burstCenters[i],burstRotations[i],burstRadii[i],65,Mathf.Clamp(elapsed/.055f,.08f,1),line.sharedMaterial==brightCore);
+                    continue;
+                }
                 line.widthMultiplier=burstWidths[i]*(1-age)*(1-age);
                 if(!expanding[i]) continue;
                 Quaternion rotation=Quaternion.FromToRotation(Vector3.up,burstNormals[i]);
@@ -828,7 +895,7 @@ namespace Wildstone.Presentation
         {
             if(octahedron!=null) Destroy(octahedron);
             if(curtainMesh!=null) Destroy(curtainMesh);
-            foreach(var material in new[] { zoneDecalMaterial,zoneCurtainMaterial,zoneBeaconMaterial }) if(material!=null) Destroy(material);
+            foreach(var material in new[] { zoneDecalMaterial,zoneCurtainMaterial,zoneBeaconMaterial,zoneShadeMaterial }) if(material!=null) Destroy(material);
             if(brightCore!=null) Destroy(brightCore);
             if(sheath!=null) Destroy(sheath);
             if(stunPaint!=null) Destroy(stunPaint);

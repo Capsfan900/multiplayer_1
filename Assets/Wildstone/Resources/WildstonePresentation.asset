@@ -32,6 +32,7 @@ MonoBehaviour:
   - {fileID: 2102311419967794915, guid: 11e20ac33f6515e43874fb9ea2c5f9a2, type: 3}
   BlinkPickup: {fileID: 2217181803577540101, guid: 44b2febc52e7eed408f27b08e812fc55, type: 3}
   ShieldPickup: {fileID: 3498973480606926337, guid: 488c39071d34d514bbcc8a498451692c, type: 3}
+  HealthPickup: {fileID: 186389966337630244, guid: 816563427e680be40b9fd93541164656, type: 3}
   Beam: {fileID: 2100000, guid: 5927a69e6451452449a7c336e494cf10, type: 2}
   Pulse: {fileID: 2100000, guid: 608fe6118ff3fc64c9a672513b9f5290, type: 2}
   Disc: {fileID: 2100000, guid: c28287f2a22a71640a2e4a119ee0e6d2, type: 2}
@@ -39,10 +40,12 @@ MonoBehaviour:
   Stun: {fileID: 2100000, guid: ccb878088f1c3314982669df284edcb6, type: 2}
   Blink: {fileID: 2100000, guid: 026e62631e79b0248a47f084433dbdc0, type: 2}
   Shield: {fileID: 2100000, guid: 58acefdf12a0d4a469a85ccf146ea81b, type: 2}
+  Health: {fileID: 2100000, guid: 0fa8b1c3227567342ad3d7d0fe78ffb2, type: 2}
   Danger: {fileID: 2100000, guid: 7f78030a2ef9b1f4d8c8f0b9cef63ea6, type: 2}
   ZoneIdle: {fileID: 2100000, guid: 60fa332407c969847a53bddd2e19410d, type: 2}
   ZoneOwned: {fileID: 2100000, guid: adfe90b650259a147aa41c98cf00c46a, type: 2}
   ZoneContested: {fileID: 2100000, guid: 0313a9803e290db499320976b9a3fa2d, type: 2}
+  VfxBlade: {fileID: 2100000, guid: e4bc2e837bc939341bdb6464a3b34b4f, type: 2}
   VfxSpark: {fileID: 2100000, guid: 3bd4b420762c89848a1322124f516715, type: 2}
   VfxGlow: {fileID: 2100000, guid: 1604c3159c6bcfa43b24a7d2104e2501, type: 2}
   VfxFire: {fileID: 2100000, guid: 99e3ba2859edd83418ca30edda9d611a, type: 2}

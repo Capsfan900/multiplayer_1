@@ -23,7 +23,7 @@ namespace Wildstone.Tests
         {
             var metadata = Attribute.GetCustomAttribute(typeof(FusionMotorState), typeof(NetworkStructWeavedAttribute)) as NetworkStructWeavedAttribute;
             Assert.That(metadata, Is.Not.Null, "Fusion must weave the movement wire assembly");
-            Assert.That(metadata.WordCount, Is.EqualTo(99));
+            Assert.That(metadata.WordCount, Is.EqualTo(100));
         }
 
         [Test]
@@ -31,7 +31,7 @@ namespace Wildstone.Tests
         {
             var metadata = Attribute.GetCustomAttribute(typeof(FusionPlayer), typeof(NetworkBehaviourWeavedAttribute)) as NetworkBehaviourWeavedAttribute;
             Assert.That(metadata, Is.Not.Null, "Fusion must weave the player behaviour");
-            Assert.That(metadata.WordCount, Is.EqualTo(105));
+            Assert.That(metadata.WordCount, Is.EqualTo(106));
         }
     }
 }
