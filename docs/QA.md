@@ -6,6 +6,65 @@ separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
 
+### 2026-10-31 current-state public preview release
+
+User-requested [Better Bean Battles preview](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261031-190bb5e)
+of the latest work, so playtests stop using the 2026-10-30 preview. It adds health packs
+([D039](#2026-10-31-health-packs-d039)), the [playtest fixes (D040)](#2026-10-31-playtest-fixes-d040)
+and the [zone waypoint chip](#2026-10-31-zone-waypoint-chip) to
+[`07d8cc8`](#2026-10-30-current-state-public-preview-release).
+
+- Snapshot: `capture.py` from that release copied 1,881 nonignored files from this
+  checkout at `fca428e` plus its uncommitted work, with source/copy SHA-256 equality at
+  `2026-10-31T14:10:06Z`. An empty stray `untitled.md` was left out. Game source
+  commit: `190bb5eb454dd5828248134ad240e406fe6196ee`, on top of `25e6943` (the
+  2026-10-30 release record). This checkout's files, index and branch were not changed.
+- Build root: `D:/WildstoneBuilds/release-20261031-100938/source`, a clone of the
+  2026-10-30 release checkout with its Unity `Library` copied to skip a fresh import.
+  Existing public Photon app settings copied separately (same SHA-256 as here); local
+  service credentials excluded.
+- Command: `./Tools/Unity/Invoke-Unity.ps1 -Action BuildWindows -TimeoutMinutes 30`,
+  `WILDSTONE BUILD OK`; log `Artifacts/Unity/BuildWindows-20261031-101034-731.log` under
+  that build root. The tracked tree stayed clean after the build.
+- Against the local `b563bab3…` playable build, 192 of 200 files are identical. The 8
+  that differ are build-stamped or compiled per project path: `boot.config`,
+  `globalgamemanagers`, `resources.assets`, the Burst library and four managed DLLs
+  (`Wildstone.Runtime.dll`: same size, 220 bytes differ). Content identity
+  `36fd444d…`.
+- Fresh headless startup stayed alive for 15 seconds with zero exception/assertion
+  matches (`startup-result.json` beside the build root).
+- `BetterBeanBattles-Windows-x64-preview-20261031-190bb5e.zip`: 75122208 bytes, 200
+  files, ZIP CRC passed, Unity backup/debug folders excluded. SHA-256:
+  `dfbf6d6e8d103666abaa72803baae0862d4918463597c5c3c2af2f9c68963e09`.
+- Not repeated on this exact build: full suites, captures and Photon runs. They passed
+  on the same game code earlier ([D040](#2026-10-31-playtest-fixes-d040),
+  [waypoint](#2026-10-31-zone-waypoint-chip)). External networks, the two-hour soak and
+  a human playtest remain open.
+
+### 2026-10-30 current-state public preview release
+
+Recorded in release commit `25e6943`; copied here because that record never reached this
+checkout. User-requested [Better Bean Battles preview](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261030-07d8cc8), captured while another agent
+continued authoring. Game source commit: `07d8cc8176c5328f556f008a40a3de2862b78a32`.
+Snapshot: 1865 nonignored files, with source/copy SHA-256 equality
+verified before acceptance at `2026-10-31T02:52:30Z`. Later edits are excluded.
+No live authoring file, index, branch or running Editor was modified by this release
+operation.
+
+- Build root: `D:/WildstoneBuilds/release-20261030-225213/source`.
+- Command: `./Tools/Unity/Invoke-Unity.ps1 -Action BuildWindows -TimeoutMinutes 30`.
+  Unity `6000.5.10f1` succeeded with `WILDSTONE BUILD OK`; log:
+  `Artifacts/Unity/BuildWindows-20261030-225312-389.log` under that build root.
+- Existing public Photon app settings were supplied separately. Ignored local
+  service credentials were excluded; no Host/Join connection was tested here.
+- Fresh headless startup stayed alive for 15 seconds with zero runtime
+  exception/assertion matches.
+- `BetterBeanBattles-Windows-x64-preview-20261030-07d8cc8.zip`: 75098659 bytes, 200 files, ZIP CRC
+  passed. SHA-256: `7f1859522cbea94b406652112430dd5d92044bd5d24579f0b2b74fffcf12825d`.
+  Anonymous download matched that SHA-256 (`public-access-check.json` beside the build root).
+- Full suites, physical-input/visual/listening checks and external-network
+  multiplayer acceptance were not repeated.
+
 ### 2026-10-29 menu backdrop, motion and music (managed only)
 
 `pwsh -File Tools/QA/Compile-Managed.ps1 -Scope All -RunManagedTests` on the

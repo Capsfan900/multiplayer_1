@@ -4,10 +4,13 @@ Updated: 2026-10-31. **Photon-only Windows preview published; full multiplayer M
 Active worktree: `C:\Users\tyler\orca\workspaces\multiplayer_1\mvp-2`, branch `mvp-2`.
 The original project at `C:\Users\tyler\Main Storage\multiplayer_1` remains untouched.
 
-Latest public download: [laser arsenal and first-person polish preview e9e091f](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261028-e9e091f).
-Built from committed snapshot `e9e091f` in `D:/WildstoneBuilds/wildstone-e9e091f`.
-Fresh Windows build, 15-second headless startup, archive integrity and anonymous
-download checks pass. [QA](QA.md) records the failed C: attempt and acceptance limits.
+Latest public download: [Better Bean Battles preview 190bb5e](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261031-190bb5e)
+(2026-10-31). It carries everything in the `b563bab3…` playable build below: health
+packs, the D040 playtest fixes and the zone waypoint. Game sources were frozen from the
+current files into `D:/WildstoneBuilds/release-20261031-100938/source` and built there;
+this checkout stays uncommitted. Players should use this release, not the 2026-10-30
+`07d8cc8` preview. [QA](QA.md#2026-10-31-current-state-public-preview-release) records
+the checks and limits.
 
 The user resumed all tasks and requested GPT-6.1 Sol delegates. We recovered the
 existing authored checkpoint rather than reimplementing it: 194 files were copied
