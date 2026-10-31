@@ -6,6 +6,35 @@ separate evidence levels. The full MVP is not complete.
 
 ## Current observed evidence
 
+### 2026-10-31 feel-pass public preview release
+
+User-requested [Better Bean Battles preview](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261031-31e86da) of `main` at `31e86da`. It adds the
+[feel pass (D041)](#2026-10-31-feel-pass-d041) and the four checkpoint commits to
+[`190bb5e`](#2026-10-31-current-state-public-preview-release). Built with the
+`release-build` skill.
+
+- Snapshot: 1,879 nonignored files from this checkout at
+  `31e86da81beb50d8867a86dbfc7974d38b6be017`, captured `2026-10-31T17:09:09Z` with
+  per-file SHA-256. The capture flagged the tree dirty; the only untracked file, an
+  empty stray `untitled.md`, is not in the snapshot.
+- Build root: `D:/WildstoneBuilds/release-20261031-130855/source`, Unity `Library`
+  copied from the Main Storage checkout. Public Photon app settings included; local
+  service credentials excluded.
+- Command: `./Tools/Unity/Invoke-Unity.ps1 -Action BuildWindows -TimeoutMinutes 30`,
+  passed; log `Artifacts/Unity/BuildWindows-20261031-130909-615.log` under that build
+  root. Content identity `f30ea00d…`.
+- Fresh headless startup stayed alive for 15 seconds with zero exception/assertion
+  matches (`release-startup.log` beside the build root).
+- `BetterBeanBattles-Windows-x64-preview-20261031-31e86da.zip`: 76620307 bytes, 200
+  files, ZIP CRC passed. SHA-256:
+  `fa23d473c8149a3b8579912d3e863b203ebf8935d3d7deec15b2edfad30adbae`.
+- Published as a prerelease on tag `preview-20261031-31e86da` (only the tag was
+  pushed). An anonymous download matched that SHA-256 and the GitHub asset digest
+  (`public-access-check.json` beside the build root, `2026-10-31T17:51:58Z`).
+- Not repeated on this exact build: full suites, captures and Photon runs. They passed
+  on the same game code in the [feel pass](#2026-10-31-feel-pass-d041). External
+  networks, the two-hour soak and a human playtest remain open.
+
 ### 2026-10-31 current-state public preview release
 
 User-requested [Better Bean Battles preview](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261031-190bb5e)

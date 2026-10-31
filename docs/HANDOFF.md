@@ -19,7 +19,11 @@ The original design/pause packet under `docs/handoffs/` remains historical and u
 
 ## Current evidence
 
-- **Resume here (2026-10-31 11:45).** Uncommitted.
+- **Public preview `preview-20261031-31e86da` (2026-10-31 13:52).** The feel pass
+    is published for playtesters: [release](https://github.com/Capsfan900/multiplayer_1/releases/tag/preview-20261031-31e86da),
+    [QA](QA.md#2026-10-31-feel-pass-public-preview-release). Everyone playing online
+    must use the same build.
+- **Resume here (2026-10-31 11:45).** Committed on `main`.
   - **Playable build `80f56a7c…`** (`Artifacts/Unity/Windows/WildstoneArena.exe`,
     not yet played). It adds the D041 feel pass to `b563bab3…`, which is archived.
     Both players must use it: the join token now carries the movement revision.

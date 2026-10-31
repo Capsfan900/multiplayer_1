@@ -7,10 +7,11 @@ remain open. Follow the
 Design documents and concept approvals do not complete implementation stages.
 Acceptance detail belongs in the [canonical specs](README.md), not this checklist.
 
-Delivery checkpoint: current-state game source `190bb5e` (health packs, D040 playtest
-fixes, zone waypoint) is packaged as public preview `preview-20261031-190bb5e` at the
-user's request. [QA](QA.md#2026-10-31-current-state-public-preview-release) records the
-build, checks and limits. Later work and remaining acceptance stages stay open.
+Delivery checkpoint: `main` at `31e86da` (D041 feel pass on top of health packs, D040
+playtest fixes and the zone waypoint) is packaged as public preview
+`preview-20261031-31e86da` at the user's request.
+[QA](QA.md#2026-10-31-feel-pass-public-preview-release) records the build, checks and
+limits. Later work and remaining acceptance stages stay open.
 
 Current work (2026-10-30): user playtest of the D028–D031 quality pass. Its
 integration evidence is complete in [QA](QA.md#2026-10-30-quality-pass-integration-d028d031):
